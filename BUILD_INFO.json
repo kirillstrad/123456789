@@ -1,15 +1,16 @@
 {
-  "build": "ASH_IRON_ITERATION_3A_1",
-  "sourceCommit": "552e4f9236a4360eec4840b067e3f2ec6aee82eb",
+  "build": "ASH_IRON_ITERATION_3A_2",
+  "sourceCommit": "e883003891a2f1282739ed345dc0aef4852f09c2",
   "originalBaseCommit": "c727a02ad98ef0c537484f664777997a2ffc56e0",
   "renderer": "Canvas2D",
   "grid": [
     196,
     140
   ],
-  "status": "3A.1-motion-preview",
+  "status": "3A.2-transition-preview",
   "approved": "Canvas2D migration",
   "rules": "DRAFT_RULES remain provisional",
   "motionBase": "addc11e18d69b084217ca501d40aa419be2d49d3",
-  "desktop": false
+  "desktop": false,
+  "previewBase": "c5c1441a998b4fa2af708065d01613936d66cdaf"
 }

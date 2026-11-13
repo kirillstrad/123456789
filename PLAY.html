@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ASH / IRON — Iteration 3A.1 Motion</title><style>*{box-sizing:border-box}body{margin:0;background:#000;color:#aaa;font:12px/1.7 monospace}main{max-width:1220px;margin:auto;padding:18px}.stage{border:1px solid #282828}canvas{display:block;width:100%;height:auto;outline:none;touch-action:none;cursor:crosshair}.tools{display:flex;gap:8px;flex-wrap:wrap}button{font:11px monospace;background:#080808;color:#aaa;border:1px solid #444;padding:8px;cursor:pointer}button:hover{color:#eee}p{color:#897b6b;font-size:11px}#status{min-height:20px;margin:10px 0;color:#a58d75}section{border-top:1px solid #42362d;margin:15px 0;padding:12px}label{display:flex;gap:10px;margin:10px 0}input{accent-color:#b45344}pre{white-space:pre-wrap}[hidden]{display:none!important}</style><main><div class="stage"><canvas id="game" width="1008" height="864" tabindex="0" aria-label="ASH IRON ASCII game"></canvas></div><div id="status">ASH / IRON — ITERATION 3A.1 / MOTION</div><div class="tools"><button id="menuButton">MENU / ESC</button><button id="restart">RESTART NAVE</button><button id="freeze">FREEZE FRAME</button><button id="export">SAVE FRAME PNG</button><button id="report">SAVE REPORT</button><button id="perfToggle">PERFORMANCE</button></div><section id="settings" hidden><h2>THE EMBER CHAMBER</h2><label>FLOW SPEED<input id="flow" type="range" min="10" max="160" value="32"></label><label>FIRE STRENGTH<input id="power" type="range" min="20" max="140" value="86"></label><label><input id="dim" type="checkbox" checked>DIM BACKGROUND</label><label><input id="fireFreeze" type="checkbox">FREEZE THE FLAME</label><p>192 columns / ASCII fire. Menu settings do not change the 196 x 140 world.</p><button id="settingsClose">CLOSE SETTINGS</button></section><section id="perf" hidden><pre id="perfText">Collecting frames...</pre></section><p>WASD / ARROWS: MOVE. LMB: LIGHT. RMB: HEAVY. Separate presses chain up to three strikes. E / MIDDLE CLICK: LIGHT-CASTING SWEEP. ESC: PAUSE.</p><p>The lamp is the only life pool. HEALTH and LAMP display that same value. No execution, dash, healing, checkpoints, saves, new rooms or installer.</p><p>Draft defaults: cursor-at-press aim, locked strike direction, damage does not interrupt a strike, movement may leave the last 14% of recovery. Canvas2D lighting is evaluated at ASCII-cell resolution; not a pixel-identical WebGL comparison. Target 30 FPS is not guaranteed.</p></main><script>
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ASH / IRON — Iteration 3A.2 Motion</title><style>*{box-sizing:border-box}body{margin:0;background:#000;color:#aaa;font:12px/1.7 monospace}main{max-width:1220px;margin:auto;padding:18px}.stage{border:1px solid #282828}canvas{display:block;width:100%;height:auto;outline:none;touch-action:none;cursor:crosshair}.tools{display:flex;gap:8px;flex-wrap:wrap}button{font:11px monospace;background:#080808;color:#aaa;border:1px solid #444;padding:8px;cursor:pointer}button:hover{color:#eee}p{color:#897b6b;font-size:11px}#status{min-height:20px;margin:10px 0;color:#a58d75}section{border-top:1px solid #42362d;margin:15px 0;padding:12px}label{display:flex;gap:10px;margin:10px 0}input{accent-color:#b45344}pre{white-space:pre-wrap}[hidden]{display:none!important}</style><main><div class="stage"><canvas id="game" width="1008" height="864" tabindex="0" aria-label="ASH IRON ASCII game"></canvas></div><div id="status">ASH / IRON — ITERATION 3A.2 / MOTION</div><div class="tools"><button id="menuButton">MENU / ESC</button><button id="restart">RESTART NAVE</button><button id="freeze">FREEZE FRAME</button><button id="export">SAVE FRAME PNG</button><button id="report">SAVE REPORT</button><button id="perfToggle">PERFORMANCE</button></div><section id="settings" hidden><h2>THE EMBER CHAMBER</h2><label>FLOW SPEED<input id="flow" type="range" min="10" max="160" value="32"></label><label>FIRE STRENGTH<input id="power" type="range" min="20" max="140" value="86"></label><label><input id="dim" type="checkbox" checked>DIM BACKGROUND</label><label><input id="fireFreeze" type="checkbox">FREEZE THE FLAME</label><p>192 columns / ASCII fire. Menu settings do not change the 196 x 140 world.</p><button id="settingsClose">CLOSE SETTINGS</button></section><section id="perf" hidden><pre id="perfText">Collecting frames...</pre></section><p>WASD / ARROWS: MOVE. LMB: LIGHT. RMB: HEAVY. Separate presses chain up to three strikes. E / MIDDLE CLICK: LIGHT-CASTING SWEEP. ESC: PAUSE.</p><p>The lamp is the only life pool. HEALTH and LAMP display that same value. No execution, dash, healing, checkpoints, saves, new rooms or installer.</p><p>Draft defaults: cursor-at-press aim, locked strike direction, damage does not interrupt a strike, movement may leave the last 14% of recovery. Canvas2D lighting is evaluated at ASCII-cell resolution; not a pixel-identical WebGL comparison. Target 30 FPS is not guaranteed.</p></main><script>
 
 (function(root){'use strict';
 const TAU=Math.PI*2,C=(x,a=0,b=1)=>Math.max(a,Math.min(b,x)),sm=x=>{x=C(x);return x*x*(3-2*x)},mix=(a,b,t)=>a+(b-a)*t,add=(a,b)=>a.map((v,i)=>v+b[i]),sub=(a,b)=>a.map((v,i)=>v-b[i]),mul=(a,s)=>a.map(v=>v*s),dot=(a,b)=>a.reduce((s,v,i)=>s+v*b[i],0),len=a=>Math.hypot(...a),norm=v=>mul(v,1/Math.max(1e-9,len(v))),cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],blend=(a,b,t)=>a.map((v,i)=>mix(v,b[i],t)),rot=(v,a)=>[v[0]*Math.cos(a)-v[1]*Math.sin(a),v[0]*Math.sin(a)+v[1]*Math.cos(a),v[2]];
@@ -40,7 +40,7 @@ root.IronPilgrim=Object.freeze({clips,sample,rig,emit,ik,body,foot,spring});})(g
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.lampBeat = lampBeat;
 exports.combatHero = combatHero;
-const motion_js_1 = require("./motion.js");
+const weight_transitions_js_1 = require("./weight-transitions.js");
 function lampBeat(life, time) {
     if (life <= 0)
         return 0;
@@ -73,8 +73,8 @@ function combatHero(s, module = globalThis.IronPilgrim, secondary = { cloth: 0, 
     }
     else if ((s.motion?.weight ?? (s.moving ? 1 : 0)) > .001)
         clip = 'walk';
-    const sampled = locomotion ? (0, motion_js_1.locomotionPose)(s, module) : null, pose = sampled?.pose ?? module.sample(clip, Math.max(0, Math.min(1, t)), s.time), rig = sampled?.rig ?? module.rig(pose), heading = s.motion?.heading ?? Math.atan2(s.fy, s.fx), fx = Math.cos(heading), fy = Math.sin(heading), transform = (v) => { const x = v[0] - pose.root[0], y = v[1] - pose.root[1]; return [s.x + fy * x + fx * y, s.y - fx * x + fy * y, v[2]]; }, parts = [], push = (kind, v, c, w = 1) => { const points = v.map(transform); parts.push({ kind, v: points, c, w, hero: true, d: points.reduce((d, v) => d + v[0] + v[1] + v[2] * .006, 0) / points.length + (kind === 1 ? .005 : 0) }); };
-    const lamp = module.emit(rig, s.time, { poly: (v, c) => push(0, v, c), line: (v, c, w) => push(1, v, c, w) }, secondary, lampBeat(s.lamp, s.time));
+    const sampled = locomotion ? (0, weight_transitions_js_1.loadedLocomotion)(s, module) : (0, weight_transitions_js_1.transitionPose)(s, module, clip, t), pose = sampled.pose, rig = sampled.rig, heading = s.motion?.heading ?? Math.atan2(s.fy, s.fx), fx = Math.cos(heading), fy = Math.sin(heading), transform = (v) => { const x = v[0] - pose.root[0], y = v[1] - pose.root[1]; return [s.x + fy * x + fx * y, s.y - fx * x + fy * y, v[2]]; }, parts = [], push = (kind, v, c, w = 1) => { const points = v.map(transform); parts.push({ kind, v: points, c, w, hero: true, d: points.reduce((d, v) => d + v[0] + v[1] + v[2] * .006, 0) / points.length + (kind === 1 ? .005 : 0) }); };
+    const lamp = module.emit(rig, s.time, { poly: (v, c) => push(0, v, c), line: (v, c, w) => push(1, v, c, w) }, (0, weight_transitions_js_1.loadSecondary)(s, secondary), lampBeat(s.lamp, s.time));
     return { parts, lamp: transform(lamp), tip: transform(rig.tip), clip };
 }
 
@@ -155,6 +155,72 @@ function locomotionPose(s, module) {
 }
 
 },
+"animation/weight-transitions.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.transitionWeight = transitionWeight;
+exports.blendPose = blendPose;
+exports.loadedLocomotion = loadedLocomotion;
+exports.transitionPose = transitionPose;
+exports.loadSecondary = loadSecondary;
+const config_js_1 = require("../combat/config.js");
+const motion_js_1 = require("./motion.js");
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x)), smooth = (x) => { x = clamp(x); return x * x * (3 - 2 * x); };
+const vec = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+function transitionWeight(clip, t) {
+    t = clamp(t);
+    if (/^(light|heavy)[123]$/.test(clip))
+        return smooth(t / .12) * (1 - smooth((t - config_js_1.COMBAT.activeEnd) / (config_js_1.COMBAT.moveCancelAt - config_js_1.COMBAT.activeEnd)));
+    if (clip === 'sweep')
+        return smooth(t / .12) * (1 - smooth((t - .8) / .2));
+    if (clip === 'hit')
+        return smooth(t / .12) * (1 - smooth((t - .7) / .3));
+    return 1;
+}
+function blendPose(a, b, t) {
+    const p = { ...b, root: vec(a.root, b.root, t), left: vec(a.left, b.left, t), right: vec(a.right, b.right, t), gait: t < .5 ? (a.gait ? { ...a.gait } : null) : (b.gait ? { ...b.gait } : null) };
+    for (const k of ['lean', 'twist', 'head', 'look', 'breath', 'down', 'lift', 'visibility', 'ash', 'burn', 'flame'])
+        p[k] = a[k] + (b[k] - a[k]) * t;
+    p.az = a.az + (0, motion_js_1.angleDelta)(a.az, b.az) * t;
+    return p;
+}
+/** Blend foot endpoints in root-relative space, then solve original bone lengths. */
+function feet(p, a, b, t, module) {
+    const rig = module.rig(p), ik = module.ik;
+    if (typeof ik !== 'function')
+        throw Error('Original hero IK is required for transition foot contacts.');
+    rig.legs = rig.legs.map((l, i) => { const target = add(vec(sub(a.legs[i].end, a.p.root), sub(b.legs[i].end, b.p.root), t), p.root); const pole = add(vec(sub(a.legs[i].joint, a.p.root), sub(b.legs[i].joint, b.p.root), t), p.root); return ik(l.base, target, l.a, l.b, pole); });
+    return rig;
+}
+function load(s) {
+    if (!s.motion || s.phase === 'dead')
+        return { forward: 0, side: 0 };
+    return { forward: clamp(s.motion.speed / motion_js_1.MOTION.maxSpeed - s.motion.weight, -.25, .25), side: clamp((0, motion_js_1.angleDelta)(s.motion.heading, Math.atan2(s.fy, s.fx)), -.5, .5) * clamp(s.motion.weight) };
+}
+function loadedLocomotion(s, module) {
+    const base = (0, motion_js_1.locomotionPose)(s, module), f = load(s);
+    if (Math.abs(f.forward) + Math.abs(f.side) < 1e-9)
+        return base;
+    const p = { ...base.pose, left: [...base.pose.left], right: [...base.pose.right], lean: base.pose.lean + .045 * f.forward, twist: base.pose.twist + .025 * f.side, az: base.pose.az + .018 * f.side };
+    p.left[0] += .012 * f.side;
+    p.left[1] -= .028 * f.forward;
+    p.right[1] -= .018 * f.forward;
+    return { pose: p, rig: feet(p, base.rig, base.rig, 0, module) };
+}
+function transitionPose(s, module, clip, t) {
+    const pose = module.sample(clip, clamp(t), s.time), rig = module.rig(pose), weight = transitionWeight(clip, t);
+    if (weight >= 1)
+        return { pose, rig };
+    const base = loadedLocomotion(s, module);
+    if (weight <= 0)
+        return base;
+    const p = blendPose(base.pose, pose, weight);
+    return { pose: p, rig: feet(p, base.rig, rig, weight, module) };
+}
+function loadSecondary(s, base) { const f = load(s); return { cloth: base.cloth + .018 * f.side, chains: base.chains.map((v, i) => v + .012 * f.forward * (i % 2 ? -1 : 1) + .009 * f.side) }; }
+
+},
 "app/main.js":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -167,7 +233,7 @@ const ornaments_js_1 = require("../ui/ornaments.js");
 const $ = s => document.getElementById(s), cv = $('game'), out = cv.getContext('2d', { willReadFrequently: true }), W = 1008, H = 720, COLS = 196, ROWS = 140;
 const canvas = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }, scene = canvas(W, H), mask = canvas(W, H), sg = scene.getContext('2d', { willReadFrequently: true }), mg = mask.getContext('2d', { willReadFrequently: true });
 const ascii = new ascii_js_1.ASCII(out), maskReader = new ascii_js_1.ASCII(out), uiASCII = new ascii_js_1.ASCII(out), ui = (0, ornaments_js_1.makeUI)(out, (src, cols, rows, y, h, mono) => uiASCII.paint(src, cols, rows, y, h, mono));
-const env = (0, environment_js_1.createEnvironment)(), world = new combat_world_js_1.CombatWorld(undefined, s => (0, combat_hero_js_1.combatHero)(s).tip), keys = new Set(), commands = [], report = { build: 'ASH_IRON_ITERATION_3A_1', errors: [], frames: [], backend: 'Canvas2D / ASCII cell lighting', gpuTime: null };
+const env = (0, environment_js_1.createEnvironment)(), world = new combat_world_js_1.CombatWorld(undefined, s => (0, combat_hero_js_1.combatHero)(s).tip), keys = new Set(), commands = [], report = { build: 'ASH_IRON_ITERATION_3A_2', errors: [], frames: [], backend: 'Canvas2D / ASCII cell lighting', gpuTime: null };
 let mode = 'menu', selected = 0, menuPage = false, time = 0, last = 0, drawAt = 0, simLast = null, acc = 0, paused = false, frozen = false, endTime = 0, aimPoint = null, camera = { x: 8, y: 12 }, renderCount = 0, fireAt = -1, coneBoost = 0;
 const fire = canvas(192, 165), fg = fire.getContext('2d', { willReadFrequently: true }), fireASCII = new ascii_js_1.ASCII(out);
 const pr = (x, y, z, cx = camera.x, cy = camera.y) => [504 + ((x - cx) - (y - cy)) * 65 * .76, 430 + ((x - cx) + (y - cy)) * 65 * .43 - z * 65 * .87];

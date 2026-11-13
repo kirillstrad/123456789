@@ -7,7 +7,7 @@ import {makeUI} from '../ui/ornaments.js';
 const $=s=>document.getElementById(s),cv=$('game'),out=cv.getContext('2d',{willReadFrequently:true}),W=1008,H=720,COLS=196,ROWS=140;
 const canvas=(w,h)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c;},scene=canvas(W,H),mask=canvas(W,H),sg=scene.getContext('2d',{willReadFrequently:true}),mg=mask.getContext('2d',{willReadFrequently:true});
 const ascii=new ASCII(out),maskReader=new ASCII(out),uiASCII=new ASCII(out),ui=makeUI(out,(src,cols,rows,y,h,mono)=>uiASCII.paint(src,cols,rows,y,h,mono));
-const env=createEnvironment(),world=new CombatWorld(undefined,s=>combatHero(s).tip),keys=new Set(),commands=[],report={build:'ASH_IRON_ITERATION_3A_1',errors:[],frames:[],backend:'Canvas2D / ASCII cell lighting',gpuTime:null};
+const env=createEnvironment(),world=new CombatWorld(undefined,s=>combatHero(s).tip),keys=new Set(),commands=[],report={build:'ASH_IRON_ITERATION_3A_2',errors:[],frames:[],backend:'Canvas2D / ASCII cell lighting',gpuTime:null};
 let mode='menu',selected=0,menuPage=false,time=0,last=0,drawAt=0,simLast=null,acc=0,paused=false,frozen=false,endTime=0,aimPoint=null,camera={x:8,y:12},renderCount=0,fireAt=-1,coneBoost=0;
 const fire=canvas(192,165),fg=fire.getContext('2d',{willReadFrequently:true}),fireASCII=new ASCII(out);
 const pr=(x,y,z,cx=camera.x,cy=camera.y)=>[504+((x-cx)-(y-cy))*65*.76,430+((x-cx)+(y-cy))*65*.43-z*65*.87];

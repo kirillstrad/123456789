@@ -1,13 +1,13 @@
 {
-  "build": "ASH_IRON_ITERATION_3A_1",
+  "build": "ASH_IRON_ITERATION_3A_2",
   "files": {
     ".github/workflows/iteration-2-canvas2d.yml": {
       "bytes": 1815,
       "sha256": "1ee6d047bb90a60ff7130d4f1648f80c22f372d438b2ab392c73341020127e81"
     },
     ".github/workflows/iteration-3-motion.yml": {
-      "bytes": 4635,
-      "sha256": "87de2857a37da2efbd08ef54fda8527edb2f175f74f23011ff752a23ccbc207a"
+      "bytes": 2581,
+      "sha256": "9289afc0398f2809a894edc7eeb8a520afc865932070de9371a8e0ef01e5abb5"
     },
     ".gitignore": {
       "bytes": 30,
@@ -18,16 +18,16 @@
       "sha256": "46a902525d9e310085824346b2e98f360ab96f7f981c0dffa96c374759b90ca2"
     },
     "BUILD_INFO.json": {
-      "bytes": 426,
-      "sha256": "69244db1639ef67e2c7395f6ca44d65c4b5edbe283ad72820fca62ea967d3c70"
+      "bytes": 491,
+      "sha256": "a68541f169b2cdf0dd0e98f76e6d0d92602d5a2349b04d9e3f605207f92a576f"
     },
     "FONT_LICENSE.txt": {
       "bytes": 1756,
       "sha256": "1b38c6f9db38d11a36714b281c968f83926c15a8c417d5db14535a5017d44151"
     },
     "PLAY.html": {
-      "bytes": 77423,
-      "sha256": "f711ab47b6cc88e702575c63568448b101c8b41fdc8af2cee98b3e2f225ebec6"
+      "bytes": 81281,
+      "sha256": "a764bbec637ea6fa42f79ddfe1d6ba1ffe49e81b833d994bd29b956a19629d6f"
     },
     "README_RU.md": {
       "bytes": 4356,
@@ -45,33 +45,37 @@
       "bytes": 1713,
       "sha256": "5c9c93086402375d3f5e9ed58d918887e6ae5aebdaea98192be807302f1a77ba"
     },
+    "docs/ITERATION_3A_2.md": {
+      "bytes": 2020,
+      "sha256": "933f768acc8851239d0b99a200e4048015c1fbfb2df1223269308b9578fbd269"
+    },
     "docs/browser-check.json": {
       "bytes": 810,
       "sha256": "493b0d0985085bc54d70343e21ae750a9e757314875a83cd1f85c2f97d358187"
     },
     "docs/browser-runtime-report.json": {
-      "bytes": 48166,
-      "sha256": "fb7405a46c89b5a8d27820426e33e2bbc04981c475b8e9ed52a36a8abc4f30f7"
+      "bytes": 48073,
+      "sha256": "6759a796491238e838fe46bb6a928167ed47ddcbd61060c7d956d08bb5464779"
     },
     "docs/gameplay.png": {
-      "bytes": 759012,
-      "sha256": "4b96330b841892d1caa2c5298666f340187f22b02281f08c6f719064d5f507db"
+      "bytes": 763872,
+      "sha256": "66cf0f890ea249bf1580faaa053e612617a106b5cc58b4c6f41435aeb09eff53"
     },
     "docs/menu.png": {
-      "bytes": 404098,
-      "sha256": "c01aadb84cadeee81999b3a6bef5dce3513ee65cdeb81ed0645a51d2a27de023"
+      "bytes": 404052,
+      "sha256": "6d0e9b21560e1a5bb913c75ed4ab59dbc0a3c7e12c56e6ca098beec699c23ebe"
     },
     "docs/sweep.png": {
-      "bytes": 849973,
-      "sha256": "8148dcf7c3683588eb17dd5576dd730f2c0995d44dd12c752135799903740062"
+      "bytes": 848023,
+      "sha256": "a5fb009d3b6ce991cd8355dbf4476a024a779a33105891b3e2e503c27c54ea58"
     },
     "docs/typecheck.json": {
       "bytes": 94,
-      "sha256": "6bb3e11329a12c24e11223c9966376d603fb5f25116ceaf61d1fe9668743043a"
+      "sha256": "d2fba3a415337fdccaa91f91e17ab740a8586eb0929f03cb472192e614c88b0c"
     },
     "docs/unit-tests.tap": {
-      "bytes": 8768,
-      "sha256": "31b27a83fa816946b16dbbcb691dc63a4973c977218bacca7ec4fbc6b9925546"
+      "bytes": 11275,
+      "sha256": "c821edc709f63c7209043cd1efa6859807b64045bf4e3d63f6e8ab63a56e8329"
     },
     "package-lock.json": {
       "bytes": 2303,
@@ -90,16 +94,20 @@
       "sha256": "957c61f0ec35526ad4c91d87814e812ca4cb7603f281797d9a66646792d9d2b5"
     },
     "runtime/animation/combat-hero.js": {
-      "bytes": 2062,
-      "sha256": "40fc919de698b261ecd7820f4474ccd169e450c0e29903093dda0bf1df6f54e3"
+      "bytes": 2075,
+      "sha256": "e7cf3fdd28664f67440e1916a22c1ca37160602b731d5801363e4fdfc97250fc"
     },
     "runtime/animation/motion.js": {
       "bytes": 3909,
       "sha256": "91e5acc54be3f90c69cbedbbc777299f20c396433c99516e5d0c820c5bfd2cca"
     },
+    "runtime/animation/weight-transitions.js": {
+      "bytes": 3250,
+      "sha256": "2b5e67be735c07d0da7ed8bb06ef804f5ce81b1768d8f4b0ffad6076b631c691"
+    },
     "runtime/app/main.js": {
       "bytes": 12100,
-      "sha256": "b720bd78698978ff8fe2976262e3f5c5f8fa0e762e1d801bc06ccb9fd9a87479"
+      "sha256": "b12e9c34bbded5642dcc448081ac99be7a76075698bf580f04f3ac4e0a2279c3"
     },
     "runtime/combat/action-machine.js": {
       "bytes": 2160,
@@ -135,7 +143,7 @@
     },
     "runtime/index.html": {
       "bytes": 2634,
-      "sha256": "64941abf4e135bd27e53c6dca483a2727ecb293796e7f0603a040d43f56cd9c9"
+      "sha256": "c4122aabf71cd97c30ef7a203815ded774862f00ca0f078ecf13f8542a97191f"
     },
     "runtime/render/ascii.js": {
       "bytes": 2158,
@@ -162,20 +170,24 @@
       "sha256": "5e80510c1bddce5b8f96d0b984cfcee571084e5e35140060e01fb5428f08aead"
     },
     "src/animation/combat-hero.ts": {
-      "bytes": 1923,
-      "sha256": "34d76c703a526862f1cf39b735fb1472b958a945fffca1317874791a9eb4864b"
+      "bytes": 1938,
+      "sha256": "174d0c3cc979bfc327f251d91b824cff8acfe2e2a99c409f8c7ca04ea7d6f492"
     },
     "src/animation/motion.ts": {
       "bytes": 3874,
       "sha256": "774d890b412d4a5fab61c91f41b17b851316fd4480e264da144a85e80daae263"
     },
+    "src/animation/weight-transitions.ts": {
+      "bytes": 3391,
+      "sha256": "6209b7ecf76835922960f2514f7416e3cc4cee91972e963d67d92ee0769f19da"
+    },
     "src/app/index.html": {
       "bytes": 2634,
-      "sha256": "64941abf4e135bd27e53c6dca483a2727ecb293796e7f0603a040d43f56cd9c9"
+      "sha256": "c4122aabf71cd97c30ef7a203815ded774862f00ca0f078ecf13f8542a97191f"
     },
     "src/app/main.js": {
       "bytes": 12100,
-      "sha256": "b720bd78698978ff8fe2976262e3f5c5f8fa0e762e1d801bc06ccb9fd9a87479"
+      "sha256": "b12e9c34bbded5642dcc448081ac99be7a76075698bf580f04f3ac4e0a2279c3"
     },
     "src/combat/action-machine.ts": {
       "bytes": 1894,
@@ -244,6 +256,14 @@
     "tests/motion.test.mjs": {
       "bytes": 4120,
       "sha256": "e4afedc365873d0173d8134a3bf0d82a27a548613dd832a73cc10c50e4887126"
+    },
+    "tests/weight-transitions-world.test.mjs": {
+      "bytes": 2084,
+      "sha256": "867b06057a8eb8fb6a5505e5b5e1743ceeb7a3b1d00a77fa1c49956ec43984b8"
+    },
+    "tests/weight-transitions.test.mjs": {
+      "bytes": 3708,
+      "sha256": "09c954d28c0d7502fc6681712934947c4947266d4940ab1f5fcbd3b96399b473"
     },
     "tools/browser-check.mjs": {
       "bytes": 4090,
