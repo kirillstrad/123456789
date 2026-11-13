@@ -1,37 +1,17 @@
 {
-  "buildId": "ASH_IRON_ITERATION_1_0_1",
-  "version": "1.0.1",
-  "createdAtUTC": "2026-11-13T11:40:52.591297+00:00",
-  "source": {
-    "repository": "kirillstrad/123456789",
-    "commit": "ce7f8bc0dbf2ef420fdcda4c3f8b76f14943b5fa",
-    "heroGitBlob": "d7b64e103433a1763f33fd42fc7286f51dd14eb0",
-    "heroByteIdentical": true
-  },
-  "scope": "iteration 1 only",
-  "typescript": {
-    "version": "5.8.2",
-    "strict": true,
-    "diagnostics": 0,
-    "files": 13
-  },
-  "nodeTests": {
-    "passed": 22,
-    "failed": 0
-  },
-  "browserChecks": {
-    "passed": 15,
-    "failed": 0,
-    "javascriptErrors": 0,
-    "browser": "134.0.6998.35",
-    "gpu": "SwiftShader",
-    "httpRuntime": true,
-    "offlineStandalone": true
-  },
-  "controlFocusFixVerified": true,
-  "vitePipelineTested": false,
-  "windowsBatTested": false,
-  "targetHardwareFpsVerified": false,
-  "visualApproval": "pending user comparison",
-  "repoChanged": false
+  "build": "ASH_IRON_ITERATION_3B_1",
+  "sourceCommit": "79474893a16577d36f9d148672ca0b6cb3d1109d",
+  "originalBaseCommit": "c727a02ad98ef0c537484f664777997a2ffc56e0",
+  "renderer": "Canvas2D",
+  "grid": [
+    196,
+    140
+  ],
+  "status": "3B.1-windows-preview",
+  "approved": "Canvas2D migration",
+  "rules": "DRAFT_RULES remain provisional",
+  "motionBase": "addc11e18d69b084217ca501d40aa419be2d49d3",
+  "desktop": true,
+  "previewBase": "243f26581131b06855e3e7358da42c058801bd06",
+  "electron": "45.3.2"
 }

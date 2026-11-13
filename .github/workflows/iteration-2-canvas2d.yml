@@ -1,0 +1,49 @@
+name: Iteration 2 Canvas2D
+on:
+  push:
+    branches: [iteration-2-canvas2d]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: iteration-2-canvas2d
+  cancel-in-progress: false
+jobs:
+  build:
+    if: github.repository == 'kirillstrad/123456789' && github.ref == 'refs/heads/iteration-2-canvas2d'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - id: plan
+        run: |
+          if [ -f .migration/migrate.py ]; then echo "bootstrap=true" >> "$GITHUB_OUTPUT"; else echo "bootstrap=false" >> "$GITHUB_OUTPUT"; fi
+      - name: Migrate, build and test before replacing old files
+        if: steps.plan.outputs.bootstrap == 'true'
+        run: python .migration/migrate.py
+      - name: Build existing clean layout
+        if: steps.plan.outputs.bootstrap != 'true'
+        run: |
+          npm ci
+          npm run build
+          npm test
+          npx playwright install --with-deps chromium
+          npm run test:browser
+          python tools/package.py
+      - name: Commit clean layout to this branch only
+        if: steps.plan.outputs.bootstrap == 'true'
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git add -A
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Migrate iteration 2 to Canvas2D and remove legacy duplicates'
+          git push origin HEAD:refs/heads/iteration-2-canvas2d
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ASH_IRON_ITERATION_2_CANVAS2D
+          path: ${{ runner.temp }}/ASH_IRON_ITERATION_2_CANVAS2D.zip
+          if-no-files-found: error

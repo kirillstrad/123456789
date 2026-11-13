@@ -1,0 +1,9 @@
+export function enemyParts(e){let parts=[],heroPart=false;function smooth(x){x=Math.max(0,Math.min(1,x));return x*x*(3-2*x);}
+function poly(v,c,s=null,w=1){parts.push({kind:0,v,c,s,w,hero:heroPart,d:v.reduce((a,q)=>a+q[0]+q[1]+(q[2]||0)*.006,0)/v.length})}
+function line(v,c,w=1){parts.push({kind:1,v,c,w,hero:heroPart,d:v.reduce((a,q)=>a+q[0]+q[1]+(q[2]||0)*.006,0)/v.length+.005})}
+function dot(x,y,z,r,c){parts.push({kind:2,v:[[x,y,z]],r,c,hero:heroPart,d:x+y+z*.006+.01})}
+function box(x,y,w,h,z,k,c=[89,91,99]){let v=[[x,y,z],[x+w,y,z],[x+w,y+h,z],[x,y+h,z],[x,y,z+k],[x+w,y,z+k],[x+w,y+h,z+k],[x,y+h,z+k]];[[0,1,5,4],[1,2,6,5],[2,3,7,6],[3,0,4,7],[4,5,6,7]].forEach((f,i)=>poly(f.map(n=>v[n]),c.map(q=>q*[.58,.43,.72,.55,1.06][i])))}
+function limb(a,b,w,c){line([a,b],c,w);dot(...a,w*.5,c);dot(...b,w*.45,c)}
+function corpse(x,y,type){if(type===1){poly([[x-.2,y-.7,.03],[x+.2,y-.7,.03],[x+.4,y-.3,.13],[x+.3,y+.7,.1],[x,y+.9,.03],[x-.35,y+.6,.03]],'#78636d');line([[x-.3,y,.14],[x+.3,y,.14]],'#49313e',2)}else{box(x-.2,y-.4,.4,.65,.02,.16,[65,60,76]);dot(x,y-.6,.12,7,'#8b7173');for(let sign of[-1,1])line([[x+sign*.1,y+.25,.1],[x+sign*.35,y+.65,.04]],'#6e6072',7)}}
+function drawEnemy(e){if(e.hp<=0){corpse(e.x,e.y,0);return}const P=(x,y,z)=>[e.x+x,e.y+y,z],s=e.state==='windup'?smooth(e.timer/.55):0,strike=e.state==='recover'?Math.max(0,1-e.timer/.7):0;limb(P(-.12,0,.65),P(-.16,Math.sin(e.walk)*.08,.05),13,'#494149');limb(P(.12,0,.65),P(.16,-Math.sin(e.walk)*.08,.05),13,'#494149');poly([P(-.24,-.1,1.3),P(.24,-.1,1.3),P(.35,.15,.36),P(-.3,.15,.33)],'#59434c');dot(e.x,e.y,1.42,10,'#8b726d');poly([P(-.18,-.08,1.43),P(0,-.08,1.7),P(.2,-.08,1.43)],'#3a3543');let hx=e.x+.33+e.fx*strike*.5,hy=e.y+e.fy*strike*.5;limb(P(.2,0,1.2),[hx,hy,1+s*.25],12,'#75606b');line([[hx,hy,1+s*.25],[hx+.1,hy-.05,1.7+s*.25]],'#93858a',5);if(e.state==='windup')dot(e.x,e.y,1.85,3,'#c58a52')}
+drawEnemy({...e,state:e.mode,timer:e.timer,walk:e.walkDistance*5.13});return parts;}
