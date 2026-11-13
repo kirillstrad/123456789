@@ -1,9 +1,13 @@
 {
-  "build": "ASH_IRON_ITERATION_2_CANVAS2D",
+  "build": "ASH_IRON_ITERATION_3A_1",
   "files": {
     ".github/workflows/iteration-2-canvas2d.yml": {
       "bytes": 1815,
       "sha256": "1ee6d047bb90a60ff7130d4f1648f80c22f372d438b2ab392c73341020127e81"
+    },
+    ".github/workflows/iteration-3-motion.yml": {
+      "bytes": 4635,
+      "sha256": "87de2857a37da2efbd08ef54fda8527edb2f175f74f23011ff752a23ccbc207a"
     },
     ".gitignore": {
       "bytes": 30,
@@ -14,16 +18,16 @@
       "sha256": "46a902525d9e310085824346b2e98f360ab96f7f981c0dffa96c374759b90ca2"
     },
     "BUILD_INFO.json": {
-      "bytes": 350,
-      "sha256": "96906e2917e00ac2c386d6b94076367021dd5cd99a1144c1f7b12159d33b0b07"
+      "bytes": 426,
+      "sha256": "69244db1639ef67e2c7395f6ca44d65c4b5edbe283ad72820fca62ea967d3c70"
     },
     "FONT_LICENSE.txt": {
       "bytes": 1756,
       "sha256": "1b38c6f9db38d11a36714b281c968f83926c15a8c417d5db14535a5017d44151"
     },
     "PLAY.html": {
-      "bytes": 71735,
-      "sha256": "b438a50ada5407f2bb34f2286dea27be4efa8e26db86ef33db5126bd96f24aea"
+      "bytes": 77423,
+      "sha256": "f711ab47b6cc88e702575c63568448b101c8b41fdc8af2cee98b3e2f225ebec6"
     },
     "README_RU.md": {
       "bytes": 4356,
@@ -37,33 +41,37 @@
       "bytes": 48,
       "sha256": "335258346cf88dbed2b1fc7d21b84a224517cd98a1a6b0a2475d15bce9ae6215"
     },
+    "docs/ITERATION_3A_1.md": {
+      "bytes": 1713,
+      "sha256": "5c9c93086402375d3f5e9ed58d918887e6ae5aebdaea98192be807302f1a77ba"
+    },
     "docs/browser-check.json": {
       "bytes": 810,
       "sha256": "493b0d0985085bc54d70343e21ae750a9e757314875a83cd1f85c2f97d358187"
     },
     "docs/browser-runtime-report.json": {
-      "bytes": 47956,
-      "sha256": "0533fbc646bf5ce9be0be98b87289370c575aae06db519faab9d01c3566c7cbd"
+      "bytes": 48166,
+      "sha256": "fb7405a46c89b5a8d27820426e33e2bbc04981c475b8e9ed52a36a8abc4f30f7"
     },
     "docs/gameplay.png": {
-      "bytes": 759278,
-      "sha256": "465513b348a3ac8527e3a354ee8efa3ba7a56f247b6b8990e361bfd8fdfc1427"
+      "bytes": 759012,
+      "sha256": "4b96330b841892d1caa2c5298666f340187f22b02281f08c6f719064d5f507db"
     },
     "docs/menu.png": {
-      "bytes": 403850,
-      "sha256": "957e7511be6330bd9c1d1a3a356eded0696a1f351fbb84eb6198b605a0252d81"
+      "bytes": 404098,
+      "sha256": "c01aadb84cadeee81999b3a6bef5dce3513ee65cdeb81ed0645a51d2a27de023"
     },
     "docs/sweep.png": {
-      "bytes": 849737,
-      "sha256": "8c463af3145ef5a7ce753b17acb18634d477f8183d274ad49f6e1ec2f62d69d0"
+      "bytes": 849973,
+      "sha256": "8148dcf7c3683588eb17dd5576dd730f2c0995d44dd12c752135799903740062"
     },
     "docs/typecheck.json": {
       "bytes": 94,
-      "sha256": "0954d31e10eae23b77fc99576f1aa318f8d6fa71205c99ea986d592e01568487"
+      "sha256": "6bb3e11329a12c24e11223c9966376d603fb5f25116ceaf61d1fe9668743043a"
     },
     "docs/unit-tests.tap": {
-      "bytes": 5090,
-      "sha256": "072706eb32c4bb9e07984e7c173a5589bb7859ef831a46c6b76cadb2c5dfa52f"
+      "bytes": 8768,
+      "sha256": "31b27a83fa816946b16dbbcb691dc63a4973c977218bacca7ec4fbc6b9925546"
     },
     "package-lock.json": {
       "bytes": 2303,
@@ -82,12 +90,16 @@
       "sha256": "957c61f0ec35526ad4c91d87814e812ca4cb7603f281797d9a66646792d9d2b5"
     },
     "runtime/animation/combat-hero.js": {
-      "bytes": 1716,
-      "sha256": "f89ceb94cc9955d25d81ddd7ab2f028bbe65add222c2e9f777fa29e261d9322e"
+      "bytes": 2062,
+      "sha256": "40fc919de698b261ecd7820f4474ccd169e450c0e29903093dda0bf1df6f54e3"
+    },
+    "runtime/animation/motion.js": {
+      "bytes": 3909,
+      "sha256": "91e5acc54be3f90c69cbedbbc777299f20c396433c99516e5d0c820c5bfd2cca"
     },
     "runtime/app/main.js": {
-      "bytes": 12106,
-      "sha256": "10995f397cbe95a04b5a039fc5acf1276b338a1e2d8a6ef974235fe76a407fcf"
+      "bytes": 12100,
+      "sha256": "b720bd78698978ff8fe2976262e3f5c5f8fa0e762e1d801bc06ccb9fd9a87479"
     },
     "runtime/combat/action-machine.js": {
       "bytes": 2160,
@@ -118,12 +130,12 @@
       "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
     },
     "runtime/game/combat-world.js": {
-      "bytes": 7268,
-      "sha256": "847cf5107e8c1b0edc7b98897b34e4c9f5ca30933148dece331adfab69cb7662"
+      "bytes": 7942,
+      "sha256": "df9242cadecef545ff019e83318e09badc46b3de61439276b599db47fa2c6332"
     },
     "runtime/index.html": {
-      "bytes": 2632,
-      "sha256": "94e1eddbbd2056e8ab33321ef12affe34ef1c7049387e68dcfdeb8ec3bbe3d5d"
+      "bytes": 2634,
+      "sha256": "64941abf4e135bd27e53c6dca483a2727ecb293796e7f0603a040d43f56cd9c9"
     },
     "runtime/render/ascii.js": {
       "bytes": 2158,
@@ -150,16 +162,20 @@
       "sha256": "5e80510c1bddce5b8f96d0b984cfcee571084e5e35140060e01fb5428f08aead"
     },
     "src/animation/combat-hero.ts": {
-      "bytes": 1630,
-      "sha256": "2c804e2ca67c27c991b01c4affc5eb131fd8fd7660c60297df01919c5c9cfbc1"
+      "bytes": 1923,
+      "sha256": "34d76c703a526862f1cf39b735fb1472b958a945fffca1317874791a9eb4864b"
+    },
+    "src/animation/motion.ts": {
+      "bytes": 3874,
+      "sha256": "774d890b412d4a5fab61c91f41b17b851316fd4480e264da144a85e80daae263"
     },
     "src/app/index.html": {
-      "bytes": 2632,
-      "sha256": "94e1eddbbd2056e8ab33321ef12affe34ef1c7049387e68dcfdeb8ec3bbe3d5d"
+      "bytes": 2634,
+      "sha256": "64941abf4e135bd27e53c6dca483a2727ecb293796e7f0603a040d43f56cd9c9"
     },
     "src/app/main.js": {
-      "bytes": 12106,
-      "sha256": "10995f397cbe95a04b5a039fc5acf1276b338a1e2d8a6ef974235fe76a407fcf"
+      "bytes": 12100,
+      "sha256": "b720bd78698978ff8fe2976262e3f5c5f8fa0e762e1d801bc06ccb9fd9a87479"
     },
     "src/combat/action-machine.ts": {
       "bytes": 1894,
@@ -182,16 +198,16 @@
       "sha256": "c79fd857d780b5effbc732337f7a302f53c5aecbcd50e859b3f77cb47041174c"
     },
     "src/combat/types.ts": {
-      "bytes": 1456,
-      "sha256": "55bdcbabff3e0547926b2c437be72ddd2f9a21b955e353333775b202810c84ab"
+      "bytes": 1533,
+      "sha256": "188ffc125f5e4f001d3679cc9c79b46dc7326d753612017d0acbe22d3aeb20cc"
     },
     "src/core/types.ts": {
       "bytes": 1718,
       "sha256": "9df417894b16ae8d83aa98c4e2fc6ab60647ae3bbfa67e26879269383ad47049"
     },
     "src/game/combat-world.ts": {
-      "bytes": 6103,
-      "sha256": "f489b21ac882861d3c4c3a58450b227cda8af8efa9ec9d72204a55f22d9461b3"
+      "bytes": 6636,
+      "sha256": "035faf9ab4b83ac0eb7b8ff2fb1fa60f88f5d0910e485dfc9558d824da6a534b"
     },
     "src/render/ascii.js": {
       "bytes": 2158,
@@ -221,6 +237,14 @@
       "bytes": 1425,
       "sha256": "670883464d6ae1126873e00e4553f7a92c85bca2a31689d841f3fda17aa9ddbb"
     },
+    "tests/motion-world.test.mjs": {
+      "bytes": 2126,
+      "sha256": "dc1bb130136618faf23bbde0094e76ea7156b2044220f1a38f488dfed9e7f96f"
+    },
+    "tests/motion.test.mjs": {
+      "bytes": 4120,
+      "sha256": "e4afedc365873d0173d8134a3bf0d82a27a548613dd832a73cc10c50e4887126"
+    },
     "tools/browser-check.mjs": {
       "bytes": 4090,
       "sha256": "24dcaf8e2d0cb68abdce03dd62fd8129618a2b4f3e08c9cf259b4bf38c449001"
@@ -230,8 +254,8 @@
       "sha256": "7fcbc1e607ea370f8840d94c138cde24e97a6c54e82e5bba7a999d7a09ea2635"
     },
     "tools/package.py": {
-      "bytes": 971,
-      "sha256": "24451b44c7b8ddd9b2d095a4ea23ee411c6ee95814112535413d8fcd6c1cdb1d"
+      "bytes": 1065,
+      "sha256": "4b185b0c002e723b418dc4c4106d0f3d49730fccabc6194fac9560e29923e265"
     },
     "tsconfig.json": {
       "bytes": 313,

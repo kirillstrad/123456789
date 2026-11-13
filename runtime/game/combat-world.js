@@ -1,9 +1,10 @@
+import { createMotion, velocity, finishMotion, interpolateMotion } from '../animation/motion.js';
 import { COMBAT, SPARKS } from '../combat/config.js';
 import { ActionMachine } from '../combat/action-machine.js';
 import { SparkSystem } from '../combat/sparks.js';
 import { makeEnemy, enemyStep } from '../combat/enemy.js';
 import { OBSTACLES, solid, blocked, inArc } from '../combat/geometry.js';
-function initial() { return { x: 8, y: 12, fx: 0, fy: -1, time: 0, walkDistance: 0, moving: false, lamp: 100, cameraX: 8, cameraY: 12, phase: 'playing', action: null, sweepProgress: null, enemy: makeEnemy(), particles: [], cone: null, hitReaction: 0, deathTime: 0, note: 'Approach the warden. LMB light / RMB heavy / E sparks.' }; }
+function initial() { return { x: 8, y: 12, fx: 0, fy: -1, time: 0, walkDistance: 0, moving: false, motion: createMotion(), lamp: 100, cameraX: 8, cameraY: 12, phase: 'playing', action: null, sweepProgress: null, enemy: makeEnemy(), particles: [], cone: null, hitReaction: 0, deathTime: 0, note: 'Approach the warden. LMB light / RMB heavy / E sparks.' }; }
 export class CombatWorld {
     current = initial();
     previous = initial();
@@ -63,12 +64,14 @@ export class CombatWorld {
         this.sparks.step(dt);
         if (s.phase === 'dead') {
             s.deathTime += dt;
+            finishMotion(s.motion ??= createMotion(), dt, s.fx, s.fy, false, false, true);
             this.sync();
             return;
         }
         const oldStarted = this.actions.started;
         if (s.phase === 'won') {
             this.actions.step(dt, false, this.hooks());
+            finishMotion(s.motion ??= createMotion(), dt, s.fx, s.fy, false, true);
             this.sync();
             return;
         }
@@ -88,11 +91,15 @@ export class CombatWorld {
         else if (this.actions.current)
             this.actions.step(dt, Math.hypot(input.x, input.y) > .001, this.hooks());
         else {
-            const n = Math.hypot(input.x, input.y);
-            if (n > .001) {
-                s.fx = input.x / n;
-                s.fy = input.y / n;
-                s.moving = this.move(s.fx * dt * 1.65, s.fy * dt * 1.65) > 1e-8;
+            const motion = s.motion ??= createMotion(), v = velocity(motion, input, dt), ox = s.x, oy = s.y;
+            this.move(v.x * dt, v.y * dt);
+            motion.vx = (s.x - ox) / dt;
+            motion.vy = (s.y - oy) / dt;
+            const speed = Math.hypot(motion.vx, motion.vy);
+            s.moving = speed > 1e-5;
+            if (s.moving) {
+                s.fx = motion.vx / speed;
+                s.fy = motion.vy / speed;
             }
             else if (input.aim) {
                 const dx = input.aim.x - s.x, dy = input.aim.y - s.y, d = Math.hypot(dx, dy);
@@ -105,6 +112,7 @@ export class CombatWorld {
         if (this.actions.started !== oldStarted)
             this.record({ type: 'strike-start', attackId: this.actions.current?.id });
         this.sync();
+        finishMotion(s.motion ??= createMotion(), dt, s.fx, s.fy, s.moving, !!s.action || s.sweepProgress !== null);
         if (this.tipProvider)
             this.sparks.stone(this.tipProvider(s), s.time, { x: s.fx, y: s.fy }, this.sweepElapsed !== null);
         if (s.phase === 'playing')
@@ -114,5 +122,5 @@ export class CombatWorld {
         this.sync();
     }
     snapshot(alpha = 1) { const s = this.current, p = this.previous, t = Math.max(0, Math.min(1, alpha)), m = (a, b) => a + (b - a) * t, action = s.action ? { ...s.action } : null; if (action && p.action?.id === action.id)
-        action.progress = m(p.action.progress, action.progress); return { ...s, x: m(p.x, s.x), y: m(p.y, s.y), time: m(p.time, s.time), walkDistance: m(p.walkDistance, s.walkDistance), cameraX: m(p.cameraX, s.cameraX), cameraY: m(p.cameraY, s.cameraY), enemy: { ...s.enemy, x: m(p.enemy.x, s.enemy.x), y: m(p.enemy.y, s.enemy.y) }, action, particles: s.particles.map(p => ({ ...p })), cone: s.cone ? { ...s.cone } : null }; }
+        action.progress = m(p.action.progress, action.progress); return { ...s, motion: interpolateMotion(p.motion, s.motion, t), x: m(p.x, s.x), y: m(p.y, s.y), time: m(p.time, s.time), walkDistance: m(p.walkDistance, s.walkDistance), cameraX: m(p.cameraX, s.cameraX), cameraY: m(p.cameraY, s.cameraY), enemy: { ...s.enemy, x: m(p.enemy.x, s.enemy.x), y: m(p.enemy.y, s.enemy.y) }, action, particles: s.particles.map(p => ({ ...p })), cone: s.cone ? { ...s.cone } : null }; }
 }

@@ -1,13 +1,15 @@
 {
-  "build": "ASH_IRON_ITERATION_2_CANVAS2D",
-  "sourceCommit": "1d6270bc6efb000fd6709272dffa1bacfafb7276",
+  "build": "ASH_IRON_ITERATION_3A_1",
+  "sourceCommit": "552e4f9236a4360eec4840b067e3f2ec6aee82eb",
   "originalBaseCommit": "c727a02ad98ef0c537484f664777997a2ffc56e0",
   "renderer": "Canvas2D",
   "grid": [
     196,
     140
   ],
-  "status": "integration-build",
+  "status": "3A.1-motion-preview",
   "approved": "Canvas2D migration",
-  "rules": "DRAFT_RULES remain provisional"
+  "rules": "DRAFT_RULES remain provisional",
+  "motionBase": "addc11e18d69b084217ca501d40aa419be2d49d3",
+  "desktop": false
 }

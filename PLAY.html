@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ASH / IRON — Iteration 2 Canvas2D</title><style>*{box-sizing:border-box}body{margin:0;background:#000;color:#aaa;font:12px/1.7 monospace}main{max-width:1220px;margin:auto;padding:18px}.stage{border:1px solid #282828}canvas{display:block;width:100%;height:auto;outline:none;touch-action:none;cursor:crosshair}.tools{display:flex;gap:8px;flex-wrap:wrap}button{font:11px monospace;background:#080808;color:#aaa;border:1px solid #444;padding:8px;cursor:pointer}button:hover{color:#eee}p{color:#897b6b;font-size:11px}#status{min-height:20px;margin:10px 0;color:#a58d75}section{border-top:1px solid #42362d;margin:15px 0;padding:12px}label{display:flex;gap:10px;margin:10px 0}input{accent-color:#b45344}pre{white-space:pre-wrap}[hidden]{display:none!important}</style><main><div class="stage"><canvas id="game" width="1008" height="864" tabindex="0" aria-label="ASH IRON ASCII game"></canvas></div><div id="status">ASH / IRON — ITERATION 2 / CANVAS2D</div><div class="tools"><button id="menuButton">MENU / ESC</button><button id="restart">RESTART NAVE</button><button id="freeze">FREEZE FRAME</button><button id="export">SAVE FRAME PNG</button><button id="report">SAVE REPORT</button><button id="perfToggle">PERFORMANCE</button></div><section id="settings" hidden><h2>THE EMBER CHAMBER</h2><label>FLOW SPEED<input id="flow" type="range" min="10" max="160" value="32"></label><label>FIRE STRENGTH<input id="power" type="range" min="20" max="140" value="86"></label><label><input id="dim" type="checkbox" checked>DIM BACKGROUND</label><label><input id="fireFreeze" type="checkbox">FREEZE THE FLAME</label><p>192 columns / ASCII fire. Menu settings do not change the 196 x 140 world.</p><button id="settingsClose">CLOSE SETTINGS</button></section><section id="perf" hidden><pre id="perfText">Collecting frames...</pre></section><p>WASD / ARROWS: MOVE. LMB: LIGHT. RMB: HEAVY. Separate presses chain up to three strikes. E / MIDDLE CLICK: LIGHT-CASTING SWEEP. ESC: PAUSE.</p><p>The lamp is the only life pool. HEALTH and LAMP display that same value. No execution, dash, healing, checkpoints, saves, new rooms or installer.</p><p>Draft defaults: cursor-at-press aim, locked strike direction, damage does not interrupt a strike, movement may leave the last 14% of recovery. Canvas2D lighting is evaluated at ASCII-cell resolution; not a pixel-identical WebGL comparison. Target 30 FPS is not guaranteed.</p></main><script>
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ASH / IRON — Iteration 3A.1 Motion</title><style>*{box-sizing:border-box}body{margin:0;background:#000;color:#aaa;font:12px/1.7 monospace}main{max-width:1220px;margin:auto;padding:18px}.stage{border:1px solid #282828}canvas{display:block;width:100%;height:auto;outline:none;touch-action:none;cursor:crosshair}.tools{display:flex;gap:8px;flex-wrap:wrap}button{font:11px monospace;background:#080808;color:#aaa;border:1px solid #444;padding:8px;cursor:pointer}button:hover{color:#eee}p{color:#897b6b;font-size:11px}#status{min-height:20px;margin:10px 0;color:#a58d75}section{border-top:1px solid #42362d;margin:15px 0;padding:12px}label{display:flex;gap:10px;margin:10px 0}input{accent-color:#b45344}pre{white-space:pre-wrap}[hidden]{display:none!important}</style><main><div class="stage"><canvas id="game" width="1008" height="864" tabindex="0" aria-label="ASH IRON ASCII game"></canvas></div><div id="status">ASH / IRON — ITERATION 3A.1 / MOTION</div><div class="tools"><button id="menuButton">MENU / ESC</button><button id="restart">RESTART NAVE</button><button id="freeze">FREEZE FRAME</button><button id="export">SAVE FRAME PNG</button><button id="report">SAVE REPORT</button><button id="perfToggle">PERFORMANCE</button></div><section id="settings" hidden><h2>THE EMBER CHAMBER</h2><label>FLOW SPEED<input id="flow" type="range" min="10" max="160" value="32"></label><label>FIRE STRENGTH<input id="power" type="range" min="20" max="140" value="86"></label><label><input id="dim" type="checkbox" checked>DIM BACKGROUND</label><label><input id="fireFreeze" type="checkbox">FREEZE THE FLAME</label><p>192 columns / ASCII fire. Menu settings do not change the 196 x 140 world.</p><button id="settingsClose">CLOSE SETTINGS</button></section><section id="perf" hidden><pre id="perfText">Collecting frames...</pre></section><p>WASD / ARROWS: MOVE. LMB: LIGHT. RMB: HEAVY. Separate presses chain up to three strikes. E / MIDDLE CLICK: LIGHT-CASTING SWEEP. ESC: PAUSE.</p><p>The lamp is the only life pool. HEALTH and LAMP display that same value. No execution, dash, healing, checkpoints, saves, new rooms or installer.</p><p>Draft defaults: cursor-at-press aim, locked strike direction, damage does not interrupt a strike, movement may leave the last 14% of recovery. Canvas2D lighting is evaluated at ASCII-cell resolution; not a pixel-identical WebGL comparison. Target 30 FPS is not guaranteed.</p></main><script>
 
 (function(root){'use strict';
 const TAU=Math.PI*2,C=(x,a=0,b=1)=>Math.max(a,Math.min(b,x)),sm=x=>{x=C(x);return x*x*(3-2*x)},mix=(a,b,t)=>a+(b-a)*t,add=(a,b)=>a.map((v,i)=>v+b[i]),sub=(a,b)=>a.map((v,i)=>v-b[i]),mul=(a,s)=>a.map(v=>v*s),dot=(a,b)=>a.reduce((s,v,i)=>s+v*b[i],0),len=a=>Math.hypot(...a),norm=v=>mul(v,1/Math.max(1e-9,len(v))),cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],blend=(a,b,t)=>a.map((v,i)=>mix(v,b[i],t)),rot=(v,a)=>[v[0]*Math.cos(a)-v[1]*Math.sin(a),v[0]*Math.sin(a)+v[1]*Math.cos(a),v[2]];
@@ -40,6 +40,7 @@ root.IronPilgrim=Object.freeze({clips,sample,rig,emit,ik,body,foot,spring});})(g
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.lampBeat = lampBeat;
 exports.combatHero = combatHero;
+const motion_js_1 = require("./motion.js");
 function lampBeat(life, time) {
     if (life <= 0)
         return 0;
@@ -49,30 +50,108 @@ function lampBeat(life, time) {
 function combatHero(s, module = globalThis.IronPilgrim, secondary = { cloth: 0, chains: [0, 0, 0, 0] }) {
     if (!module)
         throw Error('Original vendor/hero.js must be loaded before rendering.');
-    let clip = 'breath', t = (s.time / 5) % 1;
+    let clip = 'breath', t = (s.time / 5) % 1, locomotion = true;
     if (s.phase === 'dead') {
         clip = 'death';
         t = Math.min(1, s.deathTime / 2.5);
+        locomotion = false;
     }
     else if (s.action) {
         clip = s.action.clip;
         t = s.action.progress;
+        locomotion = false;
     }
     else if (s.sweepProgress !== null) {
         clip = 'sweep';
         t = s.sweepProgress;
+        locomotion = false;
     }
     else if (s.hitReaction > 0) {
         clip = 'hit';
         t = 1 - s.hitReaction / .65;
+        locomotion = false;
     }
-    else if (s.moving) {
+    else if ((s.motion?.weight ?? (s.moving ? 1 : 0)) > .001)
         clip = 'walk';
-        t = (s.walkDistance / .8) % 1;
-    }
-    const pose = module.sample(clip, Math.max(0, Math.min(1, t)), s.time), rig = module.rig(pose), transform = (v) => { const x = v[0] - pose.root[0], y = v[1] - pose.root[1]; return [s.x + s.fy * x + s.fx * y, s.y - s.fx * x + s.fy * y, v[2]]; }, parts = [], push = (kind, v, c, w = 1) => { const points = v.map(transform); parts.push({ kind, v: points, c, w, hero: true, d: points.reduce((d, v) => d + v[0] + v[1] + v[2] * .006, 0) / points.length + (kind === 1 ? .005 : 0) }); };
+    const sampled = locomotion ? (0, motion_js_1.locomotionPose)(s, module) : null, pose = sampled?.pose ?? module.sample(clip, Math.max(0, Math.min(1, t)), s.time), rig = sampled?.rig ?? module.rig(pose), heading = s.motion?.heading ?? Math.atan2(s.fy, s.fx), fx = Math.cos(heading), fy = Math.sin(heading), transform = (v) => { const x = v[0] - pose.root[0], y = v[1] - pose.root[1]; return [s.x + fy * x + fx * y, s.y - fx * x + fy * y, v[2]]; }, parts = [], push = (kind, v, c, w = 1) => { const points = v.map(transform); parts.push({ kind, v: points, c, w, hero: true, d: points.reduce((d, v) => d + v[0] + v[1] + v[2] * .006, 0) / points.length + (kind === 1 ? .005 : 0) }); };
     const lamp = module.emit(rig, s.time, { poly: (v, c) => push(0, v, c), line: (v, c, w) => push(1, v, c, w) }, secondary, lampBeat(s.lamp, s.time));
     return { parts, lamp: transform(lamp), tip: transform(rig.tip), clip };
+}
+
+},
+"animation/motion.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.MOTION = void 0;
+exports.createMotion = createMotion;
+exports.angleDelta = angleDelta;
+exports.turnToward = turnToward;
+exports.velocity = velocity;
+exports.finishMotion = finishMotion;
+exports.interpolateMotion = interpolateMotion;
+exports.locomotionPose = locomotionPose;
+exports.MOTION = Object.freeze({ maxSpeed: 1.65, acceleration: 9, deceleration: 14, turnRate: 9, strikeTurnRate: 16, blendRate: 14 });
+function createMotion(fx = 0, fy = -1) { return { vx: 0, vy: 0, heading: Math.atan2(fy, fx), weight: 0, speed: 0 }; }
+function angleDelta(from, to) { return Math.atan2(Math.sin(to - from), Math.cos(to - from)); }
+function turnToward(from, to, maxDelta) { const d = angleDelta(from, to); return from + Math.max(-maxDelta, Math.min(maxDelta, d)); }
+function velocity(m, input, dt) {
+    if (!Number.isFinite(dt) || dt <= 0)
+        return { x: m.vx, y: m.vy };
+    const n = Math.hypot(input.x, input.y), tx = n > .001 ? input.x / n * exports.MOTION.maxSpeed : 0, ty = n > .001 ? input.y / n * exports.MOTION.maxSpeed : 0, dx = tx - m.vx, dy = ty - m.vy, d = Math.hypot(dx, dy), step = (n > .001 ? exports.MOTION.acceleration : exports.MOTION.deceleration) * dt, t = d > 0 ? Math.min(1, step / d) : 0;
+    m.vx += dx * t;
+    m.vy += dy * t;
+    if (Math.hypot(m.vx, m.vy) < 1e-5) {
+        m.vx = 0;
+        m.vy = 0;
+    }
+    return { x: m.vx, y: m.vy };
+}
+function finishMotion(m, dt, fx, fy, walking, striking, dead = false) {
+    m.speed = walking ? Math.hypot(m.vx, m.vy) : 0;
+    if (!walking) {
+        m.vx = 0;
+        m.vy = 0;
+    }
+    const target = Math.min(1, m.speed / exports.MOTION.maxSpeed);
+    m.weight += (target - m.weight) * (1 - Math.exp(-exports.MOTION.blendRate * dt));
+    if (target === 0 && m.weight < .001)
+        m.weight = 0;
+    if (!dead && Math.hypot(fx, fy) > .001)
+        m.heading = turnToward(m.heading, Math.atan2(fy, fx), (striking ? exports.MOTION.strikeTurnRate : exports.MOTION.turnRate) * dt);
+}
+function interpolateMotion(a, b, t) {
+    if (!b)
+        return undefined;
+    if (!a)
+        return { ...b };
+    const mix = (x, y) => x + (y - x) * t;
+    return { vx: mix(a.vx, b.vx), vy: mix(a.vy, b.vy), speed: mix(a.speed, b.speed), weight: mix(a.weight, b.weight), heading: a.heading + angleDelta(a.heading, b.heading) * t };
+}
+const mix3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], mul = (a, n) => [a[0] * n, a[1] * n, a[2] * n], dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+function leg(base, target, a, b, pole) {
+    const d = sub(target, base), distance = Math.hypot(...d), n = distance > .000001 ? mul(d, 1 / distance) : [0, 0, -1], reach = Math.max(Math.abs(a - b) + .001, Math.min(a + b - .001, distance)), end = add(base, mul(n, reach));
+    let bend = sub(sub(pole, base), mul(n, dot(sub(pole, base), n)));
+    if (Math.hypot(...bend) < .001) {
+        const axis = Math.abs(n[0]) < .8 ? [1, 0, 0] : [0, 1, 0];
+        bend = sub(axis, mul(n, dot(axis, n)));
+    }
+    bend = mul(bend, 1 / Math.max(1e-9, Math.hypot(...bend)));
+    const x = (a * a - b * b + reach * reach) / (2 * reach), h = Math.sqrt(Math.max(0, a * a - x * x));
+    return { base, joint: add(add(base, mul(n, x)), mul(bend, h)), end, a, b };
+}
+/** Pure sampling: no renderer-owned clock or mutable animation cache. */
+function locomotionPose(s, module) {
+    const idle = module.sample('breath', (s.time / 5) % 1, s.time), walk = module.sample('walk', (s.walkDistance / .8) % 1, s.time), w = Math.max(0, Math.min(1, s.motion?.weight ?? (s.moving ? 1 : 0))), p = { ...idle, root: mix3(idle.root, walk.root, w), right: mix3(idle.right, walk.right, w), left: mix3(idle.left, walk.left, w), gait: w > 0 && walk.gait ? { ...walk.gait } : null };
+    for (const k of ['lean', 'twist', 'head', 'look', 'breath', 'az', 'down', 'lift', 'flame'])
+        p[k] = idle[k] + (walk[k] - idle[k]) * w;
+    p.lean += .035 * w;
+    const rig = module.rig(p);
+    if (w > 0) {
+        const ir = module.rig(idle), wr = module.rig(walk);
+        rig.legs = rig.legs.map((l, i) => { const target = add(mix3(sub(ir.legs[i].end, idle.root), sub(wr.legs[i].end, walk.root), w), p.root); return leg(l.base, target, l.a, l.b, l.joint); });
+    }
+    return { pose: p, rig };
 }
 
 },
@@ -88,7 +167,7 @@ const ornaments_js_1 = require("../ui/ornaments.js");
 const $ = s => document.getElementById(s), cv = $('game'), out = cv.getContext('2d', { willReadFrequently: true }), W = 1008, H = 720, COLS = 196, ROWS = 140;
 const canvas = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }, scene = canvas(W, H), mask = canvas(W, H), sg = scene.getContext('2d', { willReadFrequently: true }), mg = mask.getContext('2d', { willReadFrequently: true });
 const ascii = new ascii_js_1.ASCII(out), maskReader = new ascii_js_1.ASCII(out), uiASCII = new ascii_js_1.ASCII(out), ui = (0, ornaments_js_1.makeUI)(out, (src, cols, rows, y, h, mono) => uiASCII.paint(src, cols, rows, y, h, mono));
-const env = (0, environment_js_1.createEnvironment)(), world = new combat_world_js_1.CombatWorld(undefined, s => (0, combat_hero_js_1.combatHero)(s).tip), keys = new Set(), commands = [], report = { build: 'ASH_IRON_ITERATION_2_CANVAS2D', errors: [], frames: [], backend: 'Canvas2D / ASCII cell lighting', gpuTime: null };
+const env = (0, environment_js_1.createEnvironment)(), world = new combat_world_js_1.CombatWorld(undefined, s => (0, combat_hero_js_1.combatHero)(s).tip), keys = new Set(), commands = [], report = { build: 'ASH_IRON_ITERATION_3A_1', errors: [], frames: [], backend: 'Canvas2D / ASCII cell lighting', gpuTime: null };
 let mode = 'menu', selected = 0, menuPage = false, time = 0, last = 0, drawAt = 0, simLast = null, acc = 0, paused = false, frozen = false, endTime = 0, aimPoint = null, camera = { x: 8, y: 12 }, renderCount = 0, fireAt = -1, coneBoost = 0;
 const fire = canvas(192, 165), fg = fire.getContext('2d', { willReadFrequently: true }), fireASCII = new ascii_js_1.ASCII(out);
 const pr = (x, y, z, cx = camera.x, cy = camera.y) => [504 + ((x - cx) - (y - cy)) * 65 * .76, 430 + ((x - cx) + (y - cy)) * 65 * .43 - z * 65 * .87];
@@ -578,12 +657,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CombatWorld = void 0;
+const motion_js_1 = require("../animation/motion.js");
 const config_js_1 = require("../combat/config.js");
 const action_machine_js_1 = require("../combat/action-machine.js");
 const sparks_js_1 = require("../combat/sparks.js");
 const enemy_js_1 = require("../combat/enemy.js");
 const geometry_js_1 = require("../combat/geometry.js");
-function initial() { return { x: 8, y: 12, fx: 0, fy: -1, time: 0, walkDistance: 0, moving: false, lamp: 100, cameraX: 8, cameraY: 12, phase: 'playing', action: null, sweepProgress: null, enemy: (0, enemy_js_1.makeEnemy)(), particles: [], cone: null, hitReaction: 0, deathTime: 0, note: 'Approach the warden. LMB light / RMB heavy / E sparks.' }; }
+function initial() { return { x: 8, y: 12, fx: 0, fy: -1, time: 0, walkDistance: 0, moving: false, motion: (0, motion_js_1.createMotion)(), lamp: 100, cameraX: 8, cameraY: 12, phase: 'playing', action: null, sweepProgress: null, enemy: (0, enemy_js_1.makeEnemy)(), particles: [], cone: null, hitReaction: 0, deathTime: 0, note: 'Approach the warden. LMB light / RMB heavy / E sparks.' }; }
 class CombatWorld {
     current = initial();
     previous = initial();
@@ -697,12 +777,14 @@ class CombatWorld {
         this.sparks.step(dt);
         if (s.phase === 'dead') {
             s.deathTime += dt;
+            (0, motion_js_1.finishMotion)(s.motion ??= (0, motion_js_1.createMotion)(), dt, s.fx, s.fy, false, false, true);
             this.sync();
             return;
         }
         const oldStarted = this.actions.started;
         if (s.phase === 'won') {
             this.actions.step(dt, false, this.hooks());
+            (0, motion_js_1.finishMotion)(s.motion ??= (0, motion_js_1.createMotion)(), dt, s.fx, s.fy, false, true);
             this.sync();
             return;
         }
@@ -722,11 +804,15 @@ class CombatWorld {
         else if (this.actions.current)
             this.actions.step(dt, Math.hypot(input.x, input.y) > .001, this.hooks());
         else {
-            const n = Math.hypot(input.x, input.y);
-            if (n > .001) {
-                s.fx = input.x / n;
-                s.fy = input.y / n;
-                s.moving = this.move(s.fx * dt * 1.65, s.fy * dt * 1.65) > 1e-8;
+            const motion = s.motion ??= (0, motion_js_1.createMotion)(), v = (0, motion_js_1.velocity)(motion, input, dt), ox = s.x, oy = s.y;
+            this.move(v.x * dt, v.y * dt);
+            motion.vx = (s.x - ox) / dt;
+            motion.vy = (s.y - oy) / dt;
+            const speed = Math.hypot(motion.vx, motion.vy);
+            s.moving = speed > 1e-5;
+            if (s.moving) {
+                s.fx = motion.vx / speed;
+                s.fy = motion.vy / speed;
             }
             else if (input.aim) {
                 const dx = input.aim.x - s.x, dy = input.aim.y - s.y, d = Math.hypot(dx, dy);
@@ -739,6 +825,7 @@ class CombatWorld {
         if (this.actions.started !== oldStarted)
             this.record({ type: 'strike-start', attackId: this.actions.current?.id });
         this.sync();
+        (0, motion_js_1.finishMotion)(s.motion ??= (0, motion_js_1.createMotion)(), dt, s.fx, s.fy, s.moving, !!s.action || s.sweepProgress !== null);
         if (this.tipProvider)
             this.sparks.stone(this.tipProvider(s), s.time, { x: s.fx, y: s.fy }, this.sweepElapsed !== null);
         if (s.phase === 'playing')
@@ -751,7 +838,7 @@ class CombatWorld {
         const s = this.current, p = this.previous, t = Math.max(0, Math.min(1, alpha)), m = (a, b) => a + (b - a) * t, action = s.action ? { ...s.action } : null;
         if (action && p.action?.id === action.id)
             action.progress = m(p.action.progress, action.progress);
-        return { ...s, x: m(p.x, s.x), y: m(p.y, s.y), time: m(p.time, s.time), walkDistance: m(p.walkDistance, s.walkDistance), cameraX: m(p.cameraX, s.cameraX), cameraY: m(p.cameraY, s.cameraY), enemy: { ...s.enemy, x: m(p.enemy.x, s.enemy.x), y: m(p.enemy.y, s.enemy.y) }, action, particles: s.particles.map(p => ({ ...p })), cone: s.cone ? { ...s.cone } : null };
+        return { ...s, motion: (0, motion_js_1.interpolateMotion)(p.motion, s.motion, t), x: m(p.x, s.x), y: m(p.y, s.y), time: m(p.time, s.time), walkDistance: m(p.walkDistance, s.walkDistance), cameraX: m(p.cameraX, s.cameraX), cameraY: m(p.cameraY, s.cameraY), enemy: { ...s.enemy, x: m(p.enemy.x, s.enemy.x), y: m(p.enemy.y, s.enemy.y) }, action, particles: s.particles.map(p => ({ ...p })), cone: s.cone ? { ...s.cone } : null };
     }
 }
 exports.CombatWorld = CombatWorld;
