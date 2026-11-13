@@ -1,0 +1,30 @@
+{
+  "version": "0.7.0",
+  "type": "complete_game_project",
+  "test_location": "The Nave",
+  "game_density": [
+    196,
+    140
+  ],
+  "menu_density": [
+    196,
+    168
+  ],
+  "hero": "Iron Pilgrim rig with 35 clips; same design direction as the latest study",
+  "player_resource": "one LAMP life, no separate HP",
+  "automatic_tests_run": false,
+  "syntax_runner_run": false,
+  "browser_run": false,
+  "server_run": false,
+  "production_runtime_run": false,
+  "actual_fps_measured": false,
+  "reason": "User explicitly requested an immediate archive without automated tests.",
+  "internet_required": false,
+  "external_runtime_dependencies": [],
+  "menu_fire_defaults": {
+    "flow": 0.32,
+    "strength": 0.86,
+    "dim": true,
+    "frozen": false
+  }
+}

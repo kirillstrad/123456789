@@ -1,0 +1,15 @@
+{
+  "name": "ash-iron-the-nave",
+  "version": "0.7.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "build": "node tools/build.mjs"
+  },
+  "engines": {
+    "node": ">=20.19"
+  },
+  "dependencies": {},
+  "description": "Full offline ASCII game / one test nave / fixed 196 x 140. No automatic tests."
+}
