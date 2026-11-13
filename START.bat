@@ -1,11 +1,10 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-title ASH IRON - The Nave - ASCII 196
+title ASH IRON - Iteration 1.0.1
 where node >nul 2>nul
 if errorlevel 1 (
- echo Opening the bundled offline version.
- start "" "%~dp0PLAY.html"
+ start "" "%~dp0CONTROL.html"
  exit /b 0
 )
 node server.mjs

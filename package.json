@@ -1,15 +1,21 @@
 {
-  "name": "ash-iron-the-nave",
-  "version": "0.7.0",
+  "name": "ash-iron-iteration-1",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
-  "scripts": {
-    "start": "node server.mjs",
-    "build": "node tools/build.mjs"
-  },
   "engines": {
     "node": ">=20.19"
   },
-  "dependencies": {},
-  "description": "Full offline ASCII game / one test nave / fixed 196 x 140. No automatic tests."
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "compile": "tsc -p tsconfig.runtime.json && node tools/copy-runtime.mjs",
+    "test": "npm run compile && node --test",
+    "build": "npm run typecheck && npm run compile && vite build && node tools/portable.mjs"
+  },
+  "devDependencies": {
+    "typescript": "5.8.2",
+    "vite": "6.1.0"
+  }
 }

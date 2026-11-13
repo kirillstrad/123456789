@@ -1,0 +1,185 @@
+{
+  "buildId": "ASH_IRON_ITERATION_1_0_1",
+  "executedAtUTC": "2026-11-13T11:40:52.591297+00:00",
+  "browser": "Chromium 134.0.6998.35",
+  "automation": "Playwright 1.51.0",
+  "hostOS": "Linux",
+  "gpu": "ANGLE SwiftShader / software rendering, not user Intel UHD",
+  "checks": [
+    {
+      "name": "runtime starts and real WebGL2 shaders link",
+      "passed": true,
+      "details": {
+        "backend": "WEBGL2",
+        "build": "ASH_IRON_ITERATION_1_0_1",
+        "profile": {
+          "width": 1008,
+          "height": 864,
+          "worldHeight": 720,
+          "cols": 196,
+          "rows": 140,
+          "zoom": 65,
+          "light": 160,
+          "radius": 120,
+          "environment": 125,
+          "black": 100
+        }
+      }
+    },
+    {
+      "name": "freeze button stops simulation",
+      "passed": true,
+      "details": {
+        "frozen_time": 0.3333333333333333,
+        "button": "RESUME"
+      }
+    },
+    {
+      "name": "WASD works immediately after clicking Resume",
+      "passed": true,
+      "details": {
+        "before": [
+          8,
+          12
+        ],
+        "after": [
+          8.116672618895784,
+          11.883327381104216
+        ],
+        "focus": "game"
+      }
+    },
+    {
+      "name": "Reset restores state and Arrow movement still works",
+      "passed": true,
+      "details": {
+        "position": [
+          7.8833273811042215,
+          12.116672618895784
+        ],
+        "lamp": 100
+      }
+    },
+    {
+      "name": "disabled combat and ability keys do not affect iteration 1",
+      "passed": true,
+      "details": {
+        "state_unchanged": true,
+        "lamp": 100
+      }
+    },
+    {
+      "name": "REFERENCE renders a nonblack scene after backend selector",
+      "passed": true,
+      "details": {
+        "mean": 5.711282425778953,
+        "nonblack": 0.15463514109347443,
+        "focus": "game",
+        "backend": "REFERENCE"
+      }
+    },
+    {
+      "name": "WASD works after backend switch and Resume in REFERENCE",
+      "passed": true,
+      "details": {
+        "before": [
+          7.8833273811042215,
+          12.116672618895784
+        ],
+        "after": [
+          7.6499821433126645,
+          11.883327381104216
+        ]
+      }
+    },
+    {
+      "name": "WEBGL2 renders after switching back and retains focus",
+      "passed": true,
+      "details": {
+        "mean": 5.84541583994709,
+        "focus": "game"
+      }
+    },
+    {
+      "name": "SAVE REPORT downloads valid diagnostic JSON",
+      "passed": true,
+      "details": {
+        "filename": "ash-iron-iteration-1-report.json",
+        "buildId": "ASH_IRON_ITERATION_1_0_1",
+        "valid_json": true,
+        "errors": []
+      }
+    },
+    {
+      "name": "reset while paused remains frozen at original camera",
+      "passed": true,
+      "details": {
+        "frozen_reset_state": {
+          "x": 8,
+          "y": 12,
+          "fx": 0,
+          "fy": -1,
+          "time": 0,
+          "walkDistance": 0,
+          "moving": false,
+          "lamp": 100,
+          "cameraX": 8,
+          "cameraY": 12
+        }
+      }
+    },
+    {
+      "name": "performance panel opens without F2",
+      "passed": true,
+      "details": {
+        "panel_visible": true
+      }
+    },
+    {
+      "name": "collision module runs in browser and stops before column",
+      "passed": true,
+      "details": {
+        "x": 5,
+        "y": 5.820000000000005,
+        "solid": false,
+        "lamp": 100
+      }
+    },
+    {
+      "name": "portable CONTROL.html starts offline through file://",
+      "passed": true,
+      "details": {
+        "build": "ASH_IRON_ITERATION_1_0_1",
+        "backend": "WEBGL2",
+        "http_requests": 0,
+        "page_errors": []
+      }
+    },
+    {
+      "name": "portable pause/resume does not lose WASD focus",
+      "passed": true,
+      "details": {
+        "frozen": true,
+        "moved_after_resume": true,
+        "before": 8,
+        "after": 8.097227182413153
+      }
+    },
+    {
+      "name": "portable diagnostic download works",
+      "passed": true,
+      "details": {
+        "valid_report": true,
+        "errors": []
+      }
+    }
+  ],
+  "passed": 15,
+  "failed": 0,
+  "pageErrors": [],
+  "portablePageErrors": [],
+  "runtimeOverHTTP": true,
+  "standaloneFileURI": true,
+  "targetDeviceFPSVerified": false,
+  "windowsBatExecuted": false
+}

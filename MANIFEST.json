@@ -1,0 +1,265 @@
+{
+  "buildId": "ASH_IRON_ITERATION_1_0_1",
+  "algorithm": "SHA-256",
+  "excluded": [
+    "MANIFEST.json"
+  ],
+  "files": {
+    ".gitignore": {
+      "bytes": 40,
+      "sha256": "bebb5386adf9846d1d8adc402486849c17ab695422114669b597da88cb78b3b4"
+    },
+    "BROWSER_CHECK.bat": {
+      "bytes": 64,
+      "sha256": "0c75e6493048a3e13a54291372cf2ce93b97106ae0f74fa5dfb6bba38a482079"
+    },
+    "BUILD.bat": {
+      "bytes": 148,
+      "sha256": "2740358d5aac8dff9feaf77510921d07242987c722280ddf508fce2480fadddf"
+    },
+    "BUILD_INFO.json": {
+      "bytes": 929,
+      "sha256": "11a7a8d5f7245f826997ba377e11e1bff0f8a4d78392964946486d2c99f8ef26"
+    },
+    "CHECK_READY_BUILD.bat": {
+      "bytes": 46,
+      "sha256": "26d330ed587d48f3f13caabd7261e15f9f404f95b9828b1dc3fce983f6180c57"
+    },
+    "CONTROL.html": {
+      "bytes": 55950,
+      "sha256": "c60078d9ab3a4a641f5aab048a764172b94821240bf68d24e8bffbfa8eb7cd74"
+    },
+    "README_RU.md": {
+      "bytes": 9057,
+      "sha256": "3a388c74efc171029bf78971fbba18311ce5c56f2e5eca23e4b6f963cb8810ad"
+    },
+    "START.bat": {
+      "bytes": 208,
+      "sha256": "f5cc7f533234f08a251b73fa027820504a80652d9e3f0d9b5d05f5c7775af940"
+    },
+    "TEST.bat": {
+      "bytes": 143,
+      "sha256": "a91a41d214be87453676c6635bb8eceb1d070d4b2a3ad82545f029e748543d0d"
+    },
+    "dist/CONTROL.html": {
+      "bytes": 55950,
+      "sha256": "c60078d9ab3a4a641f5aab048a764172b94821240bf68d24e8bffbfa8eb7cd74"
+    },
+    "docs/BROWSER_CHECK_RU.md": {
+      "bytes": 2612,
+      "sha256": "16f108de6e3ef52095e261fdf6eb0a51cef68256a71de92456eed2e82e2e48b0"
+    },
+    "docs/SCOPE.md": {
+      "bytes": 412,
+      "sha256": "85e4c8e9efc9569674d7e373c210c4149a183c4d4ed9951f4703b2678d5c8b48"
+    },
+    "docs/browser-check.json": {
+      "bytes": 4356,
+      "sha256": "2501e0f21c557ca96457d9538ac4904d2faad19a904f6c2bf86f5408e28ae606"
+    },
+    "docs/portable-report.json": {
+      "bytes": 3566,
+      "sha256": "d4ebd8d1d75adb1a85a7acfed0380d1b166024a947b4478185b024b592dbfe9c"
+    },
+    "docs/reference-frame.png": {
+      "bytes": 620377,
+      "sha256": "d6143d51ea2b9e1566ca6edd37b6b992628cb27b019a0402c1227c2010f90653"
+    },
+    "docs/sample-report.json": {
+      "bytes": 1360,
+      "sha256": "3f2b6dc21f2fa5d6abc4fc771cf351f1b691f027d23c93263573093797815f3b"
+    },
+    "docs/typecheck.json": {
+      "bytes": 219,
+      "sha256": "212e6291504b6dc4a25f39b0f907b56375eef189fc676916ba581f697a032610"
+    },
+    "docs/unit-tests.tap": {
+      "bytes": 2437,
+      "sha256": "d345ab00d2743d20deb74844b58c08bb0fd0aa1f8b46891d49a58bef96b7ae06"
+    },
+    "docs/webgl2-frame.png": {
+      "bytes": 532041,
+      "sha256": "aa819f57bded0e0b95f7805558b445b4bafd1bd594737b21baf1e2d884f6e8f1"
+    },
+    "index.html": {
+      "bytes": 1993,
+      "sha256": "c1f65014e1047593b3af4e6ceb3a0d71a8231abd92490b4dbf82088f1d6500d8"
+    },
+    "package.json": {
+      "bytes": 535,
+      "sha256": "c5b8c7751ffbb9f95869cfbbc178927007c1afa0c64d60b5af40e9c8ebb82a97"
+    },
+    "public/vendor/hero.js": {
+      "bytes": 12340,
+      "sha256": "96a7de64ec52577f69aa3ca0ae3ca49edd4ff795b315e61ef1df6d13c243a1e8"
+    },
+    "reference/visual-reference.html": {
+      "bytes": 34591,
+      "sha256": "957c61f0ec35526ad4c91d87814e812ca4cb7603f281797d9a66646792d9d2b5"
+    },
+    "runtime/animation/hero.js": {
+      "bytes": 908,
+      "sha256": "a7d4b23ec20809fbc61e22186207198d87bf62f277ccddb147f134236d40ee8f"
+    },
+    "runtime/app/main.js": {
+      "bytes": 4342,
+      "sha256": "042323faa3b07915d13572ad470f095a5251ade897249bb0cb20847e72b16ef6"
+    },
+    "runtime/core/clock.js": {
+      "bytes": 962,
+      "sha256": "1eb088c7eb4879290856e2db9c44f48230c169e343fb05d6b59aa2c701a00a1c"
+    },
+    "runtime/core/input.js": {
+      "bytes": 1165,
+      "sha256": "9ac0b23f4a4aac355f8a9285d6f95dc2995f1599094b4feca01432f0e2e0a7ed"
+    },
+    "runtime/core/profile.js": {
+      "bytes": 409,
+      "sha256": "82f930a2465b36bed1e7d11c68053a8ad0957eb33d28ec32592368b3377cdbdf"
+    },
+    "runtime/core/types.js": {
+      "bytes": 11,
+      "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
+    },
+    "runtime/game/world.js": {
+      "bytes": 1863,
+      "sha256": "3e28be403ad82f2fb1b8e6112631049532baf0efda7a0312546d9e77d6a7ca7d"
+    },
+    "runtime/index.html": {
+      "bytes": 1985,
+      "sha256": "40eb071515322e249745d6ddd251f7d5bf821b657bbb3cc722f749cce871b12a"
+    },
+    "runtime/render/environment.js": {
+      "bytes": 4365,
+      "sha256": "52abae03531417bf5a49ba420a6cd584e61c537154878d54e2a51cbb8f57015d"
+    },
+    "runtime/render/reference-backend.js": {
+      "bytes": 3404,
+      "sha256": "ff572689bbd72189de48227f8612000ba6846bfab2539284e545cf665d765db1"
+    },
+    "runtime/render/renderer.js": {
+      "bytes": 2490,
+      "sha256": "32d12645d325824fd41a4c06cba9eed1f9b8661807844cce97bdce399e492ad0"
+    },
+    "runtime/render/scene.js": {
+      "bytes": 2611,
+      "sha256": "d6fc6820f4542eb85e95d0d741df6758d49966243c67a179324d2669c09adf99"
+    },
+    "runtime/render/webgl.js": {
+      "bytes": 7775,
+      "sha256": "f6634a3440d6de11b1924ccf4df4c7c48c73d7f8c9eac86e695bff70632681df"
+    },
+    "runtime/style.css": {
+      "bytes": 1014,
+      "sha256": "7878ae4a29565d5d5119602f549f634b0e8a27cc21298d0be20dc1192b5bbcee"
+    },
+    "runtime/ui/diagnostics.js": {
+      "bytes": 1991,
+      "sha256": "a8ee92191480e78c57fcd553739d2b52897ae9124f66f34be066b0cfc8dfb38d"
+    },
+    "runtime/vendor/hero.js": {
+      "bytes": 12340,
+      "sha256": "96a7de64ec52577f69aa3ca0ae3ca49edd4ff795b315e61ef1df6d13c243a1e8"
+    },
+    "server.mjs": {
+      "bytes": 1452,
+      "sha256": "f62fc42e15e21ddca48447f367413be1bb5b3337046547f35cca31fa8f61cc33"
+    },
+    "src/animation/hero.ts": {
+      "bytes": 868,
+      "sha256": "d54c293256f046b5674da281486e4096131ee805e0970c08a973288f716f6a41"
+    },
+    "src/app/main.ts": {
+      "bytes": 4384,
+      "sha256": "51f3013be2b933625a0758e9827e7653f47decf374d2e54ff1a9b4d0df647595"
+    },
+    "src/core/clock.ts": {
+      "bytes": 806,
+      "sha256": "354cddaa68a666821fcd23f6ec37c6b49d58bbc8157c33c672b5cb2e4317a5d9"
+    },
+    "src/core/input.ts": {
+      "bytes": 1082,
+      "sha256": "130de2353fa48ef934817168b9903adba223993bc0ff13687f4588835c97e4ef"
+    },
+    "src/core/profile.ts": {
+      "bytes": 373,
+      "sha256": "c5bd7cebb449beb4cae343fcd69fe142dc9b558837b3086b65ce918e5f6988af"
+    },
+    "src/core/types.ts": {
+      "bytes": 1718,
+      "sha256": "9df417894b16ae8d83aa98c4e2fc6ab60647ae3bbfa67e26879269383ad47049"
+    },
+    "src/game/world.ts": {
+      "bytes": 1668,
+      "sha256": "3438af74bc029c7461fcbfdf66966ff98b486ce4817b04fbaf1c6c44a7b3c393"
+    },
+    "src/render/environment.d.ts": {
+      "bytes": 116,
+      "sha256": "661caa880439f17cac48fd3c5893fa4f51f3f18d27dd668f0000d86db33a41ae"
+    },
+    "src/render/environment.js": {
+      "bytes": 4365,
+      "sha256": "52abae03531417bf5a49ba420a6cd584e61c537154878d54e2a51cbb8f57015d"
+    },
+    "src/render/reference-backend.d.ts": {
+      "bytes": 183,
+      "sha256": "affa22876c974d83534d56ce279774de37ff97d56422d166521be9d9727f6b8c"
+    },
+    "src/render/reference-backend.js": {
+      "bytes": 3404,
+      "sha256": "ff572689bbd72189de48227f8612000ba6846bfab2539284e545cf665d765db1"
+    },
+    "src/render/renderer.ts": {
+      "bytes": 2125,
+      "sha256": "3f63c71bd3ee37e4253a6048419a01d449c123ea8fbedbfd05047eb96eb4e83c"
+    },
+    "src/render/scene.ts": {
+      "bytes": 2361,
+      "sha256": "0387b3f97f536202b38b720bbc61e26e3695dd0737fa0007a120b72e124a5a8f"
+    },
+    "src/render/webgl.ts": {
+      "bytes": 7368,
+      "sha256": "da3b7a22044233c503f59edf98ad4a8478d61bac66f943df64eeb94bac015edb"
+    },
+    "src/ui/diagnostics.ts": {
+      "bytes": 2030,
+      "sha256": "db9574ad60771c2a8f675e6967f943dc953a2ade6f0a458af692764b2b23390d"
+    },
+    "src/ui/style.css": {
+      "bytes": 1014,
+      "sha256": "7878ae4a29565d5d5119602f549f634b0e8a27cc21298d0be20dc1192b5bbcee"
+    },
+    "tests/foundation.test.mjs": {
+      "bytes": 4468,
+      "sha256": "a9fbebf251ed8d6b412e2e5dc170f3a93f45c958826294cbf669ea0882796435"
+    },
+    "tools/browser-check.py": {
+      "bytes": 10879,
+      "sha256": "d08ec0117562a31809ecdc80cc3b0faa166853089266f583577949a661aab496"
+    },
+    "tools/browser-requirements.txt": {
+      "bytes": 19,
+      "sha256": "3ac03b3e052baefd9bf6c5a9f06765194c63c546316e2b54bc30b38b3dedc2ad"
+    },
+    "tools/copy-runtime.mjs": {
+      "bytes": 816,
+      "sha256": "42e51a809bffb5bcccb0c7e011c053a099c526e17c79ed4c4c19091520f5e04e"
+    },
+    "tools/portable.mjs": {
+      "bytes": 2151,
+      "sha256": "dff786218d4c128789478db7ea6954f2c648037c13b7f5da17715cbb6a3d6bf3"
+    },
+    "tsconfig.json": {
+      "bytes": 332,
+      "sha256": "48b4ebe7fe2e388f92940cbb0c4e5bd742e0cfd2660dac451fb6d47267f3b28d"
+    },
+    "tsconfig.runtime.json": {
+      "bytes": 193,
+      "sha256": "d9bba5d70d3c890a27c6e720c19f0a1dabe42ebc69d3820c93fd7a98d9c1ef8d"
+    },
+    "vite.config.ts": {
+      "bytes": 171,
+      "sha256": "c1ca654b8a858fc5fc988770576f884ac2fb889294c623ada4b1b80318d06af5"
+    }
+  }
+}

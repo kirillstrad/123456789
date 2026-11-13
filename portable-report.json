@@ -1,0 +1,150 @@
+{
+  "buildId": "ASH_IRON_ITERATION_1_0_1",
+  "source": {
+    "repository": "kirillstrad/123456789",
+    "commit": "ce7f8bc0dbf2ef420fdcda4c3f8b76f14943b5fa",
+    "heroBlob": "d7b64e103433a1763f33fd42fc7286f51dd14eb0"
+  },
+  "profile": {
+    "width": 1008,
+    "height": 864,
+    "worldHeight": 720,
+    "cols": 196,
+    "rows": 140,
+    "zoom": 65,
+    "light": 160,
+    "radius": 120,
+    "environment": 125,
+    "black": 100
+  },
+  "backend": "WEBGL2",
+  "state": {
+    "x": 8.097227182413153,
+    "y": 11.902772817586847,
+    "fx": 0.7071067811865475,
+    "fy": -0.7071067811865475,
+    "time": 0.35,
+    "walkDistance": 0.13750000000000412,
+    "moving": true,
+    "lamp": 100,
+    "cameraX": 8.025559276167135,
+    "cameraY": 11.974440723832865
+  },
+  "droppedSimulationSeconds": 0.5999000000000001,
+  "summary": {
+    "frames": {
+      "samples": 5,
+      "meanMs": 185.3,
+      "p95Ms": 76.5,
+      "maxMs": 716.6,
+      "fps": 5.4
+    },
+    "simulation": {
+      "samples": 5,
+      "meanMs": 0.1,
+      "p95Ms": 0.2,
+      "maxMs": 0.3,
+      "fps": 10000
+    },
+    "geometry": {
+      "samples": 5,
+      "meanMs": 8.86,
+      "p95Ms": 9,
+      "maxMs": 10,
+      "fps": 112.87
+    },
+    "animation": {
+      "samples": 5,
+      "meanMs": 1.52,
+      "p95Ms": 1.7,
+      "maxMs": 1.8,
+      "fps": 657.89
+    },
+    "lighting": {
+      "samples": 5,
+      "meanMs": 1.5,
+      "p95Ms": 1.8,
+      "maxMs": 3.3,
+      "fps": 666.67
+    },
+    "glyph": {
+      "samples": 5,
+      "meanMs": 0.08,
+      "p95Ms": 0.1,
+      "maxMs": 0.1,
+      "fps": 12500
+    },
+    "cpuSubmission": {
+      "samples": 5,
+      "meanMs": 12.06,
+      "p95Ms": 13,
+      "maxMs": 13.8,
+      "fps": 82.92
+    }
+  },
+  "gpuTime": null,
+  "errors": [],
+  "records": [
+    {
+      "backend": "WEBGL2",
+      "geometryMs": 10,
+      "animationMs": 1.7999999999883585,
+      "lightingMs": 1.7999999999883585,
+      "glyphMs": 0,
+      "cpuSubmitMs": 13.799999999988358,
+      "frameMs": 76.5,
+      "simulationMs": 0.29999999998835847,
+      "at": 76.5
+    },
+    {
+      "backend": "WEBGL2",
+      "geometryMs": 8.5,
+      "animationMs": 1.7000000000116415,
+      "lightingMs": 0.7000000000116415,
+      "glyphMs": 0.09999999997671694,
+      "cpuSubmitMs": 11.100000000034925,
+      "frameMs": 33.3,
+      "simulationMs": 0,
+      "at": 109.8
+    },
+    {
+      "backend": "WEBGL2",
+      "geometryMs": 9,
+      "animationMs": 1.099999999976717,
+      "lightingMs": 0.7999999999883585,
+      "glyphMs": 0.1000000000349246,
+      "cpuSubmitMs": 11.099999999976717,
+      "frameMs": 33.3,
+      "simulationMs": 0,
+      "at": 143.1
+    },
+    {
+      "backend": "WEBGL2",
+      "geometryMs": 8.099999999976717,
+      "animationMs": 1.400000000023283,
+      "lightingMs": 3.300000000046566,
+      "glyphMs": 0.09999999997671694,
+      "cpuSubmitMs": 13,
+      "frameMs": 716.6,
+      "simulationMs": 0,
+      "at": 859.7
+    },
+    {
+      "backend": "WEBGL2",
+      "geometryMs": 8.700000000011642,
+      "animationMs": 1.599999999976717,
+      "lightingMs": 0.8999999999650754,
+      "glyphMs": 0.1000000000349246,
+      "cpuSubmitMs": 11.299999999988358,
+      "frameMs": 66.80000000000018,
+      "simulationMs": 0.20000000001164153,
+      "at": 2376.4
+    }
+  ],
+  "notes": [
+    "Iteration 1: no combat, AI, execution, ash transfer or progression.",
+    "CPU timing is not isolated GPU time.",
+    "REFERENCE retains supplied native Canvas lighting and glyph functions.",
+    "WEBGL2 uses area averaging, not brightest-point sampling. Final visual approval is manual."
+  ]
+}

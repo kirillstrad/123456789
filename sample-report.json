@@ -1,0 +1,52 @@
+{
+  "buildId": "ASH_IRON_ITERATION_1_0_1",
+  "source": {
+    "repository": "kirillstrad/123456789",
+    "commit": "ce7f8bc0dbf2ef420fdcda4c3f8b76f14943b5fa",
+    "heroBlob": "d7b64e103433a1763f33fd42fc7286f51dd14eb0"
+  },
+  "profile": {
+    "width": 1008,
+    "height": 864,
+    "worldHeight": 720,
+    "cols": 196,
+    "rows": 140,
+    "zoom": 65,
+    "light": 160,
+    "radius": 120,
+    "environment": 125,
+    "black": 100
+  },
+  "backend": "WEBGL2",
+  "state": {
+    "x": 7.6499821433126645,
+    "y": 11.883327381104216,
+    "fx": -0.7071067811865475,
+    "fy": -0.7071067811865475,
+    "time": 0.49999999999999994,
+    "walkDistance": 0.4950000000000035,
+    "moving": false,
+    "lamp": 100,
+    "cameraX": 7.69199100264381,
+    "cameraY": 11.91225422335601
+  },
+  "droppedSimulationSeconds": 12.182699999999999,
+  "summary": {
+    "frames": null,
+    "simulation": null,
+    "geometry": null,
+    "animation": null,
+    "lighting": null,
+    "glyph": null,
+    "cpuSubmission": null
+  },
+  "gpuTime": null,
+  "errors": [],
+  "records": [],
+  "notes": [
+    "Iteration 1: no combat, AI, execution, ash transfer or progression.",
+    "CPU timing is not isolated GPU time.",
+    "REFERENCE retains supplied native Canvas lighting and glyph functions.",
+    "WEBGL2 uses area averaging, not brightest-point sampling. Final visual approval is manual."
+  ]
+}

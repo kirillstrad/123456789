@@ -1,0 +1,8 @@
+{
+  "compiler": "TypeScript 5.8.2",
+  "strict": true,
+  "diagnostics": 0,
+  "files": 13,
+  "compiler_source": "Local installed TypeScript library; emitted with tsconfig.runtime.json",
+  "vite_pipeline_executed": false
+}
