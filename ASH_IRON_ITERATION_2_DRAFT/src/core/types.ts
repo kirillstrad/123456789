@@ -1,8 +1,0 @@
-export type Vec3=[number,number,number];export type Color=string|number[];
-export interface Part{kind:0|1|2;v:Vec3[];c:Color;s?:Color|null;w?:number;r?:number;hero:boolean;d:number}export interface Light{x:number;y:number;z:number;r:number;power:number}export interface ProjectedLight{x:number;y:number;r:number;power:number}
-export interface State{x:number;y:number;fx:number;fy:number;time:number;walkDistance:number;moving:boolean;lamp:number;cameraX:number;cameraY:number}export interface MoveInput{x:number;y:number}
-export interface Pose{id:string;root:Vec3;lean:number;twist:number;head:number;look:number;breath:number;right:Vec3;left:Vec3;az:number;down:number;gait:null|{cycle:number;id:string};lift:number;visibility:number;ash:number;burn:number;victim:boolean;flame:number}
-export interface Bone{base:Vec3;joint:Vec3;end:Vec3;a:number;b:number}export interface Rig{p:Pose;legs:Bone[];arms:Bone[];grip:Vec3;tip:Vec3;n:Vec3;lamp:Vec3}
-export interface HeroModule{clips:{id:string;name:string;group:string;duration:number}[];sample(id:string,t:number,time:number):Pose;rig(p:Pose):Rig;emit(r:Rig,time:number,api:{poly(v:Vec3[],c:Color):void;line(v:Vec3[],c:Color,w:number):void},secondary?:{cloth:number;chains:number[]},level?:number):Vec3;body(p:Pose,v:Vec3):Vec3;spring(o:{x:number;v:number},target:number,dt:number,k?:number,d?:number):void}
-declare global{var IronPilgrim:HeroModule;}
-export interface SceneFrame{scene:HTMLCanvasElement;mask:HTMLCanvasElement;parts:Part[];lights:ProjectedLight[];lamp:[number,number];time:number;geometryMs:number;animationMs:number}export interface RenderTimings{backend:string;geometryMs:number;animationMs:number;lightingMs:number;glyphMs:number;cpuSubmitMs:number}

@@ -1,0 +1,47 @@
+{
+  "checks": [
+    {
+      "name": "file:// boot",
+      "passed": true
+    },
+    {
+      "name": "Enter starts game",
+      "passed": true
+    },
+    {
+      "name": "WASD movement",
+      "passed": true
+    },
+    {
+      "name": "pause freezes world but fire continues",
+      "passed": true
+    },
+    {
+      "name": "left attack",
+      "passed": true
+    },
+    {
+      "name": "right attack",
+      "passed": true
+    },
+    {
+      "name": "E illuminates ASCII texture",
+      "passed": true
+    },
+    {
+      "name": "JSON export",
+      "passed": true
+    },
+    {
+      "name": "death menu",
+      "passed": true
+    },
+    {
+      "name": "restart",
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "passed": true,
+  "environment": "Headless Chromium / GitHub Actions; not user hardware FPS"
+}
