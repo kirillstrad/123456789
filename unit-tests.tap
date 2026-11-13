@@ -1,0 +1,120 @@
+TAP version 13
+# Subtest: hero byte-identical to pinned GitHub blob
+ok 1 - hero byte-identical to pinned GitHub blob
+  ---
+  duration_ms: 2.178609
+  ...
+# Subtest: fixed profile
+ok 2 - fixed profile
+  ---
+  duration_ms: 0.711607
+  ...
+# Subtest: initial state matches control frame
+ok 3 - initial state matches control frame
+  ---
+  duration_ms: 0.154266
+  ...
+# Subtest: 60 fixed steps per second
+ok 4 - 60 fixed steps per second
+  ---
+  duration_ms: 1.40143
+  ...
+# Subtest: bounded catch-up
+ok 5 - bounded catch-up
+  ---
+  duration_ms: 0.171168
+  ...
+# Subtest: pause does not advance hidden time
+ok 6 - pause does not advance hidden time
+  ---
+  duration_ms: 0.157074
+  ...
+# Subtest: movement independent of step size
+ok 7 - movement independent of step size
+  ---
+  duration_ms: 2.189975
+  ...
+# Subtest: normalized diagonal speed
+ok 8 - normalized diagonal speed
+  ---
+  duration_ms: 0.185252
+  ...
+# Subtest: columns and tombs solid
+ok 9 - columns and tombs solid
+  ---
+  duration_ms: 0.197715
+  ...
+# Subtest: gate and boundaries solid
+ok 10 - gate and boundaries solid
+  ---
+  duration_ms: 0.19275
+  ...
+# Subtest: stop before column
+ok 11 - stop before column
+  ---
+  duration_ms: 1.024999
+  ...
+# Subtest: slide on free axis
+ok 12 - slide on free axis
+  ---
+  duration_ms: 0.197883
+  ...
+# Subtest: full lamp does not drain
+ok 13 - full lamp does not drain
+  ---
+  duration_ms: 0.501109
+  ...
+# Subtest: no HP or combat state
+ok 14 - no HP or combat state
+  ---
+  duration_ms: 0.161939
+  ...
+# Subtest: state interpolation
+ok 15 - state interpolation
+  ---
+  duration_ms: 0.178474
+  ...
+# Subtest: reset
+ok 16 - reset
+  ---
+  duration_ms: 0.229861
+  ...
+# Subtest: adapter invokes only walk and breath
+ok 17 - adapter invokes only walk and breath
+  ---
+  duration_ms: 0.242572
+  ...
+# Subtest: arm bone lengths fixed
+ok 18 - arm bone lengths fixed
+  ---
+  duration_ms: 15.407539
+  ...
+# Subtest: blade rigid and above floor
+ok 19 - blade rigid and above floor
+  ---
+  duration_ms: 5.339503
+  ...
+# Subtest: lamp on left arm
+ok 20 - lamp on left arm
+  ---
+  duration_ms: 0.220611
+  ...
+# Subtest: real intervals in diagnostics
+ok 21 - real intervals in diagnostics
+  ---
+  duration_ms: 0.22403
+  ...
+# Subtest: no invented FPS without samples
+ok 22 - no invented FPS without samples
+  ---
+  duration_ms: 0.124371
+  ...
+1..22
+# tests 22
+# suites 0
+# pass 22
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 115.830592

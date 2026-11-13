@@ -1,0 +1,761 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ASH / IRON — Iteration 1.0.1</title><style>*{box-sizing:border-box}html,body{margin:0;background:#000;color:#aaa;font:12px/1.7 monospace}main{max-width:1220px;margin:auto;padding:18px}h1{font:13px monospace;letter-spacing:1px;color:#b9a58f;margin:0 0 12px}.stage{border:1px solid #282828;background:#000}canvas{width:100%;height:auto;display:block;outline:none}.info{color:#8f7964;margin:10px 0;font-size:11px}.tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}button,select{font:11px monospace;background:#080808;color:#aaa;border:1px solid #444;padding:8px;cursor:pointer}button:hover{color:#eee;background:#171717}button:focus-visible,select:focus-visible{outline:1px solid #bba482;outline-offset:3px}p{color:#777;font-size:11px}details{border-top:1px solid #292929;padding-top:10px;margin:14px 0}summary{cursor:pointer;color:#9b8871}pre{white-space:pre-wrap;font:11px/1.65 monospace;color:#a28c75}#perf{border-left:1px solid #51412e;padding:8px 12px;margin:10px 0}label{font-size:11px;color:#8e7963}@media(max-width:850px){main{padding:8px}}
+</style><main><h1>ASH / IRON / ITERATION 1.0.1 / THE NAVE</h1><div class="stage"><canvas id="game" width="1008" height="864" tabindex="0" aria-label="ASH IRON isometric ASCII scene"></canvas></div><div id="status" class="info">PREPARING THE NAVE...</div><div class="tools"><button id="pause">FREEZE FRAME</button><button id="reset">RESET CONTROL FRAME</button><button id="export">SAVE FRAME PNG</button><button id="report">SAVE REPORT</button><button id="perfToggle">PERFORMANCE</button><label>RENDER <select id="backend"><option value="WEBGL2">WEBGL2 / AREA AVERAGE</option><option value="REFERENCE">EXACT REFERENCE / CPU</option></select></label></div><div id="perf" hidden><pre id="perfText">Collecting frames...</pre></div><p>WASD / ARROWS: MOVE. SPACE: FREEZE / RESUME. No click-to-move. Solid objects block movement.</p><p>Current hero.js is unchanged from NAVE 196. Fixed profile: 1008 x 720, ASCII 196 x 140, zoom 65, lamp 160, radius 120, environment 125, black 100.</p><p>Iteration 1 only: one room, the existing hero, breathing and walking, collisions, LAMP 100 and diagnostics. No combat, enemy AI, execution, ash transfer, damage, progression or new menu effects.</p><details><summary>VISUAL MATCH / SOURCE</summary><pre>Build: ASH_IRON_ITERATION_1_0_1
+Source: kirillstrad/123456789
+Commit: ce7f8bc0dbf2ef420fdcda4c3f8b76f14943b5fa
+Hero blob: d7b64e103433a1763f33fd42fc7286f51dd14eb0
+REFERENCE retains the supplied native Canvas lighting and glyph functions. WEBGL2 uses area averaging, not brightest-point sampling. GPU glyph rasterization differs from native subpixel text. Final artistic approval remains manual. CPU timing is not isolated GPU time.</pre></details></main><script>
+
+(function(root){'use strict';
+const TAU=Math.PI*2,C=(x,a=0,b=1)=>Math.max(a,Math.min(b,x)),sm=x=>{x=C(x);return x*x*(3-2*x)},mix=(a,b,t)=>a+(b-a)*t,add=(a,b)=>a.map((v,i)=>v+b[i]),sub=(a,b)=>a.map((v,i)=>v-b[i]),mul=(a,s)=>a.map(v=>v*s),dot=(a,b)=>a.reduce((s,v,i)=>s+v*b[i],0),len=a=>Math.hypot(...a),norm=v=>mul(v,1/Math.max(1e-9,len(v))),cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],blend=(a,b,t)=>a.map((v,i)=>mix(v,b[i],t)),rot=(v,a)=>[v[0]*Math.cos(a)-v[1]*Math.sin(a),v[0]*Math.sin(a)+v[1]*Math.cos(a),v[2]];
+const clips=[['breath','HEAVY BREATH','IDLE',5],['weight','SHIFT THE WEIGHT','IDLE',5.3],['sigh','LONG EXHALE','IDLE',5.5],['look','LISTEN IN THE DARK','IDLE',5],['lamp','INSPECT THE FLAME','IDLE',5.4],['shelter','SHELTER THE LIGHT','IDLE',5.2],['chain','SETTLE THE CHAINS','IDLE',4.8],['hood','ADJUST THE COWL','IDLE',5],['grip','RESET THE GRIP','IDLE',4.8],['cough','COUGH ASH','IDLE',4.8],['restfoot','REST ONE FOOT','IDLE',5.4],['bow','LOWER THE HEAD','IDLE',5.3],['walk','WALK WITH THE IRON','MOVE',2.4],['back','WITHDRAW','MOVE',2.5],['left','STEP LEFT','MOVE',2.4],['right','STEP RIGHT','MOVE',2.4],['turn','TURN UNDER THE LOAD','MOVE',4],['stop','SETTLE AFTER A STEP','MOVE',3.5],['light1','FIRST CUT','COMBAT',2],['light2','RETURN CUT','COMBAT',2.2],['light3','LOW FINISH','COMBAT',2.4],['heavy1','HEAVY DIAGONAL','COMBAT',2.8],['heavy2','REVERSE THE WEIGHT','COMBAT',3],['heavy3','IRON INTO STONE','COMBAT',3.2],['combo','THREE BONDS OF IRON','COMBAT',6.8],['sweep','STONE AND SPARK','COMBAT',3.3],['execution','PIN / LIFT / PURGE','RITUAL',7],['ash','BODY TO ASH','RITUAL',3],['hit','SMALL IMPACT','REACTION',2.5],['stagger','BROKEN BALANCE','REACTION',3.4],['feed','FEED THE LAMP','RITUAL',4.8],['seal','KINDLE THE SEAL','RITUAL',5],['relight','RELIGHT','RITUAL',4.7],['death','LAST EMBER','LIFE',5.7],['rise','RETURN FROM CINDER','LIFE',5.9]].map(([id,name,group,duration])=>({id,name,group,duration}));
+function ik(base,target,a,b,pole){let d=sub(target,base),dist=len(d),n=dist>1e-8?norm(d):[0,0,-1],reach=C(dist,Math.abs(a-b)+.001,a+b-.001),end=add(base,mul(n,reach)),bend=sub(sub(pole,base),mul(n,dot(sub(pole,base),n)));if(len(bend)<.001)bend=cross(n,[1,0,0]);if(len(bend)<.001)bend=cross(n,[0,1,0]);bend=norm(bend);let x=(a*a-b*b+reach*reach)/(2*reach),h=Math.sqrt(Math.max(0,a*a-x*x));return{base,joint:add(add(base,mul(n,x)),mul(bend,h)),end,a,b};}
+function track(k,t){t=C(t);let i=0;while(i<k.length-2&&t>k[i+1][0])i++;let [ta,a]=k[i],[tb,b]=k[i+1],dt=tb-ta,u=(t-ta)/dt,u2=u*u,u3=u2*u,m=j=>{if(j===0||j===k.length-1)return a.map(()=>0);let p=k[j-1],n=k[j+1];return p[1].map((v,q)=>.65*(n[1][q]-v)/(n[0]-p[0]));},m0=m(i),m1=m(i+1);return a.map((v,q)=>(2*u3-3*u2+1)*v+(u3-2*u2+u)*dt*m0[q]+(-2*u3+3*u2)*b[q]+(u3-u2)*dt*m1[q]);}
+function sample(id,t,time){let e=Math.sin(Math.PI*C((t-.08)/.84)),w=Math.sin(TAU*t),p={id,root:[0,0,0],lean:.25,twist:0,head:0,look:0,breath:Math.sin(time*1.6)*.03,right:[.28,-.02,.9],left:[-.28,.3,1.04],az:-1.2,down:-.66,gait:null,lift:0,visibility:1,ash:0,burn:0,victim:false,flame:1};
+switch(id){case'breath':p.breath=Math.sin(time*1.6)*.045;p.lean+=Math.sin(time*1.6)*.022;break;case'weight':p.root[0]=w*.05;p.twist=w*.09;break;case'sigh':p.breath=Math.sin(Math.PI*t)*.08;p.head=e*.14;p.lean+=e*.09;break;case'look':p.look=w*.55;break;case'lamp':p.left=[-.2,.42,1.04+e*.4];p.look=-e*.23;p.head=e*.18;break;case'shelter':p.left=[-.18,.4,1.04+e*.15];p.right=blend(p.right,[.04,.44,1.17],e);p.down=-.8;break;case'chain':p.right=blend(p.right,[.06,.3,1.2],e);p.head=e*.15;break;case'hood':p.right=blend(p.right,[.16,.24,1.68],e);p.az=-.8;p.down=-1.02;p.head=e*.1;break;case'grip':p.right[2]+=e*.12;p.az+=w*.08;break;case'cough':p.lean+=Math.max(0,Math.sin(t*TAU*3))*e*.2;p.head+=Math.max(0,Math.sin(t*TAU*3))*e*.17;break;case'restfoot':p.lift=e*.055;p.root[0]=-e*.03;break;case'bow':p.head=e*.3;p.lean+=e*.08;break;}
+if(['walk','back','left','right'].includes(id)){p.gait={cycle:t*2,id};p.root[1]=id==='walk'?t*.8:id==='back'?-t*.8:0;p.root[0]=id==='left'?-t*.4:id==='right'?t*.4:0;p.root[2]=Math.abs(Math.sin(t*TAU*2))*.015;p.twist=Math.sin(t*TAU*2)*.035;}
+if(id==='turn')p.twist=Math.sin(Math.PI*t)*.17;if(id==='stop'){p.lean+=e*.14;p.root[1]=e*.08;}
+if(id.startsWith('light')||id.startsWith('heavy')||id==='combo'){let tt=t,name=id;if(id==='combo'){let seg=Math.min(2,Math.floor(t*3));tt=t*3-seg;name=['light1','light2','heavy3'][seg];}let s=name.endsWith('2')?-1:1,h=name.startsWith('heavy'),q=track([[0,[.28,-.02,.9,-1.2,-.66,0,0]],[.2,[s*.35,-.19,.8,-1.08,-.5,-s*.12,-.03]],[.4,[s*.34,-.12,1.24,-s*.05,h?.4:.15,-s*.25,.03]],[.54,[-s*.02,.48,.98,Math.PI/2+s*.9,-.43,s*.28,.18]],[.68,[s*.1,.44,.65,Math.PI/2+s*1.2,-.52,s*.17,.2]],[.84,[s*.16,.23,.73,Math.PI/2+s*.75,-.58,s*.1,.12]],[1,[.28,-.02,.9,-1.2,-.66,0,0]]],tt);p.right=q.slice(0,3);p.az=q[3];p.down=q[4];p.twist=q[5];p.root[1]=q[6];p.lean+=Math.sin(Math.PI*C((tt-.25)/.65))*(h?.19:.12);}
+if(id==='sweep'){let q=track([[0,[.28,-.02,.9,-1.2,-.66]],[.22,[.36,.04,.64,-.05,-.4]],[.47,[.18,.4,.6,1.3,-.37]],[.7,[.06,.36,.68,2.8,-.42]],[1,[.28,-.02,.9,-1.2,-.66]]],t);p.right=q.slice(0,3);p.az=q[3];p.down=q[4];p.lean+=e*.16;p.root[1]=e*.1;}
+if(id==='execution'){p.victim=true;let q=track([[0,[.28,-.02,.9,-1.2,-.66,1.04,.25]],[.2,[.08,.58,1.12,Math.PI/2,0,1.04,.3]],[.37,[.08,.5,.76,Math.PI/2,-.43,1.04,.48]],[.57,[.08,.5,.76,Math.PI/2,-.43,1.8,.4]],[.79,[.08,.5,.76,Math.PI/2,-.43,1.8,.4]],[1,[.28,-.02,.9,-1.2,-.66,1.04,.25]]],t);p.right=q.slice(0,3);p.az=q[3];p.down=q[4];p.left=[-.23,.46,q[5]];p.lean=q[6];p.burn=sm((t-.44)/.13)*(1-sm((t-.82)/.13));}
+if(id==='ash'){p.visibility=t<.22?1-sm(t/.22):t>.77?sm((t-.77)/.23):0;p.ash=1-p.visibility;p.root[0]=-1+2*sm((t-.18)/.6);}
+if(id==='hit'||id==='stagger'){let f=Math.sin(Math.PI*C((t-.13)/.69));p.root[1]=-f*(id==='hit'?.1:.2);p.twist=f*(id==='hit'?.12:.26);p.head=-f*.1;}
+if(['feed','seal','relight'].includes(id)){p.left=[-.18,.42,1.04+e*(id==='seal'?.68:.3)];p.right=blend(p.right,[.04,.42,1.2],id==='feed'?e:0);p.head=e*.14;p.flame=id==='relight'?sm((t-.25)/.4):1+e*.15;}
+if(id==='death'||id==='rise'){let f=id==='death'?sm((t-.18)/.65):1-sm((t-.18)/.65);p.root[2]=-f*.55;p.lean+=f*.3;p.head=f*.2;p.left[2]-=f*.24;p.flame=1-f;p.visibility=id==='rise'?sm((t-.04)/.3):1-sm((t-.7)/.3)*.5;p.ash=1-p.visibility;}
+return p;}
+function body(p,v){let f=C(v[2]-.7),q=rot(v,p.twist*f);q[1]+=.12*v[2]+.22*Math.max(0,v[2]-.8)+(p.lean-.25)*v[2]*.35;q[2]+=p.breath*f;return add(q,p.root);}
+function foot(t,side){let q=(t+(side<0?.5:0))%1;if(q<.62)return{x:side*.12,y:.2-q*.4,z:.065,stance:true};let u=(q-.62)/.38;return{x:side*.12,y:mix(-.048,.2,sm(u)),z:.065+Math.sin(Math.PI*u)*.12,stance:false};}
+function rig(p){let legs=[];for(let s of[-1,1]){let f=p.gait?foot(p.gait.cycle,s):{x:s*.14,y:s*.04,z:.065};if(p.gait?.id==='back')f.y=-f.y;if(p.gait&&['left','right'].includes(p.gait.id)){f.x+=f.y*.5*(p.gait.id==='left'?-1:1);f.y=0;}let off=p.gait?[p.root[0],p.root[1],0]:[0,0,0];legs.push(ik(body(p,[s*.1,0,.94]),add([f.x,f.y,f.z+(s>0?p.lift:0)],off),.46,.46,[s*.14,.4,.48]));}let arms=[ik(body(p,[-.18,.02,1.42]),add(p.left,p.root),.36,.35,[-.55,-.13,1.13]),ik(body(p,[.18,.02,1.42]),add(p.right,p.root),.36,.35,[.58,-.08,1.13])],grip=arms[1].end,down=p.down,az=p.az,n=[Math.cos(az)*Math.cos(down),Math.sin(az)*Math.cos(down),Math.sin(down)],tip=add(grip,mul(n,1.72));if(tip[2]<.025){down=Math.asin(C((.025-grip[2])/1.72,-1,1));n=[Math.cos(az)*Math.cos(down),Math.sin(az)*Math.cos(down),Math.sin(down)];tip=add(grip,mul(n,1.72));}return{p,legs,arms,grip,tip,n,lamp:arms[0].end};}
+function emit(r,time,api,secondary={cloth:0,chains:[0,0,0,0]},level=1){let p=r.p,B=v=>body(p,v),poly=api.poly,line=api.line;function tube(a,b,r1,r2,col,n=6){let d=norm(sub(b,a)),u=norm(cross(d,Math.abs(d[2])>.9?[1,0,0]:[0,0,1])),v=cross(d,u),rad=(t,rr)=>add(mul(u,Math.cos(t)*rr),mul(v,Math.sin(t)*rr));for(let i=0;i<n;i++){let t=i*TAU/n,z=(i+1)*TAU/n,shade=.48+.48*Math.max(0,dot(norm(rad((t+z)/2,1)),norm([-.7,-.8,1.4])));poly([add(a,rad(t,r1)),add(b,rad(t,r2)),add(b,rad(z,r2)),add(a,rad(z,r1))],col.map(x=>Math.round(x*shade)));}}function oval(c,rx,ry,rz,col){for(let i=0;i<4;i++)for(let j=0;j<8;j++){let a=-Math.PI/2+i*Math.PI/4,b=-Math.PI/2+(i+1)*Math.PI/4,t=j*TAU/8,z=(j+1)*TAU/8,V=(q,rr)=>add(c,[Math.cos(q)*Math.cos(rr)*rx,Math.sin(q)*Math.cos(rr)*ry,Math.sin(rr)*rz]),s=.55+.4*Math.max(0,Math.sin(t)*-.5+Math.sin(a)*.6);poly([V(t,a),V(t,b),V(z,b),V(z,a)],col.map(x=>Math.round(x*s)));}}
+let skin=[151,123,101],metal=[165,150,133],Clo=(x,y,z)=>B([x+secondary.cloth*C((1.5-z)/1.4),y+.015*Math.sin(time*2+z*4)*C(1.3-z),z]);
+for(let l of r.legs){tube(l.base,l.joint,.065,.05,skin);tube(l.joint,l.end,.053,.04,[124,112,101]);oval(l.joint,.06,.05,.05,metal);let f=l.end;poly([add(f,[-.07,-.16,-.035]),add(f,[.07,-.16,-.035]),add(f,[.07,.13,.025]),add(f,[-.07,.13,.025])],'#9d8a73');}
+oval(B([0,0,1.25]),.165,.11,.31,[115,96,84]);oval(B([0,-.07,1.5]),.16,.11,.22,[120,108,96]);for(let z of[1.05,1.17,1.29,1.4]){poly([B([-.14,.1,z+.05]),B([0,.17,z+.075]),B([.14,.1,z+.04]),B([.12,.12,z-.02]),B([0,.17,z]),B([-.12,.12,z])],'#b5a087');line([B([-.1,.15,z+.03]),B([0,.185,z+.04]),B([.1,.15,z+.015])],'#d9c2a0',.7);}
+for(let i=0;i<8;i++){let a=-Math.PI*.96+i*Math.PI*1.25/8,b=-Math.PI*.96+(i+1)*Math.PI*1.25/8,top=t=>Clo(Math.cos(t)*.2,Math.sin(t)*.15,1.54),low=(t,k)=>Clo(Math.cos(t)*.33,Math.sin(t)*.25,.1+k%3*.035);poly([top(a),top(b),low(b,i+1),low(a,i)],i%2?'#5b4f4b':'#413b3b');line([top(a),Clo(Math.cos(a)*.25,Math.sin(a)*.2,.83),low(a,i)],'#958575',.7);}
+for(let s of[-1,1]){poly([Clo(s*.14,.08,1.5),Clo(s*.23,.16,1.4),Clo(s*.28,.25,.2),Clo(s*.13,.23,.1),Clo(s*.045,.2,.84),Clo(s*.06,.17,1.4)],s<0?'#95806e':'#6e5d51');line([Clo(s*.13,.22,1.36),Clo(s*.16,.23,.8),Clo(s*.21,.24,.2)],'#c1a88a',.7);}
+for(let i=0;i<2;i++){let a=r.arms[i],s=i?1:-1;tube(a.base,a.joint,.05,.042,skin);tube(a.joint,a.end,.045,.035,[153,128,104]);oval(a.joint,.052,.048,.048,metal);oval(a.end,.044,.045,.044,[164,138,107]);oval(B([s*.18,-.025,1.45]),.105,.095,.085,metal);for(let k=0;k<3;k++){let v=B([s*(.18+k*.025),-.06+k*.06,1.49-k*.025]);poly([add(v,[-.02,0,0]),B([s*(.235+k*.025),-.04+k*.06,1.65-k*.03]),add(v,[.02,.026,0])],'#c2ad8c');}}
+let h=B([0,.21+p.head*.1,1.66-p.head*.08]),F=(x,y,z)=>add(h,rot([x,y,z],p.look));oval(h,.105,.1,.145,[143,124,102]);poly([F(-.1,-.04,.01),F(-.09,-.04,.18),F(.02,-.07,.43),F(.11,.02,.2),F(.11,.1,.02),F(.035,.16,-.13),F(-.07,.13,-.1)],'#b7a082');poly([F(-.09,-.04,.18),F(.02,-.07,.43),F(.045,.015,.16),F(-.04,.06,.01)],'#d0b38d');poly([F(.045,.015,.16),F(.02,-.07,.43),F(.11,.02,.2),F(.11,.1,.02)],'#786453');line([F(-.07,.12,.02),F(.075,.14,.005)],'#1d191b',1.4);line([F(.02,.155,.04),F(.01,.17,-.11)],'#e5c99e',.85);for(let k=0;k<4;k++)line([F(-.05+k*.027,.14,-.03),F(-.045+k*.027,.15,-.085)],'#4d362e',.7);poly([B([-.16,-.055,1.54]),B([-.17,.08,1.75]),F(-.1,-.05,.16),F(.09,-.05,.13),B([.18,.05,1.56]),B([.13,.19,1.47]),B([-.1,.19,1.47])],'#776451');
+for(let[j,x,z,n]of[[0,-.14,1.4,7],[1,.14,1.32,6],[2,-.1,1.01,8],[3,.09,1.02,6]]){let prev=B([x,.23,z]);for(let k=1;k<=n;k++){let f=k/n,q=B([x+(secondary.chains[j]||0)*f,.24+.025*Math.sin(Math.PI*f),z-k*.044]);line([prev,q],k%2?'#e0c69c':'#937554',.9);if(k%2===0)line([add(q,[-.011,0,0]),add(q,[.011,.009,0])],'#eed7ad',.7);prev=q;}}
+let side=norm(cross(r.n,Math.abs(r.n[2])>.95?[1,0,0]:[0,0,1])),A=(t,w)=>add(add(r.grip,mul(r.n,1.72*t)),mul(side,w));poly([A(.06,-.1),A(.3,-.145),A(.5,-.12),A(.63,-.17),A(.84,-.13),A(1,0),A(.85,.14),A(.6,.13),A(.4,.16),A(.06,.1)],'#b4a087');line([A(.06,-.1),A(.3,-.145),A(.5,-.12),A(.63,-.17),A(.84,-.13),A(1,0)],'#efd3a2',.95);line([A(-.025,-.17),A(-.025,.17)],'#d4ae75',2);for(let k=0;k<3;k++)line([A(.24+k*.21,-.12),A(.29+k*.21,.015),A(.36+k*.21,-.05)],'#594033',.7);
+let l=r.lamp,base=add(l,[0,0,-.28]),v=level*p.flame;for(let x of[-.075,.075])for(let y of[-.055,.055])line([add(l,[x,y,-.04]),add(base,[x,y,0])],'#dbb477',1);line([add(l,[-.08,0,-.03]),add(l,[0,0,.055]),add(l,[.08,0,-.03])],'#ebc58a',1);tube(add(base,[0,0,.035]),add(base,[0,0,.16]),.018,.016,[195,158,83],5);oval(add(base,[0,0,.2]),.025,.025,.04,[255*v,193*v,93*v]);return add(base,[0,0,.2]);}
+function spring(o,target,dt,k=30,d=10){o.v+=(target-o.x)*k*dt;o.v*=Math.exp(-d*dt);o.x+=o.v*dt;}
+root.IronPilgrim=Object.freeze({clips,sample,rig,emit,ik,body,foot,spring});})(globalThis);
+
+</script><script>
+(function(){const definitions={"animation/hero.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.heroParts = heroParts;
+function heroParts(state) {
+    const module = globalThis.IronPilgrim;
+    if (!module)
+        throw Error('The original hero.js failed to load.');
+    const p = module.sample(state.moving ? 'walk' : 'breath', state.moving ? (state.walkDistance / .8) % 1 : (state.time / 5) % 1, state.time), rig = module.rig(p), root = p.gait ? p.root : [0, 0, 0], world = (v) => { const x = v[0] - root[0], y = v[1] - root[1]; return [state.x - state.fy * x + state.fx * y, state.y + state.fx * x + state.fy * y, v[2]]; }, parts = [], push = (kind, v, c, w = 1) => { const vv = v.map(world); parts.push({ kind, v: vv, c, w, hero: true, d: vv.reduce((s, q) => s + q[0] + q[1] + q[2] * .006, 0) / vv.length + (kind === 1 ? .005 : 0) }); };
+    const lamp = module.emit(rig, state.time, { poly: (v, c) => push(0, v, c), line: (v, c, w) => push(1, v, c, w) }, { cloth: 0, chains: [0, 0, 0, 0] }, 1);
+    return { parts, lamp: world(lamp) };
+}
+
+},
+"app/main.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const clock_js_1 = require("../core/clock.js");
+const input_js_1 = require("../core/input.js");
+const world_js_1 = require("../game/world.js");
+const renderer_js_1 = require("../render/renderer.js");
+const diagnostics_js_1 = require("../ui/diagnostics.js");
+const profile_js_1 = require("../core/profile.js");
+const byId = (id) => {
+    const e = document.getElementById(id);
+    if (!e)
+        throw Error('Missing element: ' + id);
+    return e;
+}, canvas = byId('game'), world = new world_js_1.World(), input = new input_js_1.Input(), clock = new clock_js_1.FixedClock(), renderer = new renderer_js_1.Renderer(canvas), diagnostics = new diagnostics_js_1.Diagnostics();
+let paused = false, dirty = true, lastRender = 0, pendingSimulationMs = 0, renderCount = 0, lastTimings = null;
+const pauseButton = byId('pause'), backendSelect = byId('backend');
+backendSelect.value = renderer.backend;
+function setPaused(v) { paused = v; input.clear(); clock.reset(); diagnostics.lastFrame = null; pauseButton.textContent = paused ? 'RESUME' : 'FREEZE FRAME'; byId('status').textContent = paused ? 'FROZEN / VISUAL CONTROL' : 'WASD / ARROWS - MOVE / ITERATION 1'; dirty = true; canvas.focus(); }
+function reset() { world.reset(); input.clear(); clock.reset(); diagnostics.reset(); dirty = true; canvas.focus(); }
+pauseButton.onclick = () => setPaused(!paused);
+byId('reset').onclick = reset;
+backendSelect.onchange = () => { renderer.setBackend(backendSelect.value); backendSelect.value = renderer.backend; diagnostics.reset(); dirty = true; canvas.focus(); };
+byId('report').onclick = () => (0, diagnostics_js_1.downloadJSON)(diagnostics.report(world.current, renderer.backend, clock.droppedSeconds));
+byId('export').onclick = () => canvas.toBlob(b => {
+    if (!b)
+        return;
+    const u = URL.createObjectURL(b), a = document.createElement('a');
+    a.href = u;
+    a.download = 'ash-iron-iteration-1-frame.png';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(u), 1000);
+});
+byId('perfToggle').onclick = () => { const p = byId('perf'); p.hidden = !p.hidden; };
+window.addEventListener('keydown', e => {
+    if (e.code === 'Space' && !e.target?.matches('input,select,textarea,button')) {
+        e.preventDefault();
+        setPaused(!paused);
+    }
+});
+window.addEventListener('blur', () => input.clear());
+document.addEventListener('visibilitychange', () => { clock.reset(); input.clear(); diagnostics.lastFrame = null; });
+window.addEventListener('error', e => { diagnostics.errors.push(e.message); byId('status').textContent = 'ERROR: ' + e.message; });
+window.addEventListener('unhandledrejection', e => diagnostics.errors.push(String(e.reason)));
+function perf() { const v = diagnostics.records.slice(-120), s = (0, diagnostics_js_1.summary)(v.map(v => v.frameMs)); byId('perfText').textContent = `BUILD ${profile_js_1.BUILD_ID}\nBACKEND ${renderer.backend}\nFPS ${s?.fps ?? '--'}\nFRAME ${s?.meanMs ?? '--'} ms\nP95 ${s?.p95Ms ?? '--'} ms\nSIM ${(v.at(-1)?.simulationMs ?? 0).toFixed(2)} ms\nCPU SUBMIT ${(lastTimings?.cpuSubmitMs ?? 0).toFixed(2)} ms\nGPU TIME NOT MEASURED\n196 x 140 / ZOOM 65\n${renderer.gpuError ?? ''}`; }
+function frame(now) {
+    if (document.hidden) {
+        clock.reset();
+        requestAnimationFrame(frame);
+        return;
+    }
+    const r = clock.advance(now, paused, dt => { const t = performance.now(); world.update(dt, input.vector()); pendingSimulationMs += performance.now() - t; });
+    if (dirty || (!paused && now - lastRender >= 1000 / 30 - .4)) {
+        const s = paused ? { ...world.current } : world.snapshot(r.alpha);
+        lastTimings = renderer.draw(s);
+        if (!paused)
+            diagnostics.record(now, pendingSimulationMs, lastTimings);
+        pendingSimulationMs = 0;
+        renderCount++;
+        dirty = false;
+        lastRender += 1000 / 30;
+        if (now - lastRender > 1000 / 30)
+            lastRender = now;
+        if (renderCount % 15 === 0)
+            perf();
+    }
+    requestAnimationFrame(frame);
+}
+window.__ASH_ITERATION_1__ = Object.freeze({ state: () => ({ ...world.current }), pause: setPaused, reset, backend: (b) => { renderer.setBackend(b); backendSelect.value = renderer.backend; dirty = true; diagnostics.reset(); }, report: () => diagnostics.report(world.current, renderer.backend, clock.droppedSeconds), getBackend: () => renderer.backend, getRenderCount: () => renderCount, source: profile_js_1.SOURCE, profile: profile_js_1.PROFILE, buildId: profile_js_1.BUILD_ID });
+byId('status').textContent = renderer.gpuError ? 'WEBGL2 UNAVAILABLE / REFERENCE FALLBACK' : 'WASD / ARROWS - MOVE / ITERATION 1';
+requestAnimationFrame(frame);
+
+},
+"core/clock.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.FixedClock = void 0;
+class FixedClock {
+    step = 1 / 60;
+    maxSteps = 6;
+    accumulator = 0;
+    last = null;
+    droppedSeconds = 0;
+    reset() { this.accumulator = 0; this.last = null; }
+    advance(nowMs, paused, update) {
+        if (this.last === null) {
+            this.last = nowMs;
+            return { alpha: 0, steps: 0 };
+        }
+        let delta = Math.max(0, (nowMs - this.last) / 1000);
+        this.last = nowMs;
+        if (paused) {
+            this.accumulator = 0;
+            return { alpha: 0, steps: 0 };
+        }
+        if (delta > .1) {
+            this.droppedSeconds += delta - .1;
+            delta = .1;
+        }
+        this.accumulator += delta;
+        let steps = 0;
+        while (this.accumulator + 1e-10 >= this.step && steps < this.maxSteps) {
+            update(this.step);
+            this.accumulator -= this.step;
+            steps++;
+        }
+        if (this.accumulator >= this.step) {
+            this.droppedSeconds += this.accumulator;
+            this.accumulator = 0;
+        }
+        return { alpha: Math.max(0, this.accumulator / this.step), steps };
+    }
+}
+exports.FixedClock = FixedClock;
+
+},
+"core/input.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Input = void 0;
+const MOVES = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+class Input {
+    target;
+    keys = new Set();
+    constructor(target = window) {
+        this.target = target;
+        target.addEventListener('keydown', this.down);
+        target.addEventListener('keyup', this.up);
+        target.addEventListener('blur', this.clear);
+    }
+    down = (e) => {
+        if (e.target?.matches('input,select,textarea'))
+            return;
+        if (MOVES.has(e.code)) {
+            e.preventDefault();
+            this.keys.add(e.code);
+        }
+    };
+    up = (e) => { this.keys.delete(e.code); };
+    clear = () => { this.keys.clear(); };
+    vector() { const has = (...k) => k.some(v => this.keys.has(v)), sx = +has('KeyD', 'ArrowRight') - +has('KeyA', 'ArrowLeft'), sy = +has('KeyS', 'ArrowDown') - +has('KeyW', 'ArrowUp'); let x = (sx + sy) * Math.SQRT1_2, y = (sy - sx) * Math.SQRT1_2, n = Math.hypot(x, y); return n ? { x: x / n, y: y / n } : { x: 0, y: 0 }; }
+    dispose() { this.target.removeEventListener('keydown', this.down); this.target.removeEventListener('keyup', this.up); this.target.removeEventListener('blur', this.clear); }
+}
+exports.Input = Input;
+
+},
+"core/profile.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.BUILD_ID = exports.SOURCE = exports.PROFILE = void 0;
+exports.PROFILE = Object.freeze({ width: 1008, height: 864, worldHeight: 720, cols: 196, rows: 140, zoom: 65, light: 160, radius: 120, environment: 125, black: 100 });
+exports.SOURCE = Object.freeze({ repository: 'kirillstrad/123456789', commit: 'ce7f8bc0dbf2ef420fdcda4c3f8b76f14943b5fa', heroBlob: 'd7b64e103433a1763f33fd42fc7286f51dd14eb0' });
+exports.BUILD_ID = 'ASH_IRON_ITERATION_1_0_1';
+
+},
+"core/types.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+
+},
+"game/world.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.World = exports.OBSTACLES = exports.CAGES = exports.TOMBS = exports.PILLARS = void 0;
+exports.isSolid = isSolid;
+exports.initialState = initialState;
+exports.interpolate = interpolate;
+exports.PILLARS = [[5, 5], [11, 5], [5, 12.8], [11, 12.8]], exports.TOMBS = [[3.2, 8], [12.7, 9.2]], exports.CAGES = [[3, 14.5], [13.3, 5.7]];
+exports.OBSTACLES = [...exports.PILLARS.map(([x, y]) => ({ x, y, r: .57 })), ...exports.TOMBS.map(([x, y]) => ({ x, y, r: .85 })), ...exports.CAGES.map(([x, y]) => ({ x, y, r: .65 }))];
+function isSolid(x, y) { return x < 1.7 || y < 1.7 || x > 16 || y > 16 || exports.OBSTACLES.some(o => Math.hypot(x - o.x, y - o.y) < o.r + .24) || (Math.abs(y - 2.8) < .28 && Math.abs(x - 8) < .85); }
+function initialState() { return { x: 8, y: 12, fx: 0, fy: -1, time: 0, walkDistance: 0, moving: false, lamp: 100, cameraX: 8, cameraY: 12 }; }
+function interpolate(a, b, t) { const m = (x, y) => x + (y - x) * t; return { ...b, x: m(a.x, b.x), y: m(a.y, b.y), time: m(a.time, b.time), walkDistance: m(a.walkDistance, b.walkDistance), cameraX: m(a.cameraX, b.cameraX), cameraY: m(a.cameraY, b.cameraY) }; }
+class World {
+    previous = initialState();
+    current = initialState();
+    reset() { this.current = initialState(); this.previous = { ...this.current }; }
+    update(dt, input) {
+        this.previous = { ...this.current };
+        const s = this.current;
+        s.time += dt;
+        const n = Math.hypot(input.x, input.y), oldX = s.x, oldY = s.y;
+        s.moving = false;
+        if (n > .001) {
+            s.fx = input.x / n;
+            s.fy = input.y / n;
+            const dx = s.fx * dt * 1.65, dy = s.fy * dt * 1.65;
+            if (!isSolid(s.x + dx, s.y))
+                s.x += dx;
+            if (!isSolid(s.x, s.y + dy))
+                s.y += dy;
+            const distance = Math.hypot(s.x - oldX, s.y - oldY);
+            s.moving = distance > 1e-8;
+            s.walkDistance += distance;
+        }
+        s.cameraX += (s.x - s.cameraX) * Math.min(1, dt * 6);
+        s.cameraY += (s.y - s.cameraY) * Math.min(1, dt * 6);
+        s.lamp = 100;
+    }
+    snapshot(alpha) { return interpolate(this.previous, this.current, alpha); }
+}
+exports.World = World;
+
+},
+"render/environment.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.createEnvironment = createEnvironment;
+// Reference geometry compatibility boundary, unchanged during TypeScript migration.
+function createEnvironment() {
+    let parts = [], heroPart = false;
+    const pillars = [[5, 5], [11, 5], [5, 12.8], [11, 12.8]], tombs = [[3.2, 8], [12.7, 9.2]], cages = [[3, 14.5], [13.3, 5.7]], candles = [[6.3, 7.3], [10.7, 11.8], [4, 13], [12.5, 8], [7, 12.8], [5.7, 9.8], [9.8, 6.7], [12.8, 14], [3.6, 6]], CP = { x: 5.7, y: 10 }, EXIT = { x: 8, y: 2.8 }, lights = [];
+    function color(c) { return Array.isArray(c) ? `rgb(${c.map(v => Math.round(Math.max(0, Math.min(255, v))))})` : c; }
+    function poly(v, c, s = null, w = 1) { parts.push({ kind: 0, v, c, s, w, hero: heroPart, d: v.reduce((a, q) => a + q[0] + q[1] + (q[2] || 0) * .006, 0) / v.length }); }
+    function line(v, c, w = 1) { parts.push({ kind: 1, v, c, w, hero: heroPart, d: v.reduce((a, q) => a + q[0] + q[1] + (q[2] || 0) * .006, 0) / v.length + .005 }); }
+    function dot(x, y, z, r, c) { parts.push({ kind: 2, v: [[x, y, z]], r, c, hero: heroPart, d: x + y + z * .006 + .01 }); }
+    function box(x, y, w, h, z, k, c = [89, 91, 99]) { let v = [[x, y, z], [x + w, y, z], [x + w, y + h, z], [x, y + h, z], [x, y, z + k], [x + w, y, z + k], [x + w, y + h, z + k], [x, y + h, z + k]]; [[0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7], [4, 5, 6, 7]].forEach((f, i) => poly(f.map(n => v[n]), c.map(q => q * [.58, .43, .72, .55, 1.06][i]))); }
+    function limb(a, b, w, c) { line([a, b], c, w); dot(...a, w * .5, c); dot(...b, w * .45, c); }
+    function arch(x, y, rot = 0) { let T = (a, b, z) => rot ? [x + b, y + a, z] : [x + a, y + b, z]; poly([T(-.85, 0, .25), T(-.85, 0, 2.15), T(0, 0, 2.95), T(.85, 0, 2.15), T(.85, 0, .25)], '#090a12'); for (let sign of [-1, 1])
+        for (let i = 0; i < 5; i++) {
+            let a = sign * (.9 - i * .9 / 5), b = sign * (.9 - (i + 1) * .9 / 5), z1 = 2.1 + i * .85 / 5, z2 = 2.1 + (i + 1) * .85 / 5;
+            poly([T(a, .025, z1), T(b, .025, z2), T(b, .025, z2 + .16), T(a, .025, z1 + .16)], '#68616e', '#393945');
+        } for (let a of [-.9, .9])
+        line([T(a, .03, .25), T(a, .03, 2.12)], '#625d69', 4); }
+    function corpse(x, y, type) { if (type === 1) {
+        poly([[x - .2, y - .7, .03], [x + .2, y - .7, .03], [x + .4, y - .3, .13], [x + .3, y + .7, .1], [x, y + .9, .03], [x - .35, y + .6, .03]], '#78636d');
+        line([[x - .3, y, .14], [x + .3, y, .14]], '#49313e', 2);
+    }
+    else {
+        box(x - .2, y - .4, .4, .65, .02, .16, [65, 60, 76]);
+        dot(x, y - .6, .12, 7, '#8b7173');
+        for (let sign of [-1, 1])
+            line([[x + sign * .1, y + .25, .1], [x + sign * .35, y + .65, .04]], '#6e6072', 7);
+    } }
+    function candle(x, y, z = .04, h = .22) { box(x - .025, y - .025, .05, .05, z, h, [130, 108, 77]); dot(x, y, z + h, 2, '#ad7135'); lights.push({ x, y, z: z + h, r: 32, power: .3 }); }
+    for (let x = 1; x < 17; x++)
+        for (let y = 1; y < 17; y++) {
+            let c = 53 + (x * 31 + y * 17) % 13;
+            poly([[x + .018, y + .018, 0], [x + .982, y + .018, 0], [x + .982, y + .982, 0], [x + .018, y + .982, 0]], [c, c - 3, c + 2]);
+            if ((x + y) % 3 === 0)
+                line([[x + .12, y + .22, .012], [x + .53, y + .43, .012], [x + .4, y + .83, .012]], '#28232f', 1);
+            if (x === 8)
+                poly([[x + .15, y + .06, .015], [x + .85, y + .06, .015], [x + .85, y + .94, .015], [x + .15, y + .94, .015]], '#3b222b');
+        }
+    for (let [x, y, r] of [[6.7, 9.6, .48], [9.7, 12.4, .55], [7.1, 7.2, .4], [11.8, 7.6, .6], [8.7, 14.4, .4]]) {
+        let v = [];
+        for (let i = 0; i < 10; i++) {
+            let a = i / 10 * Math.PI * 2, q = r * (.7 + ((i * 7) % 5) / 10);
+            v.push([x + Math.cos(a) * q, y + Math.sin(a) * q, .022]);
+        }
+        poly(v, '#3d101b');
+    }
+    for (let i = 1; i < 17; i++) {
+        for (let z = 0; z < 5; z++)
+            box(i + (z % 2 ? .18 : 0), 1, .78, .28, z * .53, .5, [82 + (i % 3) * 3, 79, 91]);
+        box(i, .96, .95, .4, 2.65, .15, [106, 98, 99]);
+        box(1, i, .28, .95, 0, 2.7, [73, 78, 92]);
+    }
+    for (let x of [3, 6, 9, 12, 15])
+        arch(x, 1.34);
+    for (let y of [3, 6, 9, 12, 15])
+        arch(1.34, y, 1);
+    for (let [x, y] of pillars) {
+        box(x - .46, y - .46, .92, .92, 0, .18, [120, 111, 108]);
+        box(x - .2, y - .2, .4, .4, .18, 2.2, [85, 89, 106]);
+        for (let a of [-.12, 0, .12])
+            line([[x + a, y - .21, .25], [x + a, y - .21, 2.3]], '#867c89', 1);
+        box(x - .4, y - .4, .8, .8, 2.38, .18, [121, 108, 106]);
+        for (let a of [-.28, .28])
+            poly([[x + a - .07, y, 2.56], [x + a, y, 2.9], [x + a + .07, y, 2.56]], '#71717f');
+    }
+    for (let [x, y] of tombs) {
+        box(x - .52, y - .94, 1.04, 1.88, 0, .57, [96, 90, 101]);
+        box(x - .61, y - 1.03, 1.22, 2.06, .57, .13, [138, 121, 108]);
+        line([[x, y - .63, .72], [x, y + .66, .72]], '#716b77', 3);
+        line([[x - .29, y - .3, .72], [x + .29, y - .3, .72]], '#716b77', 3);
+    }
+    for (let [x, y] of cages) {
+        box(x - .5, y - .5, 1, 1, 0, .12, [90, 81, 93]);
+        for (let a = -.4; a <= .41; a += .2) {
+            line([[x + a, y - .48, .12], [x + a, y - .48, 1.7]], '#777180', 2);
+            line([[x - .48, y + a, .12], [x - .48, y + a, 1.7]], '#515669', 2);
+        }
+        box(x - .52, y - .52, 1.04, 1.04, 1.7, .12, [91, 81, 93]);
+    }
+    for (let i = 0; i < 22; i++) {
+        let x = 2 + (i * 3.73) % 13.2, y = 2 + (i * 5.19) % 13;
+        if (i % 4 === 0)
+            box(x, y, .15 + i % 3 * .05, .18, 0, .08, [90, 81, 88]);
+        else
+            line([[x, y, .02], [x + .12, y + .04, .02]], '#78635d', 1.2);
+    }
+    for (let [x, y, t] of [[6.3, 9.2, 0], [10, 12.7, 1], [7, 6.8, 1], [12.1, 7.2, 0], [3.9, 11.9, 1]])
+        corpse(x, y, t);
+    for (let [x, y] of candles) {
+        candle(x, y, .035, .15);
+        candle(x + .13, y - .09, .035, .3);
+    }
+    box(CP.x - .38, CP.y - .38, .76, .76, 0, .16, [113, 99, 92]);
+    line([[CP.x, CP.y, .16], [CP.x, CP.y, 1.25]], '#604753', 5);
+    line([[CP.x - .25, CP.y, .92], [CP.x + .25, CP.y, .92]], '#705763', 4);
+    arch(EXIT.x, EXIT.y);
+    for (let a = -.7; a < .8; a += .2)
+        line([[EXIT.x + a, EXIT.y, .05], [EXIT.x + a, EXIT.y, 2.4]], '#817782', 3);
+    return { parts, lights };
+}
+
+},
+"render/reference-backend.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.createReferenceBackend = createReferenceBackend;
+function createReferenceBackend() {
+    const $ = id => ({ value: String({ light: 160, radius: 120, world: 125, black: 100 }[id]) }), smp = document.createElement('canvas');
+    let g, mg, out, clock = 0, scale = 65, lampPoint = [504, 360], lights = [], flashes = [], cone = null, camera = { x: 8, y: 12 }, pl = { x: 8, y: 12, lamp: 100 };
+    function pr(x, y, z = 0) { return [504 + ((x - camera.x) - (y - camera.y)) * scale * .76, 430 + ((x - camera.x) + (y - camera.y)) * scale * .43 - z * scale * .87]; }
+    function smooth(x) { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); }
+    function lighting() { let im = g.getImageData(0, 0, 1008, 720), a = im.data, ma = mg.getImageData(0, 0, 1008, 720).data, rx = lampPoint[0], ry = lampPoint[1], radius = 146 * scale / 94 * (+$('radius').value / 100), power = +$('light').value / 100 * (.35 + .65 * pl.lamp / 100), black = +$('black').value / 100, gain = +$('world').value / 100, pulse = 1 + Math.sin(clock * 2.2) * .035, fs = flashes.map(f => ({ p: pr(f.x, f.y, .1), r: f.r * scale, power: f.power * f.life / f.max })), cf = cone ? Math.pow(Math.max(0, cone.life / cone.max), 1.15) : 0, edgeCos = Math.cos(65 * Math.PI / 180); for (let y = 0; y < 720; y++)
+        for (let x = 0; x < 1008; x++) {
+            let i = (y * 1008 + x) * 4, hero = ma[i] > 127, d = (x - rx) ** 2 + (y - ry) ** 2, n = Math.exp(-d / (2 * radius * radius)), l = .018 + black * (hero ? .065 : .12) + n * .82 * power * pulse, f = 0;
+            for (let q of lights) {
+                let dd = (x - q.p[0]) ** 2 + (y - q.p[1]) ** 2;
+                l += Math.exp(-dd / (2 * q.r * q.r)) * q.power;
+            }
+            if (!hero) {
+                for (let q of fs) {
+                    let dd = (x - q.p[0]) ** 2 + (y - q.p[1]) ** 2;
+                    f += Math.exp(-dd / (2 * q.r * q.r)) * q.power;
+                }
+                if (cone && cf > 0) {
+                    let aa = (x - 504) / (scale * .76), bb = (y - 430) / (scale * .43), wx = camera.x + (aa + bb) / 2, wy = camera.y + (bb - aa) / 2, dx = wx - cone.x, dy = wy - cone.y, dist = Math.hypot(dx, dy), front = (dx * cone.fx + dy * cone.fy) / Math.max(.01, dist);
+                    if (dist > .2 && dist < 4.2 && front > edgeCos)
+                        f += cf * 1.35 * smooth((front - edgeCos) / .16) * smooth((dist - .2) / .35) * (1 - smooth((dist - 3.2) / 1));
+                }
+                l += f;
+            }
+            else
+                l = Math.max(.3, Math.min(.8, l));
+            let vign = Math.max(.25, 1 - ((x - 504) / 700) ** 2 * .32 - ((y - 360) / 600) ** 2 * .2), warm = Math.min(1, n + f);
+            for (let k = 0; k < 3; k++)
+                a[i + k] = Math.max(0, Math.min(255, a[i + k] * l * vign * (hero ? 1 : gain) * (1 + warm * [.19, -.1, -.32][k])));
+        } g.putImageData(im, 0, 0); }
+    function glyph(source, cols, rows, yoff, height, mono = false, blocks = false) { smp.width = cols; smp.height = rows; let s = smp.getContext('2d', { willReadFrequently: true }); s.drawImage(source, 0, 0, cols, rows); let a = s.getImageData(0, 0, cols, rows).data, cw = 1008 / cols, ch = height / rows, ramp = blocks ? ' .░▒▓█' : ' .,:;i1tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW8&%@'; out.font = Math.ceil(ch * 1.14) + 'px monospace'; out.textBaseline = 'top'; for (let y = 0; y < rows; y++)
+        for (let x = 0; x < cols; x++) {
+            let i = (y * cols + x) * 4, r = a[i], gg = a[i + 1], b = a[i + 2], l = .2126 * r + .7152 * gg + .0722 * b;
+            if (l < 4)
+                continue;
+            let idx = blocks ? Math.min(ramp.length - 1, Math.max(1, Math.floor(l / 190 * (ramp.length - 1)))) : Math.max(1, Math.min(ramp.length - 1, Math.floor(Math.pow(l / 150, .66) * (ramp.length - 1)))), c = ramp[idx];
+            if (blocks) {
+                let shade = Math.min(190, Math.round(l * 1.12));
+                out.fillStyle = `rgb(${shade},${shade},${shade})`;
+            }
+            else {
+                let fade = l < 9 ? (l - 4) / 5 : 1;
+                out.fillStyle = mono ? `rgb(${l},${l},${l})` : `rgb(${Math.min(255, Math.round(r * 1.62 * fade))},${Math.min(255, Math.round(gg * 1.62 * fade))},${Math.min(255, Math.round(b * 1.62 * fade))})`;
+            }
+            out.fillText(c, x * cw, yoff + y * ch);
+        } }
+    return { draw(frame, target) { g = frame.scene.getContext('2d', { willReadFrequently: true }); mg = frame.mask.getContext('2d', { willReadFrequently: true }); out = target; clock = frame.time; lampPoint = frame.lamp; lights = frame.lights.map(l => ({ p: [l.x, l.y], r: l.r, power: l.power })); let t = performance.now(); lighting(); const lightingMs = performance.now() - t; t = performance.now(); glyph(frame.scene, 196, 140, 0, 720); return { lightingMs, glyphMs: performance.now() - t }; } };
+}
+
+},
+"render/renderer.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Renderer = void 0;
+const scene_js_1 = require("./scene.js");
+const reference_backend_js_1 = require("./reference-backend.js");
+const webgl_js_1 = require("./webgl.js");
+class Renderer {
+    canvas;
+    scene = new scene_js_1.SceneBuilder();
+    reference = (0, reference_backend_js_1.createReferenceBackend)();
+    gpu = null;
+    output;
+    backend = 'WEBGL2';
+    gpuError = null;
+    constructor(canvas) {
+        this.canvas = canvas;
+        canvas.width = 1008;
+        canvas.height = 864;
+        const c = canvas.getContext('2d');
+        if (!c)
+            throw Error('Canvas2D unavailable');
+        this.output = c;
+        try {
+            this.gpu = new webgl_js_1.WebGLRenderer();
+        }
+        catch (e) {
+            this.gpuError = String(e);
+            this.backend = 'REFERENCE';
+        }
+    }
+    setBackend(b) { this.backend = b === 'WEBGL2' && this.gpu ? 'WEBGL2' : 'REFERENCE'; }
+    draw(s) {
+        const start = performance.now(), f = this.scene.build(s), o = this.output;
+        o.fillStyle = '#000';
+        o.fillRect(0, 0, 1008, 864);
+        let t;
+        if (this.backend === 'WEBGL2' && this.gpu) {
+            try {
+                t = this.gpu.render(f, o);
+            }
+            catch (e) {
+                this.gpuError = String(e);
+                this.backend = 'REFERENCE';
+                t = this.reference.draw(f, o);
+            }
+        }
+        else
+            t = this.reference.draw(f, o);
+        this.hud();
+        return { backend: this.backend, geometryMs: f.geometryMs, animationMs: f.animationMs, ...t, cpuSubmitMs: performance.now() - start };
+    }
+    hud() {
+        const c = this.output;
+        c.fillStyle = '#000';
+        c.fillRect(0, 720, 1008, 144);
+        c.strokeStyle = '#94887f';
+        c.lineWidth = 1;
+        for (const side of [-1, 1]) {
+            c.save();
+            c.translate(504, 720);
+            c.scale(side, 1);
+            c.beginPath();
+            c.moveTo(20, 58);
+            c.lineTo(48, 43);
+            c.lineTo(81, 55);
+            c.lineTo(118, 38);
+            c.lineTo(152, 49);
+            c.lineTo(198, 38);
+            c.lineTo(249, 54);
+            c.lineTo(294, 41);
+            c.lineTo(339, 57);
+            c.stroke();
+            c.restore();
+        }
+        c.strokeStyle = '#b5a18f';
+        c.beginPath();
+        c.moveTo(504, 740);
+        c.lineTo(517, 756);
+        c.lineTo(504, 772);
+        c.lineTo(491, 756);
+        c.closePath();
+        c.moveTo(504, 772);
+        c.lineTo(504, 807);
+        c.moveTo(492, 784);
+        c.lineTo(516, 784);
+        c.stroke();
+        c.textAlign = 'center';
+        c.textBaseline = 'alphabetic';
+        c.font = '13px monospace';
+        c.fillStyle = '#bba28b';
+        c.fillText('LAMP', 504, 827);
+        c.font = '11px monospace';
+        c.fillStyle = '#8f7b69';
+        c.fillText('100 / 100', 504, 850);
+        c.textAlign = 'left';
+    }
+}
+exports.Renderer = Renderer;
+
+},
+"render/scene.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.SceneBuilder = void 0;
+exports.project = project;
+const profile_js_1 = require("../core/profile.js");
+const environment_js_1 = require("./environment.js");
+const hero_js_1 = require("../animation/hero.js");
+function project(x, y, z, s) { return [504 + ((x - s.cameraX) - (y - s.cameraY)) * profile_js_1.PROFILE.zoom * .76, 430 + ((x - s.cameraX) + (y - s.cameraY)) * profile_js_1.PROFILE.zoom * .43 - z * profile_js_1.PROFILE.zoom * .87]; }
+function css(c) { return typeof c === 'string' ? c : `rgb(${c.map(v => Math.round(Math.max(0, Math.min(255, v)))).join(',')})`; }
+class SceneBuilder {
+    scene = document.createElement('canvas');
+    mask = document.createElement('canvas');
+    context;
+    maskContext;
+    environment = (0, environment_js_1.createEnvironment)();
+    constructor() {
+        this.scene.width = this.mask.width = 1008;
+        this.scene.height = this.mask.height = 720;
+        const a = this.scene.getContext('2d'), b = this.mask.getContext('2d');
+        if (!a || !b)
+            throw Error('Canvas2D unavailable');
+        this.context = a;
+        this.maskContext = b;
+    }
+    part(ctx, a, s, mask) {
+        ctx.fillStyle = mask ? (a.hero ? '#fff' : '#000') : css(a.c);
+        ctx.strokeStyle = ctx.fillStyle;
+        ctx.lineWidth = a.w || 1;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        if (a.kind === 2) {
+            const p = project(...a.v[0], s), r = a.r || 0;
+            ctx.beginPath();
+            ctx.ellipse(p[0], p[1], r * 65 / 94, r * .85 * 65 / 94, 0, 0, 7);
+            ctx.fill();
+            return;
+        }
+        ctx.beginPath();
+        a.v.forEach((v, i) => {
+            const p = project(...v, s);
+            if (i)
+                ctx.lineTo(...p);
+            else
+                ctx.moveTo(...p);
+        });
+        if (a.kind === 1)
+            ctx.stroke();
+        else {
+            ctx.closePath();
+            ctx.fill();
+            if (a.s) {
+                ctx.strokeStyle = mask ? ctx.fillStyle : css(a.s);
+                ctx.stroke();
+            }
+        }
+    }
+    build(state) {
+        const start = performance.now(), h0 = performance.now(), hero = (0, hero_js_1.heroParts)(state), animationMs = performance.now() - h0, parts = [...this.environment.parts, ...hero.parts].sort((a, b) => a.d - b.d), g = this.context, mg = this.maskContext;
+        g.fillStyle = '#020306';
+        g.fillRect(0, 0, 1008, 720);
+        mg.fillStyle = '#000';
+        mg.fillRect(0, 0, 1008, 720);
+        let started = false;
+        for (const a of parts) {
+            this.part(g, a, state, false);
+            if (a.hero)
+                started = true;
+            if (started)
+                this.part(mg, a, state, true);
+        }
+        return { scene: this.scene, mask: this.mask, parts, lights: this.environment.lights.map(l => { const p = project(l.x, l.y, l.z, state); return { x: p[0], y: p[1], r: l.r, power: l.power }; }), lamp: project(...hero.lamp, state), time: state.time, geometryMs: performance.now() - start - animationMs, animationMs };
+    }
+}
+exports.SceneBuilder = SceneBuilder;
+
+},
+"render/webgl.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.WebGLRenderer = void 0;
+const VS = `#version 300 es
+layout(location=0) in vec2 position;out vec2 uv;void main(){uv=position*.5+.5;gl_Position=vec4(position,0.,1.);}`;
+const LIGHT = `#version 300 es
+precision highp float;in vec2 uv;out vec4 frag;uniform sampler2D scene;uniform sampler2D heroMask;uniform vec2 size;uniform vec2 lamp;uniform float time;uniform int count;uniform vec4 lights[24];void main(){vec2 p=vec2(uv.x,1.-uv.y)*size-.5;bool hero=texture(heroMask,uv).r>.5;vec2 delta=p-lamp;float radius=146.*65./94.*1.2,n=exp(-dot(delta,delta)/(2.*radius*radius)),l=.018+(hero?.065:.12)+n*.82*1.6*(1.+sin(time*2.2)*.035);for(int i=0;i<24;i++){if(i>=count)break;vec2 d=p-lights[i].xy;l+=exp(-dot(d,d)/(2.*lights[i].z*lights[i].z))*lights[i].w;}if(hero)l=max(.3,min(.8,l));float vign=max(.25,1.-pow((p.x-504.)/700.,2.)*.32-pow((p.y-360.)/600.,2.)*.2),warm=min(1.,n);vec3 c=texture(scene,uv).rgb*l*vign*(hero?1.:1.25)*(vec3(1.)+warm*vec3(.19,-.1,-.32));frag=vec4(clamp(c,0.,1.),1.);}`;
+const AVG = `#version 300 es
+precision highp float;in vec2 uv;out vec4 frag;uniform sampler2D lit;uniform vec2 size;uniform vec2 grid;void main(){vec2 cell=floor(vec2(uv.x,1.-uv.y)*grid),lo=cell*size/grid,hi=(cell+1.)*size/grid,base=floor(lo);vec3 sum=vec3(0.);float total=0.;for(int y=0;y<7;y++)for(int x=0;x<7;x++){vec2 p=base+vec2(float(x),float(y)),w=max(vec2(0.),min(p+1.,hi)-max(p,lo));float area=w.x*w.y;if(area>0.){sum+=texelFetch(lit,ivec2(int(p.x),int(size.y)-1-int(p.y)),0).rgb*area;total+=area;}}frag=vec4(sum/max(total,.00001),1.);}`;
+const GLYPH = `#version 300 es
+precision highp float;in vec2 uv;out vec4 frag;uniform sampler2D cells;uniform sampler2D atlas;uniform vec2 size;uniform vec2 grid;vec4 cellColor(ivec2 cell){if(cell.x<0||cell.y<0||cell.x>=int(grid.x)||cell.y>=int(grid.y))return vec4(0.);vec3 c=texelFetch(cells,ivec2(cell.x,int(grid.y)-1-cell.y),0).rgb;float l=dot(c,vec3(.2126,.7152,.0722))*255.;if(l<4.)return vec4(0.);float idx=clamp(floor(pow(l/150.,.66)*44.),1.,44.),fade=l<9.?(l-4.)/5.:1.;return vec4(clamp(floor(c*255.*1.62*fade+.5)/255.,0.,1.),idx);}float ink(float idx,vec2 local){if(local.x<0.||local.y<0.||local.x>=8.||local.y>=10.)return 0.;ivec2 p=ivec2(int(mod(idx,8.))*8+int(floor(local.x)),int(floor(idx/8.))*10+int(floor(local.y)));return texelFetch(atlas,ivec2(p.x,59-p.y),0).a;}void main(){vec2 top=vec2(uv.x,1.-uv.y),cell=floor(top*grid),local=fract(top*grid)*size/grid;vec4 cur=cellColor(ivec2(cell));float a=cur.a>0.?ink(cur.a,local):0.;vec4 prev=cellColor(ivec2(cell)-ivec2(0,1));float b=prev.a>0.?ink(prev.a,local+vec2(0.,size.y/grid.y)):0.;frag=vec4(cur.rgb*a+prev.rgb*b*(1.-a),1.);}`;
+class WebGLRenderer {
+    canvas = document.createElement('canvas');
+    gl;
+    lighting;
+    downsample;
+    glyph;
+    textures = [];
+    fbos = [];
+    vao;
+    constructor() {
+        this.canvas.width = 1008;
+        this.canvas.height = 720;
+        const gl = this.canvas.getContext('webgl2', { alpha: false, antialias: false, depth: false, stencil: false, preserveDrawingBuffer: true });
+        if (!gl)
+            throw Error('WebGL2 unavailable');
+        this.gl = gl;
+        this.vao = gl.createVertexArray();
+        gl.bindVertexArray(this.vao);
+        const b = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, b);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(0);
+        gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+        this.lighting = this.program(LIGHT, ['scene', 'heroMask', 'size', 'lamp', 'time', 'count', 'lights[0]']);
+        this.downsample = this.program(AVG, ['lit', 'size', 'grid']);
+        this.glyph = this.program(GLYPH, ['cells', 'atlas', 'size', 'grid']);
+        for (let i = 0; i < 5; i++) {
+            let t = gl.createTexture();
+            this.textures.push(t);
+            gl.bindTexture(gl.TEXTURE_2D, t);
+            for (const p of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T])
+                gl.texParameteri(gl.TEXTURE_2D, p, gl.CLAMP_TO_EDGE);
+            for (const p of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER])
+                gl.texParameteri(gl.TEXTURE_2D, p, gl.NEAREST);
+        }
+        for (const [i, w, h] of [[2, 1008, 720], [3, 196, 140]]) {
+            gl.bindTexture(gl.TEXTURE_2D, this.textures[i]);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+            const f = gl.createFramebuffer();
+            this.fbos.push(f);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.textures[i], 0);
+            if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE)
+                throw Error('Framebuffer incomplete');
+        }
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        const a = document.createElement('canvas');
+        a.width = 64;
+        a.height = 60;
+        const c = a.getContext('2d');
+        c.font = '6px monospace';
+        c.textBaseline = 'top';
+        c.fillStyle = '#fff';
+        [...' .,:;i1tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW8&%@'].forEach((s, i) => c.fillText(s, i % 8 * 8, Math.floor(i / 8) * 10));
+        this.upload(4, a);
+    }
+    program(fragment, names) {
+        const gl = this.gl, compile = (type, code) => {
+            const s = gl.createShader(type);
+            gl.shaderSource(s, code);
+            gl.compileShader(s);
+            if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
+                throw Error(gl.getShaderInfoLog(s) || 'Shader compile failed');
+            return s;
+        }, p = gl.createProgram();
+        gl.attachShader(p, compile(gl.VERTEX_SHADER, VS));
+        gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fragment));
+        gl.linkProgram(p);
+        if (!gl.getProgramParameter(p, gl.LINK_STATUS))
+            throw Error(gl.getProgramInfoLog(p) || 'Shader link failed');
+        return { p, u: Object.fromEntries(names.map(n => [n, gl.getUniformLocation(p, n)])) };
+    }
+    upload(i, c) { const gl = this.gl; gl.bindTexture(gl.TEXTURE_2D, this.textures[i]); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c); }
+    bind(i, u) { const gl = this.gl; gl.activeTexture(gl.TEXTURE0 + u); gl.bindTexture(gl.TEXTURE_2D, this.textures[i]); }
+    pass(p, f, w, h) { const gl = this.gl; gl.bindFramebuffer(gl.FRAMEBUFFER, f); gl.viewport(0, 0, w, h); gl.useProgram(p.p); gl.bindVertexArray(this.vao); }
+    render(frame, target) {
+        const gl = this.gl;
+        if (gl.isContextLost())
+            throw Error('WebGL2 context lost');
+        let t = performance.now();
+        this.upload(0, frame.scene);
+        this.upload(1, frame.mask);
+        this.pass(this.lighting, this.fbos[0], 1008, 720);
+        this.bind(0, 0);
+        this.bind(1, 1);
+        const u = this.lighting.u;
+        gl.uniform1i(u.scene, 0);
+        gl.uniform1i(u.heroMask, 1);
+        gl.uniform2f(u.size, 1008, 720);
+        gl.uniform2f(u.lamp, ...frame.lamp);
+        gl.uniform1f(u.time, frame.time);
+        const lights = frame.lights.slice(0, 24), buf = new Float32Array(96);
+        lights.forEach((l, i) => buf.set([l.x, l.y, l.r, l.power], i * 4));
+        gl.uniform1i(u.count, lights.length);
+        gl.uniform4fv(u['lights[0]'], buf);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        const lightingMs = performance.now() - t;
+        t = performance.now();
+        this.pass(this.downsample, this.fbos[1], 196, 140);
+        this.bind(2, 0);
+        gl.uniform1i(this.downsample.u.lit, 0);
+        gl.uniform2f(this.downsample.u.size, 1008, 720);
+        gl.uniform2f(this.downsample.u.grid, 196, 140);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        this.pass(this.glyph, null, 1008, 720);
+        this.bind(3, 0);
+        this.bind(4, 1);
+        gl.uniform1i(this.glyph.u.cells, 0);
+        gl.uniform1i(this.glyph.u.atlas, 1);
+        gl.uniform2f(this.glyph.u.size, 1008, 720);
+        gl.uniform2f(this.glyph.u.grid, 196, 140);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        target.drawImage(this.canvas, 0, 0);
+        return { lightingMs, glyphMs: performance.now() - t };
+    }
+}
+exports.WebGLRenderer = WebGLRenderer;
+
+},
+"ui/diagnostics.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Diagnostics = void 0;
+exports.summary = summary;
+exports.downloadJSON = downloadJSON;
+const profile_js_1 = require("../core/profile.js");
+function summary(v) {
+    if (!v.length)
+        return null;
+    const a = [...v].sort((a, b) => a - b), mean = a.reduce((s, x) => s + x, 0) / a.length;
+    return { samples: a.length, meanMs: +mean.toFixed(3), p95Ms: +a[Math.floor((a.length - 1) * .95)].toFixed(3), maxMs: +a[a.length - 1].toFixed(3), fps: +(1000 / Math.max(.001, mean)).toFixed(2) };
+}
+class Diagnostics {
+    records = [];
+    errors = [];
+    lastFrame = null;
+    record(at, simulationMs, t) {
+        if (this.lastFrame !== null) {
+            const d = at - this.lastFrame;
+            if (d > 0 && d < 1000)
+                this.records.push({ ...t, frameMs: d, simulationMs, at });
+        }
+        this.lastFrame = at;
+        if (this.records.length > 1800)
+            this.records.shift();
+    }
+    reset() { this.records = []; this.lastFrame = null; }
+    report(s, backend, dropped) { const r = this.records; return { buildId: profile_js_1.BUILD_ID, source: profile_js_1.SOURCE, profile: profile_js_1.PROFILE, backend, state: s, droppedSimulationSeconds: dropped, summary: { frames: summary(r.map(v => v.frameMs)), simulation: summary(r.map(v => v.simulationMs)), geometry: summary(r.map(v => v.geometryMs)), animation: summary(r.map(v => v.animationMs)), lighting: summary(r.map(v => v.lightingMs)), glyph: summary(r.map(v => v.glyphMs)), cpuSubmission: summary(r.map(v => v.cpuSubmitMs)) }, gpuTime: null, errors: this.errors, records: r, notes: ['Iteration 1: no combat, AI, execution, ash transfer or progression.', 'CPU timing is not isolated GPU time.', 'REFERENCE retains supplied native Canvas lighting and glyph functions.', 'WEBGL2 uses area averaging, not brightest-point sampling. Final visual approval is manual.'] }; }
+}
+exports.Diagnostics = Diagnostics;
+function downloadJSON(data) { const u = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })), a = document.createElement('a'); a.href = u; a.download = 'ash-iron-iteration-1-report.json'; a.click(); setTimeout(() => URL.revokeObjectURL(u), 1000); }
+
+}},cache={};function normalize(s){const o=[];for(const p of s.split('/')){if(p==='..')o.pop();else if(p&&p!=='.')o.push(p);}return o.join('/');}function load(name,from=''){const id=normalize(name.startsWith('.')?from.split('/').slice(0,-1).join('/')+'/'+name:name);if(cache[id])return cache[id].exports;const fn=definitions[id];if(!fn)throw Error('Missing bundled module: '+id);const m={exports:{}};cache[id]=m;fn(n=>load(n,id),m,m.exports);return m.exports;}load('app/main.js');})();
+</script></html>

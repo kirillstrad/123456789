@@ -1,0 +1,3 @@
+export const PROFILE = Object.freeze({ width: 1008, height: 864, worldHeight: 720, cols: 196, rows: 140, zoom: 65, light: 160, radius: 120, environment: 125, black: 100 });
+export const SOURCE = Object.freeze({ repository: 'kirillstrad/123456789', commit: 'ce7f8bc0dbf2ef420fdcda4c3f8b76f14943b5fa', heroBlob: 'd7b64e103433a1763f33fd42fc7286f51dd14eb0' });
+export const BUILD_ID = 'ASH_IRON_ITERATION_1_0_1';
