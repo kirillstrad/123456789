@@ -1,4 +1,4 @@
-name: Iteration 3A Motion
+name: Iteration 3B Windows Desktop
 on:
   push:
     branches: [iteration-3-motion-desktop]
@@ -9,10 +9,13 @@ concurrency:
   group: iteration-3-motion-desktop
   cancel-in-progress: false
 jobs:
-  motion:
+  desktop:
     if: github.repository == 'kirillstrad/123456789' && github.ref == 'refs/heads/iteration-3-motion-desktop'
-    runs-on: ubuntu-22.04
+    runs-on: windows-2022
     timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
         with:
@@ -20,36 +23,47 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Mark 3A.2 build
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import json,os
-          assert 'motion?:MotionState' in Path('src/combat/types.ts').read_text()
-          assert 'finishMotion' in Path('src/game/combat-world.ts').read_text()
-          p=Path('src/app/main.js');s=p.read_text();assert 'ASH_IRON_ITERATION_3A_1' in s or 'ASH_IRON_ITERATION_3A_2' in s;p.write_text(s.replace('ASH_IRON_ITERATION_3A_1','ASH_IRON_ITERATION_3A_2'))
-          p=Path('src/app/index.html');p.write_text(p.read_text().replace('Iteration 3A.1 Motion','Iteration 3A.2 Motion').replace('ITERATION 3A.1 / MOTION','ITERATION 3A.2 / MOTION'))
-          p=Path('BUILD_INFO.json');d=json.loads(p.read_text());d.update(build='ASH_IRON_ITERATION_3A_2',sourceCommit=os.environ['GITHUB_SHA'],previewBase='c5c1441a998b4fa2af708065d01613936d66cdaf',status='3A.2-transition-preview',desktop=False);p.write_text(json.dumps(d,indent=2))
-          PY
+      - run: node tools/desktop-prepare.mjs
       - run: npm ci
       - run: npm run build
-      - name: Unit and actual-hero integration tests
+      - name: Full game and desktop unit tests
         run: |
           set -o pipefail
           npm test | tee docs/unit-tests.tap
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install chromium
       - run: npm run test:browser
+      - name: Install pinned Electron and capture first lockfile
+        run: |
+          if [ ! -f desktop/package-lock.json ]; then npm install --prefix desktop --package-lock-only --ignore-scripts; fi
+          npm ci --prefix desktop
+      - run: node tools/desktop-build.mjs
+      - name: Smoke-test packaged Windows executable
+        run: node tools/desktop-smoke.mjs
+      - name: Stage portable folder outside the source tree
+        shell: pwsh
+        run: |
+          Start-Sleep -Seconds 2
+          $target = Join-Path $env:RUNNER_TEMP 'ASH_IRON_3B_1_WIN_X64'
+          Move-Item 'dist/ASH_IRON_3B_1_WIN_X64' $target
+          Copy-Item 'docs/desktop-check.json' $target
+          Copy-Item 'docs/desktop-preview.png' $target
+          Compress-Archive -Path $target -DestinationPath (Join-Path $env:RUNNER_TEMP 'ASH_IRON_3B_1_WIN_X64.zip')
       - run: python tools/package.py
-      - name: Commit verified runtime only to iteration 3
+      - name: Commit verified source hooks, lockfile and runtime only to iteration 3
         run: |
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git add src/app/main.js src/app/index.html runtime PLAY.html docs BUILD_INFO.json MANIFEST.json
+          git add src/app/main.js src/app/index.html runtime PLAY.html docs BUILD_INFO.json MANIFEST.json desktop/package-lock.json
           if ! git diff --cached --quiet; then
-            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Build and verify iteration 3A.2 transitions'
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Build and verify iteration 3B.1 Windows desktop'
             git push origin HEAD:refs/heads/iteration-3-motion-desktop
           fi
       - uses: actions/upload-artifact@v4
         with:
-          name: ASH_IRON_ITERATION_3A_2
-          path: ${{ runner.temp }}/ASH_IRON_ITERATION_3A_2.zip
+          name: ASH_IRON_3B_1_WIN_X64
+          path: ${{ runner.temp }}/ASH_IRON_3B_1_WIN_X64.zip
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ASH_IRON_ITERATION_3B_1_SOURCE
+          path: ${{ runner.temp }}/ASH_IRON_ITERATION_3B_1.zip
           if-no-files-found: error

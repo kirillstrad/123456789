@@ -1,0 +1,9 @@
+{
+  "name": "ash-iron-desktop",
+  "version": "3.0.0-preview.1",
+  "private": true,
+  "main": "main.cjs",
+  "devDependencies": {
+    "electron": "45.3.2"
+  }
+}
