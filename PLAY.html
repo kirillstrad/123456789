@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ASH / IRON — Iteration 3A.2 Motion</title><style>*{box-sizing:border-box}body{margin:0;background:#000;color:#aaa;font:12px/1.7 monospace}main{max-width:1220px;margin:auto;padding:18px}.stage{border:1px solid #282828}canvas{display:block;width:100%;height:auto;outline:none;touch-action:none;cursor:crosshair}.tools{display:flex;gap:8px;flex-wrap:wrap}button{font:11px monospace;background:#080808;color:#aaa;border:1px solid #444;padding:8px;cursor:pointer}button:hover{color:#eee}p{color:#897b6b;font-size:11px}#status{min-height:20px;margin:10px 0;color:#a58d75}section{border-top:1px solid #42362d;margin:15px 0;padding:12px}label{display:flex;gap:10px;margin:10px 0}input{accent-color:#b45344}pre{white-space:pre-wrap}[hidden]{display:none!important}</style><main><div class="stage"><canvas id="game" width="1008" height="864" tabindex="0" aria-label="ASH IRON ASCII game"></canvas></div><div id="status">ASH / IRON — ITERATION 3A.2 / MOTION</div><div class="tools"><button id="menuButton">MENU / ESC</button><button id="restart">RESTART NAVE</button><button id="freeze">FREEZE FRAME</button><button id="export">SAVE FRAME PNG</button><button id="report">SAVE REPORT</button><button id="perfToggle">PERFORMANCE</button></div><section id="settings" hidden><h2>THE EMBER CHAMBER</h2><label>FLOW SPEED<input id="flow" type="range" min="10" max="160" value="32"></label><label>FIRE STRENGTH<input id="power" type="range" min="20" max="140" value="86"></label><label><input id="dim" type="checkbox" checked>DIM BACKGROUND</label><label><input id="fireFreeze" type="checkbox">FREEZE THE FLAME</label><p>192 columns / ASCII fire. Menu settings do not change the 196 x 140 world.</p><button id="settingsClose">CLOSE SETTINGS</button></section><section id="perf" hidden><pre id="perfText">Collecting frames...</pre></section><p>WASD / ARROWS: MOVE. LMB: LIGHT. RMB: HEAVY. Separate presses chain up to three strikes. E / MIDDLE CLICK: LIGHT-CASTING SWEEP. ESC: PAUSE.</p><p>The lamp is the only life pool. HEALTH and LAMP display that same value. No execution, dash, healing, checkpoints, saves, new rooms or installer.</p><p>Draft defaults: cursor-at-press aim, locked strike direction, damage does not interrupt a strike, movement may leave the last 14% of recovery. Canvas2D lighting is evaluated at ASCII-cell resolution; not a pixel-identical WebGL comparison. Target 30 FPS is not guaranteed.</p></main><script>
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ASH / IRON — Iteration 3B.1 Desktop</title><style>*{box-sizing:border-box}body{margin:0;background:#000;color:#aaa;font:12px/1.7 monospace}main{max-width:1220px;margin:auto;padding:18px}.stage{border:1px solid #282828}canvas{display:block;width:100%;height:auto;outline:none;touch-action:none;cursor:crosshair}.tools{display:flex;gap:8px;flex-wrap:wrap}button{font:11px monospace;background:#080808;color:#aaa;border:1px solid #444;padding:8px;cursor:pointer}button:hover{color:#eee}p{color:#897b6b;font-size:11px}#status{min-height:20px;margin:10px 0;color:#a58d75}section{border-top:1px solid #42362d;margin:15px 0;padding:12px}label{display:flex;gap:10px;margin:10px 0}input{accent-color:#b45344}pre{white-space:pre-wrap}[hidden]{display:none!important}</style><main><div class="stage"><canvas id="game" width="1008" height="864" tabindex="0" aria-label="ASH IRON ASCII game"></canvas></div><div id="status">ASH / IRON — ITERATION 3B.1 / DESKTOP</div><div class="tools"><button id="menuButton">MENU / ESC</button><button id="restart">RESTART NAVE</button><button id="freeze">FREEZE FRAME</button><button id="export">SAVE FRAME PNG</button><button id="report">SAVE REPORT</button><button id="perfToggle">PERFORMANCE</button></div><section id="settings" hidden><h2>THE EMBER CHAMBER</h2><label>FLOW SPEED<input id="flow" type="range" min="10" max="160" value="32"></label><label>FIRE STRENGTH<input id="power" type="range" min="20" max="140" value="86"></label><label><input id="dim" type="checkbox" checked>DIM BACKGROUND</label><label><input id="fireFreeze" type="checkbox">FREEZE THE FLAME</label><p>192 columns / ASCII fire. Menu settings do not change the 196 x 140 world.</p><button id="settingsClose">CLOSE SETTINGS</button></section><section id="perf" hidden><pre id="perfText">Collecting frames...</pre></section><p>WASD / ARROWS: MOVE. LMB: LIGHT. RMB: HEAVY. Separate presses chain up to three strikes. E / MIDDLE CLICK: LIGHT-CASTING SWEEP. ESC: PAUSE.</p><p>The lamp is the only life pool. HEALTH and LAMP display that same value. No execution, dash, healing, checkpoints, saves, new rooms or installer.</p><p>Draft defaults: cursor-at-press aim, locked strike direction, damage does not interrupt a strike, movement may leave the last 14% of recovery. Canvas2D lighting is evaluated at ASCII-cell resolution; not a pixel-identical WebGL comparison. Target 30 FPS is not guaranteed.</p></main><script>
 
 (function(root){'use strict';
 const TAU=Math.PI*2,C=(x,a=0,b=1)=>Math.max(a,Math.min(b,x)),sm=x=>{x=C(x);return x*x*(3-2*x)},mix=(a,b,t)=>a+(b-a)*t,add=(a,b)=>a.map((v,i)=>v+b[i]),sub=(a,b)=>a.map((v,i)=>v-b[i]),mul=(a,s)=>a.map(v=>v*s),dot=(a,b)=>a.reduce((s,v,i)=>s+v*b[i],0),len=a=>Math.hypot(...a),norm=v=>mul(v,1/Math.max(1e-9,len(v))),cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],blend=(a,b,t)=>a.map((v,i)=>mix(v,b[i],t)),rot=(v,a)=>[v[0]*Math.cos(a)-v[1]*Math.sin(a),v[0]*Math.sin(a)+v[1]*Math.cos(a),v[2]];
@@ -221,9 +221,26 @@ function transitionPose(s, module, clip, t) {
 function loadSecondary(s, base) { const f = load(s); return { cloth: base.cloth + .018 * f.side, chains: base.chains.map((v, i) => v + .012 * f.forward * (i % 2 ? -1 : 1) + .009 * f.side) }; }
 
 },
+"app/desktop-mode.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.DESKTOP_CSS = void 0;
+exports.isDesktopMode = isDesktopMode;
+exports.desktopItems = desktopItems;
+exports.installDesktop = installDesktop;
+exports.DESKTOP_CSS = 'html,body{width:100%;height:100%;overflow:hidden;background:#000}main{max-width:none;margin:0;padding:0;width:100vw;height:100vh;display:flex;align-items:center;justify-content:center}.stage{border:0;width:min(100vw,116.6666667vh)}#game{display:block;width:100%;height:auto;max-height:100vh}.tools,#status,#settings,#perf,main>p{display:none!important}';
+function isDesktopMode(search = globalThis.location?.search ?? '') { return new URLSearchParams(search).get('desktop') === '1'; }
+function desktopItems(mode, { start, resume, quit = () => globalThis.close() }) { return mode === 'pause' ? [['RESUME', resume], ['RESTART NAVE', start], ['EXIT GAME', quit]] : [['RISE AGAIN', start], ['EXIT GAME', quit]]; }
+function installDesktop(start, pause) { if (!isDesktopMode())
+    return false; if (document.documentElement.dataset.ashDesktop === 'active')
+    return true; const style = document.createElement('style'); style.id = 'ash-desktop-style'; style.textContent = exports.DESKTOP_CSS; document.head.append(style); window.addEventListener('blur', pause); start(); document.documentElement.dataset.ashDesktop = 'active'; return true; }
+
+},
 "app/main.js":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+const desktop_mode_js_1 = require("./desktop-mode.js");
+const DESKTOP = (0, desktop_mode_js_1.isDesktopMode)();
 const combat_world_js_1 = require("../game/combat-world.js");
 const combat_hero_js_1 = require("../animation/combat-hero.js");
 const environment_js_1 = require("../render/environment.js");
@@ -233,7 +250,7 @@ const ornaments_js_1 = require("../ui/ornaments.js");
 const $ = s => document.getElementById(s), cv = $('game'), out = cv.getContext('2d', { willReadFrequently: true }), W = 1008, H = 720, COLS = 196, ROWS = 140;
 const canvas = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }, scene = canvas(W, H), mask = canvas(W, H), sg = scene.getContext('2d', { willReadFrequently: true }), mg = mask.getContext('2d', { willReadFrequently: true });
 const ascii = new ascii_js_1.ASCII(out), maskReader = new ascii_js_1.ASCII(out), uiASCII = new ascii_js_1.ASCII(out), ui = (0, ornaments_js_1.makeUI)(out, (src, cols, rows, y, h, mono) => uiASCII.paint(src, cols, rows, y, h, mono));
-const env = (0, environment_js_1.createEnvironment)(), world = new combat_world_js_1.CombatWorld(undefined, s => (0, combat_hero_js_1.combatHero)(s).tip), keys = new Set(), commands = [], report = { build: 'ASH_IRON_ITERATION_3A_2', errors: [], frames: [], backend: 'Canvas2D / ASCII cell lighting', gpuTime: null };
+const env = (0, environment_js_1.createEnvironment)(), world = new combat_world_js_1.CombatWorld(undefined, s => (0, combat_hero_js_1.combatHero)(s).tip), keys = new Set(), commands = [], report = { build: 'ASH_IRON_ITERATION_3B_1', errors: [], frames: [], backend: 'Canvas2D / ASCII cell lighting', gpuTime: null };
 let mode = 'menu', selected = 0, menuPage = false, time = 0, last = 0, drawAt = 0, simLast = null, acc = 0, paused = false, frozen = false, endTime = 0, aimPoint = null, camera = { x: 8, y: 12 }, renderCount = 0, fireAt = -1, coneBoost = 0;
 const fire = canvas(192, 165), fg = fire.getContext('2d', { willReadFrequently: true }), fireASCII = new ascii_js_1.ASCII(out);
 const pr = (x, y, z, cx = camera.x, cy = camera.y) => [504 + ((x - cx) - (y - cy)) * 65 * .76, 430 + ((x - cx) + (y - cy)) * 65 * .43 - z * 65 * .87];
@@ -323,7 +340,8 @@ function render(s = world.snapshot()) {
     renderCount++;
     return { geometryMs, lightingMs, glyphMs: performance.now() - glyphAt, cpuMs: performance.now() - start, coneBoost };
 }
-function items() { return mode === 'menu' ? [['BEGIN DESCENT', start], ['THE EMBER CHAMBER', () => { $('settings').hidden = !$('settings').hidden; }], ['THE RITES', () => menuPage = true]] : mode === 'pause' ? [['RESUME', resume], ['RESTART NAVE', start], ['MAIN MENU', home]] : [['RISE AGAIN', start], ['MAIN MENU', home]]; }
+function items() { if (DESKTOP)
+    return (0, desktop_mode_js_1.desktopItems)(mode, { start, resume }); return mode === 'menu' ? [['BEGIN DESCENT', start], ['THE EMBER CHAMBER', () => { $('settings').hidden = !$('settings').hidden; }], ['THE RITES', () => menuPage = true]] : mode === 'pause' ? [['RESUME', resume], ['RESTART NAVE', start], ['MAIN MENU', home]] : [['RISE AGAIN', start], ['MAIN MENU', home]]; }
 function drawMenu() { out.fillStyle = '#000'; out.fillRect(0, 0, W, 864); if (time - fireAt > .025 || fireAt < 0) {
     fireAt = time;
     const a = fg.createImageData(192, 165), flow = time, power = +$('power').value / 100 * ($('dim').checked ? .6 : 1), clamp = x => Math.max(0, Math.min(1, x));
@@ -481,6 +499,7 @@ function tick(now) {
 window.__ASH_ITERATION_2__ = Object.freeze({ build: report.build, start, pause, resume, home, state: () => world.snapshot(), events: () => world.events.slice(), report: getReport, mode: () => mode, menuTime: () => time, render: () => render(), coneBoost: () => coneBoost, freeze: () => { frozen = true; keys.clear(); simLast = null; acc = 0; }, advance: seconds => { for (let i = 0; i < Math.round(seconds * 60); i++)
         world.step(1 / 60); }, place: (x, y, ex, ey) => { Object.assign(world.current, { x, y, cameraX: x, cameraY: y }); Object.assign(world.previous, { x, y, cameraX: x, cameraY: y }); camera = { x, y }; if (ex !== undefined)
         Object.assign(world.current.enemy, { x: ex, y: ey }); }, damage: n => world.damage(n), attack: (kind, x, y) => world.attack({ kind, aim: { x, y } }) });
+(0, desktop_mode_js_1.installDesktop)(start, pause);
 requestAnimationFrame(tick);
 
 },

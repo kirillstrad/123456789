@@ -1,0 +1,16 @@
+{
+  "passed": true,
+  "checks": [
+    "packaged desktop boot",
+    "native fullscreen",
+    "F11 fullscreen toggle",
+    "renderer isolation",
+    "settings and debug controls hidden",
+    "aspect ratio and viewport fit",
+    "native movement input",
+    "pause freezes world and resumes",
+    "focus loss pauses",
+    "no recorded renderer errors"
+  ],
+  "environment": "Packaged Windows x64 Electron / GitHub Actions; not user hardware or visual acceptance"
+}

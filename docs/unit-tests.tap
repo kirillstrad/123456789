@@ -6,417 +6,465 @@ TAP version 13
 # Subtest: light hits exactly once during its active window
 ok 1 - light hits exactly once during its active window
   ---
-  duration_ms: 8.255358
+  duration_ms: 7.0021
   type: 'test'
   ...
 # Subtest: heavy damage uses existing value
 ok 2 - heavy damage uses existing value
   ---
-  duration_ms: 3.123979
+  duration_ms: 1.8941
   type: 'test'
   ...
 # Subtest: cursor direction is locked during a strike
 ok 3 - cursor direction is locked during a strike
   ---
-  duration_ms: 0.258578
+  duration_ms: 0.3342
   type: 'test'
   ...
 # Subtest: ordinary damage does not cancel active strike
 ok 4 - ordinary damage does not cancel active strike
   ---
-  duration_ms: 0.360428
+  duration_ms: 0.4886
   type: 'test'
   ...
 # Subtest: mixed queued strike starts from separate click
 ok 5 - mixed queued strike starts from separate click
   ---
-  duration_ms: 0.907
+  duration_ms: 0.8152
   type: 'test'
   ...
 # Subtest: single click never automatically repeats
 ok 6 - single click never automatically repeats
   ---
-  duration_ms: 2.977749
+  duration_ms: 2.6631
   type: 'test'
   ...
 # Subtest: too early queue input is rejected explicitly
 ok 7 - too early queue input is rejected explicitly
   ---
-  duration_ms: 0.303033
+  duration_ms: 0.4122
   type: 'test'
   ...
 # Subtest: movement cannot cancel early strike
 ok 8 - movement cannot cancel early strike
   ---
-  duration_ms: 0.31453
+  duration_ms: 0.4167
   type: 'test'
   ...
 # Subtest: movement can leave late recovery
 ok 9 - movement can leave late recovery
   ---
-  duration_ms: 0.962263
+  duration_ms: 0.8557
   type: 'test'
   ...
 # Subtest: obstacle blocks sword hit
 ok 10 - obstacle blocks sword hit
   ---
-  duration_ms: 2.244085
+  duration_ms: 1.7964
   type: 'test'
   ...
 # Subtest: arc rejects targets behind hero
 ok 11 - arc rejects targets behind hero
   ---
-  duration_ms: 0.25866
+  duration_ms: 0.2433
   type: 'test'
   ...
 # Subtest: column and gate block line of attack
 ok 12 - column and gate block line of attack
   ---
-  duration_ms: 0.328835
+  duration_ms: 0.2918
   type: 'test'
   ...
 # Subtest: swept line catches thin obstacles without sampling holes
 ok 13 - swept line catches thin obstacles without sampling holes
   ---
-  duration_ms: 0.1183
+  duration_ms: 0.1349
   type: 'test'
   ...
 # Subtest: spark sweep creates cone, light particles and no damage
 ok 14 - spark sweep creates cone, light particles and no damage
   ---
-  duration_ms: 4.029174
+  duration_ms: 1.3274
   type: 'test'
   ...
 # Subtest: spark cone expires
 ok 15 - spark cone expires
   ---
-  duration_ms: 0.385007
+  duration_ms: 0.3557
   type: 'test'
   ...
 # Subtest: stationary resting sword does not spam particles
 ok 16 - stationary resting sword does not spam particles
   ---
-  duration_ms: 0.663325
+  duration_ms: 0.2797
   type: 'test'
   ...
 # Subtest: moving stone contact produces additional sparks
 ok 17 - moving stone contact produces additional sparks
   ---
-  duration_ms: 0.354833
+  duration_ms: 0.3193
   type: 'test'
   ...
 # Subtest: particle count is bounded
 ok 18 - particle count is bounded
   ---
-  duration_ms: 3.549214
+  duration_ms: 0.7849
   type: 'test'
   ...
 # Subtest: one enemy attack triggers damage once
 ok 19 - one enemy attack triggers damage once
   ---
-  duration_ms: 0.401859
+  duration_ms: 0.5288
   type: 'test'
   ...
 # Subtest: enemy cannot strike through obstacle
 ok 20 - enemy cannot strike through obstacle
   ---
-  duration_ms: 0.165946
+  duration_ms: 0.2252
   type: 'test'
   ...
 # Subtest: stagger cancels enemy windup
 ok 21 - stagger cancels enemy windup
   ---
-  duration_ms: 0.119621
+  duration_ms: 0.2551
   type: 'test'
   ...
 # Subtest: enemy is defeated and does not respawn automatically
 ok 22 - enemy is defeated and does not respawn automatically
   ---
-  duration_ms: 1.07962
+  duration_ms: 1.1231
   type: 'test'
   ...
 # Subtest: zero lamp ends the hero action
 ok 23 - zero lamp ends the hero action
   ---
-  duration_ms: 0.240719
+  duration_ms: 0.181
   type: 'test'
   ...
 # Subtest: restart fully restores room state
 ok 24 - restart fully restores room state
   ---
-  duration_ms: 0.192664
+  duration_ms: 0.5829
   type: 'test'
   ...
 # Subtest: snapshot does not expose mutable enemy or particle objects
 ok 25 - snapshot does not expose mutable enemy or particle objects
   ---
-  duration_ms: 0.132115
+  duration_ms: 0.2921
   type: 'test'
   ...
 # Subtest: render interpolation remains between fixed states
 ok 26 - render interpolation remains between fixed states
   ---
-  duration_ms: 0.17838
+  duration_ms: 0.2965
   type: 'test'
   ...
 # Subtest: gameplay rules are explicitly draft defaults
 ok 27 - gameplay rules are explicitly draft defaults
   ---
-  duration_ms: 0.098184
+  duration_ms: 0.2057
   type: 'test'
   ...
 # Subtest: approved menu profile stays separate from 196x140 game profile
 ok 28 - approved menu profile stays separate from 196x140 game profile
   ---
-  duration_ms: 0.089215
+  duration_ms: 0.1608
   type: 'test'
   ...
 # Subtest: critical lamp retains a mild heartbeat
 ok 29 - critical lamp retains a mild heartbeat
   ---
-  duration_ms: 1.076815
+  duration_ms: 0.9944
+  type: 'test'
+  ...
+# Subtest: desktop mode requires the explicit query value
+ok 30 - desktop mode requires the explicit query value
+  ---
+  duration_ms: 2.255
+  type: 'test'
+  ...
+# Subtest: desktop pause has resume, restart, exit and no settings or home
+ok 31 - desktop pause has resume, restart, exit and no settings or home
+  ---
+  duration_ms: 39.9591
+  type: 'test'
+  ...
+# Subtest: desktop death and victory permit restart and exit
+ok 32 - desktop death and victory permit restart and exit
+  ---
+  duration_ms: 0.3171
+  type: 'test'
+  ...
+# Subtest: web startup is untouched outside desktop mode
+ok 33 - web startup is untouched outside desktop mode
+  ---
+  duration_ms: 0.285
+  type: 'test'
+  ...
+# Subtest: desktop installation starts once and pauses on focus loss
+ok 34 - desktop installation starts once and pauses on focus loss
+  ---
+  duration_ms: 0.6634
+  type: 'test'
+  ...
+# Subtest: desktop CSS keeps canvas sizing and hides external controls
+ok 35 - desktop CSS keeps canvas sizing and hides external controls
+  ---
+  duration_ms: 0.2883
+  type: 'test'
+  ...
+# Subtest: native entry has explicit renderer isolation and no preload bridge
+ok 36 - native entry has explicit renderer isolation and no preload bridge
+  ---
+  duration_ms: 0.4679
+  type: 'test'
+  ...
+# Subtest: synthetic Windows layout retains licenses and hashes normalized scripts
+ok 37 - synthetic Windows layout retains licenses and hashes normalized scripts
+  ---
+  duration_ms: 684.4057
   type: 'test'
   ...
 # Subtest: original hero and environment retained
-ok 30 - original hero and environment retained
+ok 38 - original hero and environment retained
   ---
-  duration_ms: 1.274012
+  duration_ms: 2.4077
   type: 'test'
   ...
 # Subtest: third strike rejects continuation and queue spam
-ok 31 - third strike rejects continuation and queue spam
+ok 39 - third strike rejects continuation and queue spam
   ---
-  duration_ms: 4.057926
+  duration_ms: 5.5976
   type: 'test'
   ...
 # Subtest: portable HTML has no external dependencies
-ok 32 - portable HTML has no external dependencies
+ok 40 - portable HTML has no external dependencies
   ---
-  duration_ms: 0.738003
+  duration_ms: 1.0408
   type: 'test'
   ...
 # Subtest: world accelerates and then settles to rest
-ok 33 - world accelerates and then settles to rest
+ok 41 - world accelerates and then settles to rest
   ---
-  duration_ms: 5.789868
+  duration_ms: 4.4083
   type: 'test'
   ...
 # Subtest: motion snapshot cannot mutate simulation
-ok 34 - motion snapshot cannot mutate simulation
+ok 42 - motion snapshot cannot mutate simulation
   ---
-  duration_ms: 0.988519
+  duration_ms: 0.2661
   type: 'test'
   ...
 # Subtest: world restart clears momentum and visual blends
-ok 35 - world restart clears momentum and visual blends
+ok 43 - world restart clears momentum and visual blends
   ---
-  duration_ms: 0.660869
+  duration_ms: 0.3607
   type: 'test'
   ...
 # Subtest: collision does not keep walking into a column
-ok 36 - collision does not keep walking into a column
+ok 44 - collision does not keep walking into a column
   ---
-  duration_ms: 1.988372
+  duration_ms: 1.4408
   type: 'test'
   ...
 # Subtest: strike heading aligns before the light hit window
-ok 37 - strike heading aligns before the light hit window
+ok 45 - strike heading aligns before the light hit window
   ---
-  duration_ms: 1.297647
+  duration_ms: 1.8333
   type: 'test'
   ...
 # Subtest: original hero renderer is repeatable and has no hidden time state
-ok 38 - original hero renderer is repeatable and has no hidden time state
+ok 46 - original hero renderer is repeatable and has no hidden time state
   ---
-  duration_ms: 30.476715
+  duration_ms: 26.7007
   type: 'test'
   ...
 # Subtest: motion starts at rest facing the original direction
-ok 39 - motion starts at rest facing the original direction
+ok 47 - motion starts at rest facing the original direction
   ---
-  duration_ms: 3.049205
+  duration_ms: 2.5806
   type: 'test'
   ...
 # Subtest: acceleration is gradual and speed remains capped
-ok 40 - acceleration is gradual and speed remains capped
+ok 48 - acceleration is gradual and speed remains capped
   ---
-  duration_ms: 0.599064
+  duration_ms: 0.526
   type: 'test'
   ...
 # Subtest: diagonal input has the same maximum speed
-ok 41 - diagonal input has the same maximum speed
+ok 49 - diagonal input has the same maximum speed
   ---
-  duration_ms: 0.427679
+  duration_ms: 0.3181
   type: 'test'
   ...
 # Subtest: release decelerates rather than stopping immediately
-ok 42 - release decelerates rather than stopping immediately
+ok 50 - release decelerates rather than stopping immediately
   ---
-  duration_ms: 0.229179
+  duration_ms: 0.2126
   type: 'test'
   ...
 # Subtest: reversal passes through a low speed instead of teleporting direction
-ok 43 - reversal passes through a low speed instead of teleporting direction
+ok 51 - reversal passes through a low speed instead of teleporting direction
   ---
-  duration_ms: 0.174171
+  duration_ms: 0.3255
   type: 'test'
   ...
 # Subtest: invalid delta does not mutate velocity
-ok 44 - invalid delta does not mutate velocity
+ok 52 - invalid delta does not mutate velocity
   ---
-  duration_ms: 0.175169
+  duration_ms: 0.1748
   type: 'test'
   ...
 # Subtest: heading turns by the shortest route across pi
-ok 45 - heading turns by the shortest route across pi
+ok 53 - heading turns by the shortest route across pi
   ---
-  duration_ms: 0.201685
+  duration_ms: 0.368
   type: 'test'
   ...
 # Subtest: turning is capped without overshoot
-ok 46 - turning is capped without overshoot
+ok 54 - turning is capped without overshoot
   ---
-  duration_ms: 0.207486
+  duration_ms: 0.1578
   type: 'test'
   ...
 # Subtest: stationary cursor changes blend heading rather than snapping
-ok 47 - stationary cursor changes blend heading rather than snapping
+ok 55 - stationary cursor changes blend heading rather than snapping
   ---
-  duration_ms: 0.619779
+  duration_ms: 0.6114
   type: 'test'
   ...
 # Subtest: death does not rotate the body
-ok 48 - death does not rotate the body
+ok 56 - death does not rotate the body
   ---
-  duration_ms: 0.540553
+  duration_ms: 0.5436
   type: 'test'
   ...
 # Subtest: visual walking weight fades gradually
-ok 49 - visual walking weight fades gradually
+ok 57 - visual walking weight fades gradually
   ---
-  duration_ms: 0.276946
+  duration_ms: 0.3091
   type: 'test'
   ...
 # Subtest: interpolation copies data and takes shortest heading path
-ok 50 - interpolation copies data and takes shortest heading path
+ok 58 - interpolation copies data and takes shortest heading path
   ---
-  duration_ms: 0.260907
+  duration_ms: 0.262
   type: 'test'
   ...
 # Subtest: independent heroes do not share animation state
-ok 51 - independent heroes do not share animation state
+ok 59 - independent heroes do not share animation state
   ---
-  duration_ms: 0.12217
+  duration_ms: 0.1861
   type: 'test'
   ...
 # Subtest: locomotion sampling is pure across repeated render calls
-ok 52 - locomotion sampling is pure across repeated render calls
+ok 60 - locomotion sampling is pure across repeated render calls
   ---
-  duration_ms: 2.884122
+  duration_ms: 2.6362
   type: 'test'
   ...
 # Subtest: blended test-rig legs preserve segment lengths
-ok 53 - blended test-rig legs preserve segment lengths
+ok 61 - blended test-rig legs preserve segment lengths
   ---
-  duration_ms: 0.811671
+  duration_ms: 0.6891
   type: 'test'
   ...
 # Subtest: zero walk weight samples the untouched idle pose
-ok 54 - zero walk weight samples the untouched idle pose
+ok 62 - zero walk weight samples the untouched idle pose
   ---
-  duration_ms: 0.150966
+  duration_ms: 0.15
   type: 'test'
   ...
 # Subtest: real hero active attack poses and sword tips are unchanged
-ok 55 - real hero active attack poses and sword tips are unchanged
+ok 63 - real hero active attack poses and sword tips are unchanged
   ---
-  duration_ms: 7.802782
+  duration_ms: 13.4679
   type: 'test'
   ...
 # Subtest: real transition legs preserve bone lengths without ground penetration
-ok 56 - real transition legs preserve bone lengths without ground penetration
+ok 64 - real transition legs preserve bone lengths without ground penetration
   ---
-  duration_ms: 8.750476
+  duration_ms: 9.9296
   type: 'test'
   ...
 # Subtest: real death pose is not pulled back toward idle
-ok 57 - real death pose is not pulled back toward idle
+ok 65 - real death pose is not pulled back toward idle
   ---
-  duration_ms: 0.700116
+  duration_ms: 1.2756
   type: 'test'
   ...
 # Subtest: first attack frame preserves walking foot endpoints
-ok 58 - first attack frame preserves walking foot endpoints
+ok 66 - first attack frame preserves walking foot endpoints
   ---
-  duration_ms: 0.678613
+  duration_ms: 0.8646
   type: 'test'
   ...
 # Subtest: actual rendered transition is repeatable and snapshot-pure
-ok 59 - actual rendered transition is repeatable and snapshot-pure
+ok 67 - actual rendered transition is repeatable and snapshot-pure
   ---
-  duration_ms: 14.588338
+  duration_ms: 17.8191
   type: 'test'
   ...
 # Subtest: all attack clips retain full weight throughout the active window
-ok 60 - all attack clips retain full weight throughout the active window
+ok 68 - all attack clips retain full weight throughout the active window
   ---
-  duration_ms: 2.189414
+  duration_ms: 2.388
   type: 'test'
   ...
 # Subtest: attack endpoints settle before movement cancel
-ok 61 - attack endpoints settle before movement cancel
+ok 69 - attack endpoints settle before movement cancel
   ---
-  duration_ms: 0.258442
+  duration_ms: 0.2319
   type: 'test'
   ...
 # Subtest: spark release stays unchanged and death is never crossfaded
-ok 62 - spark release stays unchanged and death is never crossfaded
+ok 70 - spark release stays unchanged and death is never crossfaded
   ---
-  duration_ms: 0.148329
+  duration_ms: 0.2073
   type: 'test'
   ...
 # Subtest: weapon angle blending takes the short route
-ok 63 - weapon angle blending takes the short route
+ok 71 - weapon angle blending takes the short route
   ---
-  duration_ms: 0.320341
+  duration_ms: 0.8057
   type: 'test'
   ...
 # Subtest: transition starts and ends at the same locomotion rig
-ok 64 - transition starts and ends at the same locomotion rig
+ok 72 - transition starts and ends at the same locomotion rig
   ---
-  duration_ms: 2.389707
+  duration_ms: 4.1266
   type: 'test'
   ...
 # Subtest: active attack pose and rig remain exactly original
-ok 65 - active attack pose and rig remain exactly original
+ok 73 - active attack pose and rig remain exactly original
   ---
-  duration_ms: 0.258208
+  duration_ms: 0.4223
   type: 'test'
   ...
 # Subtest: transition legs preserve segment lengths on a synthetic rig
-ok 66 - transition legs preserve segment lengths on a synthetic rig
+ok 74 - transition legs preserve segment lengths on a synthetic rig
   ---
-  duration_ms: 1.822593
+  duration_ms: 3.2392
   type: 'test'
   ...
 # Subtest: sampling and secondary load do not mutate inputs
-ok 67 - sampling and secondary load do not mutate inputs
+ok 75 - sampling and secondary load do not mutate inputs
   ---
-  duration_ms: 0.678394
+  duration_ms: 1.1138
   type: 'test'
   ...
 # Subtest: secondary load is bounded and disabled for death
-ok 68 - secondary load is bounded and disabled for death
+ok 76 - secondary load is bounded and disabled for death
   ---
-  duration_ms: 0.342234
+  duration_ms: 0.629
   type: 'test'
   ...
-1..68
-# tests 68
+1..76
+# tests 76
 # suites 0
-# pass 68
+# pass 76
 # fail 0
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 245.320159
+# duration_ms 997.3936

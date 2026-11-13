@@ -1,13 +1,17 @@
 {
-  "build": "ASH_IRON_ITERATION_3A_2",
+  "build": "ASH_IRON_ITERATION_3B_1",
   "files": {
+    ".gitattributes": {
+      "bytes": 133,
+      "sha256": "a0ab8f78e47adb78dd3482170b5fdcabd319129685eb7ba452725a0edae6faca"
+    },
     ".github/workflows/iteration-2-canvas2d.yml": {
       "bytes": 1815,
       "sha256": "1ee6d047bb90a60ff7130d4f1648f80c22f372d438b2ab392c73341020127e81"
     },
     ".github/workflows/iteration-3-motion.yml": {
-      "bytes": 2581,
-      "sha256": "9289afc0398f2809a894edc7eeb8a520afc865932070de9371a8e0ef01e5abb5"
+      "bytes": 2795,
+      "sha256": "b3b3420481ba988ca8400402969f656c463aedf84728f1e5d3dc223d78bf684d"
     },
     ".gitignore": {
       "bytes": 30,
@@ -18,28 +22,44 @@
       "sha256": "46a902525d9e310085824346b2e98f360ab96f7f981c0dffa96c374759b90ca2"
     },
     "BUILD_INFO.json": {
-      "bytes": 491,
-      "sha256": "a68541f169b2cdf0dd0e98f76e6d0d92602d5a2349b04d9e3f605207f92a576f"
+      "bytes": 511,
+      "sha256": "1b3bb6d78cd496b1e96f3676e8ed58345e3af85208a8118610df937f4a4c9c11"
     },
-    "FONT_LICENSE.txt": {
-      "bytes": 1756,
-      "sha256": "1b38c6f9db38d11a36714b281c968f83926c15a8c417d5db14535a5017d44151"
+    "desktop/main.cjs": {
+      "bytes": 2329,
+      "sha256": "31e62a9deebf14c6768ec94858713e1d80d1f62c55a320ca798eae1bc574aabc"
     },
-    "PLAY.html": {
-      "bytes": 81281,
-      "sha256": "a764bbec637ea6fa42f79ddfe1d6ba1ffe49e81b833d994bd29b956a19629d6f"
+    "desktop/package-lock.json": {
+      "bytes": 6248,
+      "sha256": "3e6b114ad8e493005517fd6833c9953b8d4719c3dac2a3f9badf5c8724d605ff"
     },
-    "README_RU.md": {
-      "bytes": 4356,
-      "sha256": "fc35d06e9aad83cb8567fc3cccac62dfc74270e92feae7c64956ac55069a9902"
+    "desktop/package.json": {
+      "bytes": 454,
+      "sha256": "3b5dd70771df38049a0e699a73ea7c29bef784f245534d88e697a4f4f351ae36"
     },
-    "START.bat": {
-      "bytes": 53,
-      "sha256": "44ed92693c1c1b7b5096fbf549d63a3240ee199ae2861416036a4e6e9c9f73cf"
+    "desktop/smoke.cjs": {
+      "bytes": 3155,
+      "sha256": "b965a1e54a885f30313b550eacb16a60a5de678e10435fcacf83fda439539479"
     },
-    "TEST.bat": {
-      "bytes": 48,
-      "sha256": "335258346cf88dbed2b1fc7d21b84a224517cd98a1a6b0a2475d15bce9ae6215"
+    "docs/browser-check.json": {
+      "bytes": 810,
+      "sha256": "493b0d0985085bc54d70343e21ae750a9e757314875a83cd1f85c2f97d358187"
+    },
+    "docs/browser-runtime-report.json": {
+      "bytes": 48046,
+      "sha256": "bed5d4dfe6133a91b1e4721fc796bb4d748611448e18a9810a0a4332be593e30"
+    },
+    "docs/desktop-check.json": {
+      "bytes": 461,
+      "sha256": "8cb85ff00d2af4ccca6a830627a7ab7f2b2418178338755b8360caebecd53a45"
+    },
+    "docs/desktop-preview.png": {
+      "bytes": 580616,
+      "sha256": "586123a8dd1ccd00470a60019742a6377c4925fe4cfdf79a10ed314c2bcb5537"
+    },
+    "docs/gameplay.png": {
+      "bytes": 887110,
+      "sha256": "4be4a6948604ba332b042774bae802a39b653548e14915b637edf52987e994c5"
     },
     "docs/ITERATION_3A_1.md": {
       "bytes": 1713,
@@ -49,33 +69,29 @@
       "bytes": 2020,
       "sha256": "933f768acc8851239d0b99a200e4048015c1fbfb2df1223269308b9578fbd269"
     },
-    "docs/browser-check.json": {
-      "bytes": 810,
-      "sha256": "493b0d0985085bc54d70343e21ae750a9e757314875a83cd1f85c2f97d358187"
-    },
-    "docs/browser-runtime-report.json": {
-      "bytes": 48073,
-      "sha256": "6759a796491238e838fe46bb6a928167ed47ddcbd61060c7d956d08bb5464779"
-    },
-    "docs/gameplay.png": {
-      "bytes": 763872,
-      "sha256": "66cf0f890ea249bf1580faaa053e612617a106b5cc58b4c6f41435aeb09eff53"
+    "docs/ITERATION_3B_1.md": {
+      "bytes": 2578,
+      "sha256": "439a5fc11448704aca80269b47fad58fbd149fcff348e50bbe95bd522df2f379"
     },
     "docs/menu.png": {
-      "bytes": 404052,
-      "sha256": "6d0e9b21560e1a5bb913c75ed4ab59dbc0a3c7e12c56e6ca098beec699c23ebe"
+      "bytes": 438536,
+      "sha256": "686c017d66a929b4d71c0c448d9b3c59b9f9d2a154ef05de6806f12955f96c44"
     },
     "docs/sweep.png": {
-      "bytes": 848023,
-      "sha256": "a5fb009d3b6ce991cd8355dbf4476a024a779a33105891b3e2e503c27c54ea58"
+      "bytes": 959477,
+      "sha256": "3bb42a48ddab32b0c9bca69db0d6a5e416cfcd6796ccab03dc3dd90e52d4ce98"
     },
     "docs/typecheck.json": {
       "bytes": 94,
-      "sha256": "d2fba3a415337fdccaa91f91e17ab740a8586eb0929f03cb472192e614c88b0c"
+      "sha256": "488bdad2df8138ee67f531fb7bfb1bd86703de093e42391b2177e75b108d2f7d"
     },
     "docs/unit-tests.tap": {
-      "bytes": 11275,
-      "sha256": "c821edc709f63c7209043cd1efa6859807b64045bf4e3d63f6e8ab63a56e8329"
+      "bytes": 12613,
+      "sha256": "423049f42037bad0aed45636cb004dcdab4f172543a647a8a7f3ed4248abce77"
+    },
+    "FONT_LICENSE.txt": {
+      "bytes": 1756,
+      "sha256": "1b38c6f9db38d11a36714b281c968f83926c15a8c417d5db14535a5017d44151"
     },
     "package-lock.json": {
       "bytes": 2303,
@@ -85,9 +101,17 @@
       "bytes": 444,
       "sha256": "4e941d6d0efae2cd8feca3179bd712d5cb557535055ce0a47986ef9671b6837d"
     },
+    "PLAY.html": {
+      "bytes": 82979,
+      "sha256": "9e83d4d2fba66418918624879a7fbd67618de67f7fbcda6267b690bfbc90a62d"
+    },
     "public/vendor/hero.js": {
       "bytes": 12340,
       "sha256": "96a7de64ec52577f69aa3ca0ae3ca49edd4ff795b315e61ef1df6d13c243a1e8"
+    },
+    "README_RU.md": {
+      "bytes": 4356,
+      "sha256": "fc35d06e9aad83cb8567fc3cccac62dfc74270e92feae7c64956ac55069a9902"
     },
     "reference/visual-reference.html": {
       "bytes": 34591,
@@ -105,9 +129,13 @@
       "bytes": 3250,
       "sha256": "2b5e67be735c07d0da7ed8bb06ef804f5ce81b1768d8f4b0ffad6076b631c691"
     },
+    "runtime/app/desktop-mode.js": {
+      "bytes": 1106,
+      "sha256": "9d380d82927d5fc1a0a57747fe2e52a9f8374bc5a400afea8813f3f7a2c1830b"
+    },
     "runtime/app/main.js": {
-      "bytes": 12100,
-      "sha256": "b12e9c34bbded5642dcc448081ac99be7a76075698bf580f04f3ac4e0a2279c3"
+      "bytes": 12289,
+      "sha256": "2f64cd94aa2ccc213b5c6504cd0dd66abfdd614abae54fee2c13a185603af5f8"
     },
     "runtime/combat/action-machine.js": {
       "bytes": 2160,
@@ -142,8 +170,8 @@
       "sha256": "df9242cadecef545ff019e83318e09badc46b3de61439276b599db47fa2c6332"
     },
     "runtime/index.html": {
-      "bytes": 2634,
-      "sha256": "c4122aabf71cd97c30ef7a203815ded774862f00ca0f078ecf13f8542a97191f"
+      "bytes": 2636,
+      "sha256": "ce65d308d4babef190e3a544e6f1c06796240e099b9826ea9dfe19689db7ee31"
     },
     "runtime/render/ascii.js": {
       "bytes": 2158,
@@ -181,13 +209,17 @@
       "bytes": 3391,
       "sha256": "6209b7ecf76835922960f2514f7416e3cc4cee91972e963d67d92ee0769f19da"
     },
+    "src/app/desktop-mode.js": {
+      "bytes": 1106,
+      "sha256": "9d380d82927d5fc1a0a57747fe2e52a9f8374bc5a400afea8813f3f7a2c1830b"
+    },
     "src/app/index.html": {
-      "bytes": 2634,
-      "sha256": "c4122aabf71cd97c30ef7a203815ded774862f00ca0f078ecf13f8542a97191f"
+      "bytes": 2636,
+      "sha256": "ce65d308d4babef190e3a544e6f1c06796240e099b9826ea9dfe19689db7ee31"
     },
     "src/app/main.js": {
-      "bytes": 12100,
-      "sha256": "b12e9c34bbded5642dcc448081ac99be7a76075698bf580f04f3ac4e0a2279c3"
+      "bytes": 12289,
+      "sha256": "2f64cd94aa2ccc213b5c6504cd0dd66abfdd614abae54fee2c13a185603af5f8"
     },
     "src/combat/action-machine.ts": {
       "bytes": 1894,
@@ -241,9 +273,21 @@
       "bytes": 4634,
       "sha256": "173962fe2e54984f22287aa6e59f86b27a5b52d43086493cc456e22c2b455deb"
     },
+    "START.bat": {
+      "bytes": 53,
+      "sha256": "44ed92693c1c1b7b5096fbf549d63a3240ee199ae2861416036a4e6e9c9f73cf"
+    },
+    "TEST.bat": {
+      "bytes": 48,
+      "sha256": "335258346cf88dbed2b1fc7d21b84a224517cd98a1a6b0a2475d15bce9ae6215"
+    },
     "tests/combat.test.mjs": {
       "bytes": 7027,
       "sha256": "91ca07a0c411a28c17afff197eb4229535b89b3a7b9876b034f03ff7b9e5af78"
+    },
+    "tests/desktop.test.mjs": {
+      "bytes": 4037,
+      "sha256": "a090a665c4f4ceaba0db9d3eed04a4be67e34a57384db8114c0cc5631a1ddcce"
     },
     "tests/integration.test.mjs": {
       "bytes": 1425,
@@ -272,6 +316,18 @@
     "tools/build.mjs": {
       "bytes": 2743,
       "sha256": "7fcbc1e607ea370f8840d94c138cde24e97a6c54e82e5bba7a999d7a09ea2635"
+    },
+    "tools/desktop-build.mjs": {
+      "bytes": 2339,
+      "sha256": "687fa019e4e16cb586ac2f29f9894ca003e0fa4645eb1bfb19e9db358409ea2f"
+    },
+    "tools/desktop-prepare.mjs": {
+      "bytes": 1444,
+      "sha256": "37aba9efd481de75f92fded7e64fb316125448576a092afa58c311ccabb0a0f8"
+    },
+    "tools/desktop-smoke.mjs": {
+      "bytes": 589,
+      "sha256": "1a0570a2290217178506bac7fe98bda83489485a4328a7dc7bb9d7b7240a056f"
     },
     "tools/package.py": {
       "bytes": 1065,
