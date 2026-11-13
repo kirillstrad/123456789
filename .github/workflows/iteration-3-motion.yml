@@ -1,0 +1,67 @@
+name: Iteration 3A Motion
+on:
+  push:
+    branches: [iteration-3-motion-desktop]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: iteration-3-motion-desktop
+  cancel-in-progress: false
+jobs:
+  motion:
+    if: github.repository == 'kirillstrad/123456789' && github.ref == 'refs/heads/iteration-3-motion-desktop'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Mark this build without changing gameplay or HUD
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json,os
+          from pathlib import Path
+          p=Path('src/combat/types.ts');s=p.read_text()
+          if 'motion?:MotionState' not in s:
+           s="import type {MotionState} from '../animation/motion.js';\n"+s
+           s=s.replace('CombatSnapshot extends State{','CombatSnapshot extends State{motion?:MotionState;')
+           assert 'motion?:MotionState' in s
+           p.write_text(s)
+          p=Path('src/game/combat-world.ts');s=p.read_text()
+          if "import {createMotion,velocity,finishMotion,interpolateMotion}" not in s:
+           s="import {createMotion,velocity,finishMotion,interpolateMotion} from '../animation/motion.js';\n"+s
+           for a,b in [('moving:false,lamp:100', 'moving:false,motion:createMotion(),lamp:100'), ("if(s.phase==='dead'){s.deathTime+=dt;this.sync();return;}", "if(s.phase==='dead'){s.deathTime+=dt;finishMotion(s.motion??=createMotion(),dt,s.fx,s.fy,false,false,true);this.sync();return;}"), ('this.actions.step(dt,false,this.hooks());this.sync();return;}', 'this.actions.step(dt,false,this.hooks());finishMotion(s.motion??=createMotion(),dt,s.fx,s.fy,false,true);this.sync();return;}'), ('else{const n=Math.hypot(input.x,input.y);if(n>.001){s.fx=input.x/n;s.fy=input.y/n;s.moving=this.move(s.fx*dt*1.65,s.fy*dt*1.65)>1e-8;}else if(input.aim){const dx=input.aim.x-s.x,dy=input.aim.y-s.y,d=Math.hypot(dx,dy);if(d>.2){s.fx=dx/d;s.fy=dy/d;}}}', 'else{const motion=s.motion??=createMotion(),v=velocity(motion,input,dt),ox=s.x,oy=s.y;this.move(v.x*dt,v.y*dt);motion.vx=(s.x-ox)/dt;motion.vy=(s.y-oy)/dt;const speed=Math.hypot(motion.vx,motion.vy);s.moving=speed>1e-5;if(s.moving){s.fx=motion.vx/speed;s.fy=motion.vy/speed;}else if(input.aim){const dx=input.aim.x-s.x,dy=input.aim.y-s.y,d=Math.hypot(dx,dy);if(d>.2){s.fx=dx/d;s.fy=dy/d;}}}'), ('this.sync();if(this.tipProvider)', 'this.sync();finishMotion(s.motion??=createMotion(),dt,s.fx,s.fy,s.moving,!!s.action||s.sweepProgress!==null);if(this.tipProvider)'), ('return{...s,x:m(p.x,s.x)', 'return{...s,motion:interpolateMotion(p.motion,s.motion,t),x:m(p.x,s.x)')]:
+            assert s.count(a)==1,'World source changed; stop rather than guessing: '+a
+            s=s.replace(a,b)
+           p.write_text(s)
+          p=Path('src/app/main.js');s=p.read_text();s=s.replace('ASH_IRON_ITERATION_2_CANVAS2D','ASH_IRON_ITERATION_3A_1');p.write_text(s)
+          p=Path('src/app/index.html');s=p.read_text().replace('Iteration 2 Canvas2D','Iteration 3A.1 Motion').replace('ITERATION 2 / CANVAS2D','ITERATION 3A.1 / MOTION');p.write_text(s)
+          p=Path('BUILD_INFO.json');d=json.loads(p.read_text());d.update(build='ASH_IRON_ITERATION_3A_1',sourceCommit=os.environ['GITHUB_SHA'],motionBase='addc11e18d69b084217ca501d40aa419be2d49d3',status='3A.1-motion-preview',desktop=False);p.write_text(json.dumps(d,indent=2))
+          PY
+      - run: npm ci
+      - run: npm run build
+      - name: Unit and motion integration tests
+        run: |
+          set -o pipefail
+          npm test | tee docs/unit-tests.tap
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+      - run: python tools/package.py
+      - name: Commit tested runtime only to iteration 3
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git add src/app/main.js src/app/index.html src/combat/types.ts src/game/combat-world.ts runtime PLAY.html docs BUILD_INFO.json MANIFEST.json
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Build and verify iteration 3A.1 motion preview'
+            git push origin HEAD:refs/heads/iteration-3-motion-desktop
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ASH_IRON_ITERATION_3A_1
+          path: ${{ runner.temp }}/ASH_IRON_ITERATION_3A_1.zip
+          if-no-files-found: error
