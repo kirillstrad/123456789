@@ -1,7 +1,7 @@
-name: Iteration 4 Development
+name: Iteration 4A Smoke Dash
 on:
   push:
-    branches: [iteration-4-development]
+    branches: [iteration-4-main-4a]
   workflow_dispatch:
 permissions:
   contents: read
@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   verify:
-    if: github.repository == 'kirillstrad/123456789' && github.ref == 'refs/heads/iteration-4-development'
+    if: github.repository == 'kirillstrad/123456789' && github.ref == 'refs/heads/iteration-4-main-4a'
     runs-on: windows-2022
     timeout-minutes: 35
     defaults:
@@ -24,7 +24,7 @@ jobs:
         with:
           node-version: '22'
       - name: Remove inherited reports
-        run: rm -f docs/unit-tests.tap docs/browser-check.json docs/browser-runtime-report.json docs/desktop-check.json docs/desktop-preview.png docs/typecheck.json docs/stability-check.json docs/stability-browser.json docs/security-check.json docs/security-scan.txt docs/acceptance-summary.json docs/acceptance-summary.md
+        run: rm -f docs/unit-tests.tap docs/browser-check.json docs/browser-runtime-report.json docs/desktop-check.json docs/desktop-preview.png docs/typecheck.json docs/stability-check.json docs/stability-browser.json docs/security-check.json docs/security-scan.txt docs/acceptance-summary.json docs/acceptance-summary.md docs/dash-browser-check.json docs/dash-dissolve.png docs/dash-travel.png docs/dash-reform.png
       - run: node tools/desktop-prepare.mjs
       - run: npm ci
       - run: npm run build
@@ -37,36 +37,38 @@ jobs:
         run: node tools/stability-check.mjs
       - run: npx playwright install chromium
       - run: npm run test:browser
+      - name: Smoke dash input pause and fixed-frame visuals
+        run: node tools/dash-browser-check.mjs
       - name: Pause/input stability and browser measurements
         run: node tools/stability-browser.mjs
       - run: npm ci --prefix desktop
       - run: node tools/desktop-build.mjs
       - name: Native Windows smoke
         run: node tools/desktop-smoke.mjs
-      - name: Integrity, Defender, signature and iteration-4 baseline staging
+      - name: Integrity Defender signature and 4A staging
         shell: pwsh
         run: ./tools/stage-iteration4.ps1
-      - name: Publish iteration-4 Windows baseline
+      - name: Publish Windows 4A preview
         uses: actions/upload-artifact@v4
         with:
           name: ASH_IRON_ITERATION_4_WIN_X64
           path: ${{ runner.temp }}/ASH_IRON_ITERATION_4_WIN_X64/
           include-hidden-files: true
           if-no-files-found: error
-      - name: Publish rebuilt browser baseline
+      - name: Publish rebuilt browser preview
         uses: actions/upload-artifact@v4
         with:
           name: ASH_IRON_ITERATION_4_WEB_PREVIEW
           path: PLAY.html
           if-no-files-found: error
-      - name: Detailed verification summary without automatic acceptance
+      - name: Verification summary without automatic acceptance
         if: always()
         run: node tools/ci-summary.mjs
-      - name: Iteration-4 baseline scope summary
+      - name: 4A scope summary
         if: always()
         run: |
-          printf '\n## Iteration 4.0 baseline\n\nThis run tests inherited gameplay, not implemented 4A/4B/4C features.\n\nOrder: 4.0 -> 4A -> 4C -> 4B -> 4E -> final 4D.\n\nObject registry is a separate task. 3C.4 manual and visual acceptance remain pending. Main is not changed.\n' >> "$GITHUB_STEP_SUMMARY"
-      - name: Upload iteration-4 diagnostics even on failure
+          printf '\n## Iteration 4A smoke dash\n\nSee the Smoke dash input pause and fixed-frame visuals step and dash-browser-check.json for the separate 4A result. The generic verification table does not include this new report.\n\n4B/4C are not included. Object registry is separate. 3C.4 manual and visual acceptance remain pending. Main is unchanged.\n' >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload diagnostics even on failure
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -78,6 +80,10 @@ jobs:
             docs/desktop-check.json
             docs/desktop-preview.png
             docs/typecheck.json
+            docs/dash-browser-check.json
+            docs/dash-dissolve.png
+            docs/dash-travel.png
+            docs/dash-reform.png
             docs/stability-check.json
             docs/stability-browser.json
             docs/security-check.json
@@ -85,6 +91,6 @@ jobs:
             docs/acceptance-summary.json
             docs/acceptance-summary.md
             docs/PENDING_ACCEPTANCE_3C.md
-            docs/ITERATION_3C_VISUAL_CHECK.md
+            docs/ITERATION_4A.md
             docs/ITERATION_4_PLAN.md
           if-no-files-found: warn
