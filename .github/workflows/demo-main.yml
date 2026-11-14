@@ -1,0 +1,98 @@
+name: Main Demo
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: main-demo-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  demo:
+    if: github.repository == 'kirillstrad/123456789' && github.ref == 'refs/heads/main'
+    runs-on: windows-2022
+    timeout-minutes: 35
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Remove inherited diagnostics
+        run: rm -f docs/unit-tests.tap docs/browser-check.json docs/browser-runtime-report.json docs/desktop-check.json docs/desktop-preview.png docs/typecheck.json docs/stability-check.json docs/stability-browser.json docs/security-check.json docs/security-scan.txt docs/acceptance-summary.json docs/acceptance-summary.md docs/dash-browser-check.json docs/demo-browser-check.json docs/demo-*.png docs/dash-*.png
+      - name: Prepare main demo identity
+        run: node tools/demo-prepare.mjs
+      - run: npm ci
+      - run: npm run build
+      - run: npm run typecheck
+      - name: Unit and integration tests
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee docs/unit-tests.tap
+      - name: Repeated gameplay and CPU measurements
+        run: node tools/stability-check.mjs
+      - run: npx playwright install chromium
+      - run: npm run test:browser
+      - name: Smoke dash input and visuals
+        run: node tools/dash-browser-check.mjs
+      - name: Combined attack and execution demo scenarios
+        run: node tools/demo-browser-check.mjs
+      - name: Pause and held-input stability
+        run: node tools/stability-browser.mjs
+      - run: npm ci --prefix desktop
+      - run: node tools/desktop-build.mjs
+      - name: Native Windows smoke
+        run: node tools/desktop-smoke.mjs
+      - name: Integrity Defender signature and demo staging
+        shell: pwsh
+        run: ./tools/stage-demo.ps1
+      - name: Publish complete Windows demo folder
+        uses: actions/upload-artifact@v4
+        with:
+          name: ASH_IRON_DEMO_WIN_X64
+          path: ${{ runner.temp }}/ASH_IRON_DEMO_WIN_X64/
+          include-hidden-files: true
+          if-no-files-found: error
+      - name: Publish freshly rebuilt HTML demo
+        uses: actions/upload-artifact@v4
+        with:
+          name: ASH_IRON_DEMO_WEB
+          path: ${{ runner.temp }}/ASH_IRON_DEMO_WEB/
+          if-no-files-found: error
+      - name: Verification summary without visual acceptance
+        if: always()
+        run: node tools/ci-summary.mjs
+      - name: Main demo scope
+        if: always()
+        run: |
+          printf '\n## Main 4BC Demo with 4A dash\n\nNew combined browser result: demo-browser-check.json and Combined attack and execution demo scenarios step. Generic summary does not include that new report.\n\nOne enemy room; human visual review and 3C.4 acceptance pending. Main source build; no generated files committed back to Git.\n' >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish diagnostics even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ASH_IRON_DEMO_REPORTS_${{ github.run_id }}_${{ github.run_attempt }}
+          path: |
+            docs/unit-tests.tap
+            docs/browser-check.json
+            docs/browser-runtime-report.json
+            docs/desktop-check.json
+            docs/desktop-preview.png
+            docs/typecheck.json
+            docs/stability-check.json
+            docs/stability-browser.json
+            docs/security-check.json
+            docs/security-scan.txt
+            docs/acceptance-summary.json
+            docs/acceptance-summary.md
+            docs/demo-browser-check.json
+            docs/demo-*.png
+            docs/dash-browser-check.json
+            docs/dash-*.png
+            docs/DEMO_MAIN.md
+            docs/PENDING_ACCEPTANCE_3C.md
+          if-no-files-found: warn
