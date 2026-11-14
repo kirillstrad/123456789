@@ -1,6 +1,23 @@
 import {throneMenu} from './throne-menu.js';
-export function makeUI(out,glyph){document.documentElement.dataset.ashMenu='throne';const ui=document.createElement('canvas');ui.width=1008;ui.height=864;const u=ui.getContext('2d',{willReadFrequently:true});let pl={hp:100,lamp:100};
-function uiText(text,x,y,size=15,c='#aaa',align='center'){u.font=size+'px monospace';u.textAlign=align;u.fillStyle=c;u.fillText(text,x,y)}
-function flourish(x,y,w=300,down=false){u.save();u.translate(x,y);if(down)u.scale(1,-1);u.strokeStyle='#aaa';u.lineWidth=10;u.beginPath();u.moveTo(-w/2,0);u.lineTo(-w/3,-17);u.lineTo(-w/4,-5);u.lineTo(-w/8,-27);u.lineTo(0,-12);u.lineTo(w/8,-27);u.lineTo(w/4,-5);u.lineTo(w/3,-17);u.lineTo(w/2,0);u.stroke();u.lineWidth=6;u.beginPath();u.moveTo(0,-12);u.lineTo(0,30);u.moveTo(-20,10);u.lineTo(20,10);u.stroke();u.restore()}
-function drawHUD(){u.fillStyle='#000';u.fillRect(0,0,1008,864);u.fillStyle='#626262';u.fillRect(32,22,944,3);u.fillRect(32,120,944,3);for(let x of[42,966]){u.fillRect(x,25,4,95);u.fillRect(x-8,60,20,5)}flourish(504,32,190);for(let[cx,value,label,icon]of[[272,pl.hp,'HEALTH','health'],[736,pl.lamp,'LAMP','lamp']]){let x=cx-164;u.fillStyle='#0d0d0d';u.fillRect(x,47,328,54);u.strokeStyle='#828282';u.lineWidth=2;u.strokeRect(x,47,328,54);u.strokeStyle='#414141';u.strokeRect(x+5,52,318,44);u.strokeStyle='#aaa';u.lineWidth=4;if(icon==='health'){u.beginPath();u.moveTo(x+22,57);u.lineTo(x+22,91);u.moveTo(x+11,68);u.lineTo(x+33,68);u.stroke()}else{u.strokeRect(x+11,65,22,22);u.beginPath();u.moveTo(x+11,65);u.lineTo(x+22,52);u.lineTo(x+33,65);u.stroke();u.fillStyle='#aaa';u.fillRect(x+20,70,5,11)}uiText(label,x+49,68,11,'#aaa','left');uiText(Math.ceil(value)+'/100',x+309,68,11,'#aaa','right');let bw=252,by=80;u.fillStyle='#242424';u.fillRect(x+49,by,bw,9);u.fillStyle='#999';u.fillRect(x+49,by,bw*Math.max(0,value)/100,9);for(let i=0;i<25;i++){u.fillStyle='#000';u.fillRect(x+49+i*10,by,2,9)}}uiText('+',504,100,16,'#999');const hudView=document.createElement('canvas');hudView.width=1008;hudView.height=144;hudView.getContext('2d').drawImage(ui,0,0,1008,144,0,0,1008,144);glyph(hudView,196,28,720,144,true,true)}
-return{menu(){throneMenu(out,window.__ASH_ITERATION_2__);},hud(lamp){pl={hp:lamp,lamp};drawHUD();}};}
+export function makeUI(out,glyph){
+ document.documentElement.dataset.ashMenu='throne';
+ const ui=document.createElement('canvas'),hudView=document.createElement('canvas');
+ ui.width=1008;ui.height=864;hudView.width=1008;hudView.height=144;
+ const u=ui.getContext('2d',{willReadFrequently:true}),h=hudView.getContext('2d');let lampLife=100;
+ function uiText(text,x,y,size=15,c='#aaa',align='center'){u.font=size+'px monospace';u.textAlign=align;u.fillStyle=c;u.fillText(text,x,y);}
+ function flourish(x,y,w=300){u.save();u.translate(x,y);u.strokeStyle='#aaa';u.lineWidth=10;u.beginPath();u.moveTo(-w/2,0);u.lineTo(-w/3,-17);u.lineTo(-w/4,-5);u.lineTo(-w/8,-27);u.lineTo(0,-12);u.lineTo(w/8,-27);u.lineTo(w/4,-5);u.lineTo(w/3,-17);u.lineTo(w/2,0);u.stroke();u.lineWidth=6;u.beginPath();u.moveTo(0,-12);u.lineTo(0,30);u.moveTo(-20,10);u.lineTo(20,10);u.stroke();u.restore();}
+ function drawHUD(){
+  u.fillStyle='#000';u.fillRect(0,0,1008,864);u.fillStyle='#626262';u.fillRect(32,22,944,3);u.fillRect(32,120,944,3);
+  for(const x of [42,966]){u.fillRect(x,25,4,95);u.fillRect(x-8,60,20,5);}flourish(504,32,190);
+  const x=200,width=608,bx=x+56,bw=width-76,by=80;
+  u.fillStyle='#0d0d0d';u.fillRect(x,47,width,54);u.strokeStyle='#828282';u.lineWidth=2;u.strokeRect(x,47,width,54);u.strokeStyle='#414141';u.strokeRect(x+5,52,width-10,44);
+  u.strokeStyle='#aaa';u.lineWidth=4;u.strokeRect(x+16,65,22,22);u.beginPath();u.moveTo(x+16,65);u.lineTo(x+27,52);u.lineTo(x+38,65);u.stroke();u.fillStyle='#aaa';u.fillRect(x+25,70,5,11);
+  uiText('LAMP',bx,68,11,'#aaa','left');uiText(Math.ceil(lampLife)+'/100',x+width-18,68,11,'#aaa','right');
+  u.fillStyle='#242424';u.fillRect(bx,by,bw,9);u.fillStyle=lampLife<=1?'#c6c6c6':'#999';u.fillRect(bx,by,bw*lampLife/100,9);
+  for(let i=0;i<53;i++){u.fillStyle='#000';u.fillRect(bx+i*10,by,2,9);}
+  const warning=lampLife<=0?'THE FLAME IS OUT':lampLife<=1?'LAST EMBER - ONE HIT LEFT':lampLife<=15?'LOW EMBER':'';
+  if(warning)uiText(warning,504,113,11,'#bfbfbf');
+  h.drawImage(ui,0,0,1008,144,0,0,1008,144);glyph(hudView,196,28,720,144,true,true);
+ }
+ return{menu(){throneMenu(out,window.__ASH_ITERATION_2__);},hud(lamp){lampLife=Number.isFinite(lamp)?Math.max(0,Math.min(100,lamp)):0;drawHUD();}};
+}
