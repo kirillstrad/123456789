@@ -5,7 +5,7 @@ export class ActionMachine{
 current:Strike|null=null;queued:AttackCommand|null=null;private serial=0;private chain='';private contactFired=false;started=0;hits=0;
 clear():void{this.current=null;this.queued=null;this.chain='';this.contactFired=false;}
 request(command:AttackCommand,hooks:AttackHooks):boolean{
-if(this.current){if(this.current.elapsed/this.current.duration<COMBAT.queueStart||this.queued||!allowedContinuation(this.chain,command.kind))return false;this.queued={kind:command.kind,aim:command.aim?{...command.aim}:null};return true;}
+if(this.current){const progress=this.current.elapsed/this.current.duration;if(progress<COMBAT.queueStart||progress>COMBAT.activeEnd||this.queued||!allowedContinuation(this.chain,command.kind))return false;this.queued={kind:command.kind,aim:command.aim?{...command.aim}:null};return true;}
 this.begin(command,0,hooks);return true;
 }
 private begin(command:AttackCommand,stage:number,hooks:AttackHooks):void{
@@ -22,5 +22,5 @@ if(!this.contactFired&&prev<contact&&t>=contact){this.contactFired=true;hooks.hi
 if(movingInput&&!this.queued&&t>=DRAFT_RULES.allowMoveCancelAfter){this.clear();return;}
 if(t>=1){if(this.queued){const next=this.queued;this.begin(next,a.stage+1,hooks);}else this.clear();}
 }
-view():ActionView|null{const a=this.current;return a?{id:a.id,kind:a.kind,stage:a.stage,progress:a.elapsed/a.duration,fx:a.fx,fy:a.fy,clip:(a.kind==='heavy'?'heavy':'light')+(a.stage+1)}:null;}
+view():ActionView|null{const a=this.current;return a?{id:a.id,kind:a.kind,stage:a.stage,progress:a.elapsed/a.duration,fx:a.fx,fy:a.fy,clip:(a.kind==='heavy'?'heavy':'light')+(a.stage+1),animation4C:true,continuation:this.queued?.kind??null}:null;}
 }

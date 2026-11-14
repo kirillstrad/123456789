@@ -7,7 +7,7 @@ export interface Point{x:number;y:number}
 export type AttackKind='light'|'heavy';
 export interface AttackCommand{kind:AttackKind;aim:Point|null}
 export interface Strike{id:number;kind:AttackKind;stage:number;elapsed:number;duration:number;fx:number;fy:number;hitIds:Set<number>}
-export interface ActionView{id:number;kind:AttackKind;stage:number;progress:number;fx:number;fy:number;clip:string}
+export interface ActionView{id:number;kind:AttackKind;stage:number;progress:number;fx:number;fy:number;clip:string;animation4C?:boolean;continuation?:AttackKind|null}
 export interface Enemy{id:number;x:number;y:number;fx:number;fy:number;hp:number;mode:'wait'|'chase'|'windup'|'recover'|'stagger'|'dead';timer:number;cooldown:number;walkDistance:number;hitFired:boolean;charred?:boolean}
 export interface Particle{x:number;y:number;z:number;vx:number;vy:number;vz:number;life:number;maxLife:number;glow:boolean;glyph:string}
 export interface Cone{x:number;y:number;fx:number;fy:number;life:number;maxLife:number}
