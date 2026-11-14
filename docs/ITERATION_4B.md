@@ -1,0 +1,13 @@
+# 4B: input and original-character animation candidate
+
+Branch iteration-4-main-4a; main and public/vendor/hero.js unchanged. Core commit 85dbe8c and world lifecycle commit ab02263 precede this step. CI status of this new patch is pending.
+
+4B.2b scope: R listener calls the world execute method only during active unfrozen gameplay; ignores repeat and form focus; rejects an already pending app command rather than silently replacing it. Existing CombatWorld exclusions remain authoritative. Original hero geometry is emitted using a dedicated IK-based pose module: fixed 1.72-unit vendor sword, released right hand independent from embedded blade, lamp offered with left arm, regrip and pull before return. This is not a replacement HTML actor or a change to the vendor file. Existing nonexecution hero path is retained.
+
+Enemy renderer wraps the existing geometry: weakened living enemy gets a fiery halo, captured enemy is lowered and struggles around a fixed torso region, color chars during drain; after completion the normal corpse geometry is tinted dark. Enemy held weapon is omitted during capture. The halo indicates weakened state, not guaranteed range/facing. No actor root staging is introduced.
+
+Still pending: blood and floor stains, spark/ember events, actual extraction fire stream and light, camera motion/toggles, build/provenance relabeling, native/browser execution-specific acceptance and artistic review. This patch does not claim a finished 4B or the same visual polish as the HTML demo. Generic existing browser/native CI still runs; the seven new tests cover rig invariants, fixed blade/free hand, pure sampling, halo/corpse and R listener contracts, not a real browser keypress.
+
+Known review boundaries: entry from moving/turning may need a dedicated captured-pose bridge; animation currently aligns with locked execution heading. Actual hand reach at extreme entry distances, intersection of weapon with target mesh, corpse geometry handoff, costume clipping, pin near obstacles and plant/return transitions need screenshots and human inspection. Limb/sword lengths alone do not certify a natural pose. Cancelled execution keeps its presentation frozen, rather than blending to the ordinary death rig, until restart/menu. Other enemies are not added; single-target limitation remains.
+
+Draft gameplay values stay <=30% life, reach 1.4, cone 120 degrees, lamp reward 30, duration 10.8s. Existing attack balance and build identifier ASH_IRON_ITERATION_4A are deliberately retained for this partial package; source commit identifies it. Do not publish as complete 4B until effect integration, provenance and full verification are done. 3C.4 acceptance remains open. No main merge authorized.

@@ -1,0 +1,24 @@
+import {EXECUTION,executionPresentation} from '../combat/execution.js';
+const clamp=x=>Math.max(0,Math.min(1,x));
+export function projectExecution(point,view){return[504+(point[0]-504)*view.zoom+view.dx,430+(point[1]-430)*view.zoom+view.dy];}
+export function unprojectExecution(point,view){return[504+(point[0]-504-view.dx)/view.zoom,430+(point[1]-430-view.dy)/view.zoom];}
+export class ExecutionEffects{
+constructor(){this.reset();}
+reset(){this.seed=8421;this.particles=[];this.stains=[];this.seen=new Set();this.target=null;this.emit=0;this.counts={blood:0,spark:0,ember:0,soul:0};}
+random(){this.seed=(Math.imul(1664525,this.seed)+1013904223)>>>0;return this.seed/4294967296;}
+spawn(kind,count,origin,force=1){this.counts[kind]+=count;for(let i=0;i<count;i++){const angle=this.random()*Math.PI*2,speed=(.3+this.random()*1.8)*force,life=kind==='blood'?1.8:kind==='soul'?.65:1+this.random()*.7;this.particles.push({kind,x:origin[0],y:origin[1],z:origin[2],vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,vz:(.4+this.random()*2)*force,life,maxLife:life,size:.012+this.random()*.018});}if(this.particles.length>384)this.particles.splice(0,this.particles.length-384);}
+step(dt,s,events){if(!Number.isFinite(dt)||dt<=0)return;
+for(const p of this.particles){p.life-=dt;if(p.kind==='soul')continue;p.x+=p.vx*dt;p.y+=p.vy*dt;p.z+=p.vz*dt;p.vz-=(p.kind==='blood'?5.8:2.5)*dt;if(p.z<=.015){if(p.kind==='blood'){this.stains.push({x:p.x,y:p.y,size:p.size*(1.5+this.random())});p.life=0;}else{p.z=.015;p.vz=Math.abs(p.vz)*.22;p.vx*=.65;p.vy*=.65;}}}
+this.particles=this.particles.filter(p=>p.life>0);if(this.stains.length>180)this.stains.splice(0,this.stains.length-180);
+if(s.execution)this.target={x:s.execution.targetX,y:s.execution.targetY};
+for(const event of events){if(event.type!=='execution-start'&&event.type!=='execution-event')continue;const key=[event.type,event.time,event.targetId,event.executionEvent??''].join(':');if(this.seen.has(key))continue;this.seen.add(key);if(this.seen.size>2048)this.seen.delete(this.seen.values().next().value);if(event.type==='execution-start'){this.target={x:s.execution?.targetX??s.enemy.x,y:s.execution?.targetY??s.enemy.y};this.emit=0;continue;}const q=this.target??s.enemy,origin=[q.x,q.y,.3];switch(event.executionEvent){case'impact':this.spawn('blood',36,origin,.8);break;case'pierced':this.spawn('blood',58,origin,1.05);this.spawn('spark',10,[q.x,q.y,.025],.65);break;case'extracted':this.spawn('ember',48,origin,.85);break;case'blade-pulled':this.spawn('spark',24,[q.x,q.y,.025],.8);break;}}
+const e=s.execution;if(e&&s.phase==='playing'&&e.phase!=='cancelled'&&e.elapsed>=EXECUTION.offer&&e.elapsed<EXECUTION.extract){this.emit+=dt;while(this.emit>=.05){this.emit-=.05;const q=this.target;this.spawn('ember',2,[q.x+(this.random()-.5)*.5,q.y+(this.random()-.5)*.3,.18],.5);this.spawn('soul',2,[q.x+(this.random()-.5)*.4,q.y+(this.random()-.5)*.3,.22],.1);}}
+}
+snapshot(){return{seed:this.seed,particles:this.particles.map(p=>({...p})),stains:this.stains.map(p=>({...p})),counts:{...this.counts}};}
+frame(s,lamp,options={}){const parts=[],lights=[],part=(kind,v,c,alpha=1,w=1)=>({kind,v,c,alpha,w,hero:false,d:v.reduce((a,q)=>a+q[0]+q[1]+q[2]*.006,0)/v.length+(kind===1?.005:.001)}),blood=options.blood!==false;
+if(blood)for(const p of this.stains){const r=p.size;parts.push(part(0,[[p.x-r,p.y,.007],[p.x,p.y-r*.65,.007],[p.x+r,p.y,.007],[p.x,p.y+r*.65,.007]],[117,17,24],.85));}
+for(const p of this.particles){if(p.kind==='blood'&&!blood)continue;let q=[p.x,p.y,p.z];const u=clamp(1-p.life/p.maxLife);if(p.kind==='soul'&&s.execution&&s.phase==='playing'){q=q.map((n,i)=>n+(lamp[i]-n)*u);q[2]+=Math.sin(u*Math.PI)*.18;}const r=p.size,alpha=clamp(p.life/.45),color=p.kind==='blood'?[173,32,36]:p.kind==='soul'?[255,221,135]:p.life>.6?[255,185,74]:[203,82,28];parts.push(part(1,[q,[q[0]-p.vx*.025,q[1]-p.vy*.025,q[2]+(p.kind==='blood'?.025:.045)]],color,alpha,p.kind==='blood'?1.8:1.2));parts.push(part(0,[[q[0]-r,q[1],q[2]],[q[0]+r,q[1],q[2]],[q[0],q[1],q[2]+r*1.5]],color,alpha));if(p.kind!=='blood'&&lights.length<6)lights.push({position:q,radius:25,power:.13*alpha});}
+const e=s.execution;let camera={zoom:1,weight:0,focusX:s.x,focusY:s.y,focusZ:.6,shakeX:0,shakeY:0};if(e){const v=executionPresentation(e),fade=s.phase==='dead'?1-clamp(s.deathTime/.6):1,weight=clamp((v.cameraZoom-1)/.17)*fade;camera={zoom:options.camera===false?1:1+(v.cameraZoom-1)*fade,weight:options.camera===false?0:weight,focusX:(s.x+e.targetX)/2,focusY:(s.y+e.targetY)/2,focusZ:.6,shakeX:options.shake===false?0:v.cameraShake*fade,shakeY:options.shake===false?0:v.cameraShake*.55*fade};if(s.phase==='playing'&&e.elapsed>=EXECUTION.offer&&e.elapsed<EXECUTION.extract){const power=.38*Math.sin(clamp((e.elapsed-EXECUTION.offer)/(EXECUTION.extract-EXECUTION.offer))*Math.PI);lights.push({position:[e.targetX,e.targetY,.3],radius:105,power});}}
+return{parts,lights,camera};
+}
+}

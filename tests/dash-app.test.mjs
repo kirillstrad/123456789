@@ -1,0 +1,8 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import vm from 'node:vm';import {movementInput} from '../src/app/movement-input.js';
+test('4A input has no implicit direction and opposing keys cancel',()=>{assert.deepEqual(movementInput(new Set()),{x:0,y:0});assert.deepEqual(movementInput(new Set(['KeyW','KeyS'])),{x:0,y:0});});
+test('4A dash and walking share the existing isometric direction mapping',()=>{const w=movementInput(new Set(['KeyW'])),up=movementInput(new Set(['ArrowUp']));assert.deepEqual(w,up);assert.equal(w.x,-Math.SQRT1_2);assert.equal(w.y,-Math.SQRT1_2);});
+const source=fs.readFileSync('src/app/main.js','utf8'),start=source.indexOf('function part('),end=source.indexOf('\nconst smooth=',start);assert.ok(start>=0&&end>start);const part=vm.runInNewContext(source.slice(start,end)+';part',{pr:(x,y)=>[x,y],color:c=>c});
+function context(){return {globalAlpha:.8,seen:[],beginPath(){},moveTo(){},lineTo(){},closePath(){},ellipse(){},fill(){this.seen.push(this.globalAlpha);},stroke(){this.seen.push(this.globalAlpha);}};}
+test('4A polygons apply opacity and restore prior alpha',()=>{const ctx=context();part(ctx,{kind:0,v:[[0,0,0],[1,0,0],[0,1,0]],c:'#fff',alpha:.3,hero:true},{cameraX:0,cameraY:0},false);assert.deepEqual(ctx.seen,[.3]);assert.equal(ctx.globalAlpha,.8);});
+test('4A sprite mask restores alpha on early return',()=>{const ctx=context();part(ctx,{kind:2,v:[[0,0,0]],r:1,c:'#fff',alpha:.2,hero:true},{cameraX:0,cameraY:0},true);assert.deepEqual(ctx.seen,[.2]);assert.equal(ctx.globalAlpha,.8);});
+test('4A fully transparent parts do not paint',()=>{const ctx=context();part(ctx,{alpha:0},{},false);assert.deepEqual(ctx.seen,[]);assert.equal(ctx.globalAlpha,.8);});

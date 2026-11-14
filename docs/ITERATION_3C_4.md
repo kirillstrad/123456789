@@ -1,0 +1,11 @@
+# Iteration 3C.4 - stabilization checks and candidate publication
+
+One package adds a 12-cycle mixed gameplay/death/retry check, CPU measurements for simulation and hero sampling, heap/RSS observations, column collision/retreat checks, browser pause tests during attacks, held-input cleanup after blur, paced frame measurements, package-copy integrity checks, executable signature reporting and a Defender custom folder scan without remediation. Existing unit/browser tests and native fullscreen/F11/pause/isolation checks remain enabled. No gameplay or animation implementation is changed by this block.
+
+Measurements include environment and source commit. They establish observations, not a comparative performance baseline, leak diagnosis, optimization result or user-hardware FPS promise. Browser mode emulates desktop layout; native checks still come from the packaged Electron smoke. No new benchmark thresholds are invented. Long sessions and human visual review remain pending.
+
+The Defender stage fails closed: unavailable service/tool, nonzero scan exit, missing package files or changed bytes block playable publication. JSON diagnostic reports are uploaded even if a preceding step fails. Scanner definition metadata and log are recorded when available; this block does not claim definitions were updated or are the latest. Signature status may reflect the Electron vendor; no project publisher certificate is configured, and separately bundled JavaScript is not attested by the executable signature alone. A clean scan is not an audit or Chrome reputation guarantee.
+
+When all checks succeed, Windows and HTML previews are published from the same source commit. The Windows artifact contains the complete portable folder without a nested ZIP, provenance, reports and checksums. Native binaries are compared byte-for-byte by SHA256 when copied; scan must not change the payload. Metadata/reports are added afterward. Main and previous branches are not write targets; no release or merge is performed.
+
+Acceptance still requires user-machine launch, visual review of walking/combat/inertia, and review of measured results and known limitations. This commit adds the stabilization instruments; it does not certify completion of all four work cycles or automatically close iteration 3. Any discovered defect requires a targeted correction and rerun.
