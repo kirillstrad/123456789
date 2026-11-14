@@ -1,0 +1,11 @@
+# 4A - smoke dash implementation, technical package 1 of 2
+
+Target: iteration-4-main-4a, based on merge 94a507d17e4175cf2f1f8bb037adf3ba87b7d958. Main is unchanged. This package adds simulation, effect geometry and ten tests, not a complete playable release. The second package must connect Shift, alpha compositing, ignition light, build identity and target-branch CI before full verification or publication is claimed.
+
+Approved behavior: .16s dissolve, .42s continuous eased smoke travel, .22s reformation; max 2.4 cells; locked input direction; zero direction rejects; 1.2s cooldown after completion; no lamp cost; protection only during smoke travel; no flare damage. Existing attacks, sweep and hit reaction prevent starting dash. Attacks/sweep during dash reject without queueing. Ordinary vulnerable-phase damage reduces lamp without replacing the dash animation; lethal damage clears it. This damage-animation policy needs integration acceptance.
+
+Path planning and movement sample solid geometry at <= .025 cells. Enemy bodies may be crossed, but an occupied landing shortens the planned path. During the action, enemy AI and timers continue; attempted movement into the reserved landing clearance is rolled back to avoid an occupied landing without teleporting the hero. This temporary reservation is an explicit implementation policy for review, not a general AI change. Static room geometry is assumed; dynamic obstacle insertion is not accepted by this preview.
+
+Movement does not advance walking gait distance during dash. Ordinary foot support and combat-entry anchors are cleared. Motion channels reset at entry; during dash only facing turns toward the locked direction while inertia drive is disabled. Dash snapshots copy state and interpolate elapsed time. Smoke/sparks are generated from snapshots with no mutable rendering clock. Alpha values are provided but the old app renderer does not consume them until package 2.
+
+Earlier preparation passed eight isolated geometry/timing checks on annotation-stripped dash logic, not a full TypeScript build. The ten repository tests in this package have not run. Full TypeScript, unit/browser/native/security checks and human visual acceptance remain pending. Risk PENDING_ACCEPTANCE_3C.md remains open. No 4B/4C/4E, object registry, PS5 port or main merge is included.
