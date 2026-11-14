@@ -1,0 +1,86 @@
+name: Iteration 3C Preflight
+on:
+  push:
+    branches: [iteration-3c-stabilization]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: iteration-3c-preflight-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  preflight:
+    if: github.repository == 'kirillstrad/123456789' && github.ref == 'refs/heads/iteration-3c-stabilization'
+    runs-on: windows-2022
+    timeout-minutes: 35
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Remove inherited reports
+        run: rm -f docs/unit-tests.tap docs/browser-check.json docs/browser-runtime-report.json docs/desktop-check.json docs/desktop-preview.png docs/typecheck.json docs/stability-check.json docs/stability-browser.json docs/security-check.json docs/security-scan.txt docs/acceptance-summary.json docs/acceptance-summary.md
+      - run: node tools/desktop-prepare.mjs
+      - run: npm ci
+      - run: npm run build
+      - run: npm run typecheck
+      - name: Unit and integration tests
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee docs/unit-tests.tap
+      - name: Repeated gameplay and CPU measurements
+        run: node tools/stability-check.mjs
+      - run: npx playwright install chromium
+      - run: npm run test:browser
+      - name: Pause/input stability and browser measurements
+        run: node tools/stability-browser.mjs
+      - run: npm ci --prefix desktop
+      - run: node tools/desktop-build.mjs
+      - name: Native Windows smoke
+        run: node tools/desktop-smoke.mjs
+      - name: Verify package, scan with Defender, inspect signature and stage candidate
+        shell: pwsh
+        run: ./tools/stage-3c4.ps1
+      - name: Publish checked Windows candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: ASH_IRON_3C_WIN_X64
+          path: ${{ runner.temp }}/ASH_IRON_3C_WIN_X64/
+          include-hidden-files: true
+          if-no-files-found: error
+      - name: Publish rebuilt browser preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: ASH_IRON_3C_WEB_PREVIEW
+          path: PLAY.html
+          if-no-files-found: error
+      - name: Detailed verification summary without automatic acceptance
+        if: always()
+        run: node tools/ci-summary.mjs
+      - name: Upload diagnostic reports even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ASH_IRON_3C_PREFLIGHT_REPORTS_${{ github.run_id }}_${{ github.run_attempt }}
+          path: |
+            docs/unit-tests.tap
+            docs/browser-check.json
+            docs/browser-runtime-report.json
+            docs/desktop-check.json
+            docs/desktop-preview.png
+            docs/typecheck.json
+            docs/stability-check.json
+            docs/stability-browser.json
+            docs/security-check.json
+            docs/security-scan.txt
+            docs/acceptance-summary.json
+            docs/acceptance-summary.md
+            docs/PENDING_ACCEPTANCE_3C.md
+            docs/ITERATION_3C_VISUAL_CHECK.md
+            docs/ITERATION_3C_4.md
+          if-no-files-found: warn
