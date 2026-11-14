@@ -1,0 +1,59 @@
+name: Iteration 3C Preflight
+on:
+  push:
+    branches: [iteration-3c-stabilization]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: iteration-3c-preflight-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  preflight:
+    if: github.repository == 'kirillstrad/123456789' && github.ref == 'refs/heads/iteration-3c-stabilization'
+    runs-on: windows-2022
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Remove inherited test reports
+        run: rm -f docs/unit-tests.tap docs/browser-check.json docs/browser-runtime-report.json docs/desktop-check.json docs/desktop-preview.png docs/typecheck.json
+      - name: Prepare desktop hooks
+        run: node tools/desktop-prepare.mjs
+      - run: npm ci
+      - name: Build game
+        run: npm run build
+      - name: TypeScript checks
+        run: npm run typecheck
+      - name: Unit and integration tests
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee docs/unit-tests.tap
+      - name: Install browser
+        run: npx playwright install chromium
+      - name: Browser regression checks
+        run: npm run test:browser
+      - name: Install Electron runtime
+        run: npm ci --prefix desktop
+      - name: Package Windows application
+        run: node tools/desktop-build.mjs
+      - name: Smoke-test packaged executable
+        run: node tools/desktop-smoke.mjs
+      - name: Upload reports from this run
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ASH_IRON_3C_PREFLIGHT_REPORTS_${{ github.run_id }}_${{ github.run_attempt }}
+          path: |
+            docs/unit-tests.tap
+            docs/browser-check.json
+            docs/browser-runtime-report.json
+            docs/desktop-check.json
+            docs/desktop-preview.png
+            docs/typecheck.json
+          if-no-files-found: warn
