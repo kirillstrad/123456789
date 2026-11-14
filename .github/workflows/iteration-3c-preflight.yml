@@ -12,7 +12,7 @@ jobs:
   preflight:
     if: github.repository == 'kirillstrad/123456789' && github.ref == 'refs/heads/iteration-3c-stabilization'
     runs-on: windows-2022
-    timeout-minutes: 25
+    timeout-minutes: 35
     defaults:
       run:
         shell: bash
@@ -23,108 +23,46 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Remove inherited test reports
-        run: rm -f docs/unit-tests.tap docs/browser-check.json docs/browser-runtime-report.json docs/desktop-check.json docs/desktop-preview.png docs/typecheck.json
-      - name: Prepare desktop hooks
-        run: node tools/desktop-prepare.mjs
+      - name: Remove inherited reports
+        run: rm -f docs/unit-tests.tap docs/browser-check.json docs/browser-runtime-report.json docs/desktop-check.json docs/desktop-preview.png docs/typecheck.json docs/stability-check.json docs/stability-browser.json docs/security-check.json docs/security-scan.txt
+      - run: node tools/desktop-prepare.mjs
       - run: npm ci
-      - name: Build game
-        run: npm run build
-      - name: TypeScript checks
-        run: npm run typecheck
+      - run: npm run build
+      - run: npm run typecheck
       - name: Unit and integration tests
         run: |
           set -o pipefail
           npm test 2>&1 | tee docs/unit-tests.tap
-      - name: Install browser
-        run: npx playwright install chromium
-      - name: Browser regression checks
-        run: npm run test:browser
-      - name: Install Electron runtime
-        run: npm ci --prefix desktop
-      - name: Package Windows application
-        run: node tools/desktop-build.mjs
-      - name: Smoke-test packaged executable
+      - name: Repeated gameplay and CPU measurements
+        run: node tools/stability-check.mjs
+      - run: npx playwright install chromium
+      - run: npm run test:browser
+      - name: Pause/input stability and browser measurements
+        run: node tools/stability-browser.mjs
+      - run: npm ci --prefix desktop
+      - run: node tools/desktop-build.mjs
+      - name: Native Windows smoke
         run: node tools/desktop-smoke.mjs
-      - name: Stage verified 3C preview and checksums
+      - name: Verify package, scan with Defender, inspect signature and stage candidate
         shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          Start-Sleep -Seconds 2
-          $source = Join-Path $env:GITHUB_WORKSPACE 'dist/ASH_IRON_3B_1_WIN_X64'
-          $target = Join-Path $env:RUNNER_TEMP 'ASH_IRON_3C_WIN_X64'
-          $report = Get-Content 'docs/desktop-check.json' -Raw | ConvertFrom-Json
-          if ($report.passed -ne $true) { throw 'Desktop smoke report did not pass' }
-          foreach ($file in @('ASH_IRON.exe', 'resources/app/PLAY.html', 'resources/app/main.cjs')) {
-            if (-not (Test-Path (Join-Path $source $file) -PathType Leaf)) { throw "Missing packaged file: $file" }
-          }
-          if (Test-Path $target) { Remove-Item $target -Recurse -Force }
-          Copy-Item -LiteralPath $source -Destination $target -Recurse
-          foreach ($file in @('ASH_IRON.exe', 'resources/app/PLAY.html', 'resources/app/main.cjs')) {
-            $original = (Get-FileHash (Join-Path $source $file) -Algorithm SHA256).Hash
-            $staged = (Get-FileHash (Join-Path $target $file) -Algorithm SHA256).Hash
-            if ($original -ne $staged) { throw "Staged file differs from smoke-tested package: $file" }
-          }
-          $encoding = [System.Text.UTF8Encoding]::new($false)
-          $provenance = [ordered]@{
-            iteration = '3C walking foot-support preview'
-            source_commit = $env:GITHUB_SHA
-            source_branch = $env:GITHUB_REF_NAME
-            workflow_run = $env:GITHUB_RUN_ID
-            workflow_attempt = $env:GITHUB_RUN_ATTEMPT
-            electron = '45.3.2'
-            platform = 'Windows x64'
-            native_smoke_passed = $true
-            human_visual_acceptance = 'pending'
-            user_hardware_performance = 'unverified'
-          }
-          [System.IO.File]::WriteAllText((Join-Path $target 'BUILD_PROVENANCE.json'), ($provenance | ConvertTo-Json), $encoding)
-          $readme = @'
-          ASH / IRON - Iteration 3C walking preview - Windows x64
-          Run ASH_IRON.exe from this extracted folder. Keep all DLLs and subfolders.
-          ESC: pause/resume. F11: fullscreen/windowed. Alt+F4 or EXIT GAME: close.
-          Build identity: BUILD_PROVENANCE.json. File hashes: SHA256SUMS.txt.
-          Read VISUAL_CHECK.md before visual acceptance.
-          The internal packaging directory and some legacy metadata may still say 3B.1;
-          BUILD_PROVENANCE.json identifies this 3C build and its exact source commit.
-          No installer, custom publisher signing, updater or online services.
-          Do not disable OS security to run this preview; report any trust warning.
-          CI smoke checks do not prove visual quality or performance on your computer.
-          Electron licenses and notices are retained.
-          '@
-          [System.IO.File]::WriteAllText((Join-Path $target 'README.txt'), $readme, $encoding)
-          Copy-Item 'docs/ITERATION_3C_VISUAL_CHECK.md' (Join-Path $target 'VISUAL_CHECK.md')
-          $verification = Join-Path $target 'verification'
-          New-Item $verification -ItemType Directory | Out-Null
-          foreach ($file in @('unit-tests.tap', 'browser-check.json', 'browser-runtime-report.json', 'desktop-check.json', 'desktop-preview.png', 'typecheck.json')) {
-            $path = Join-Path 'docs' $file
-            if (Test-Path $path) { Copy-Item $path $verification }
-          }
-          $lines = Get-ChildItem $target -File -Recurse | Sort-Object FullName | ForEach-Object {
-            $relative = [System.IO.Path]::GetRelativePath($target, $_.FullName).Replace('\', '/')
-            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-            "$hash  $relative"
-          }
-          [System.IO.File]::WriteAllText((Join-Path $target 'SHA256SUMS.txt'), (($lines -join "`n") + "`n"), $encoding)
-          if (-not (Test-Path (Join-Path $target 'locales') -PathType Container)) { throw 'Missing Electron locales' }
-          if (-not (Get-ChildItem $target -Filter '*.dll' -File)) { throw 'Missing Electron DLLs' }
-      - name: Upload playable Windows folder without nested ZIP
+        run: ./tools/stage-3c4.ps1
+      - name: Publish checked Windows candidate
         uses: actions/upload-artifact@v4
         with:
           name: ASH_IRON_3C_WIN_X64
           path: ${{ runner.temp }}/ASH_IRON_3C_WIN_X64/
           include-hidden-files: true
           if-no-files-found: error
-      - name: Upload rebuilt browser preview
+      - name: Publish rebuilt browser preview
         uses: actions/upload-artifact@v4
         with:
           name: ASH_IRON_3C_WEB_PREVIEW
           path: PLAY.html
           if-no-files-found: error
-      - name: Write preview summary
+      - name: Candidate summary
         run: |
-          printf '## Iteration 3C playable previews\n\nSource commit: `%s`\n\nWindows: `ASH_IRON_3C_WIN_X64` - extract once, then run `ASH_IRON.exe` with all adjacent files.\n\nBrowser: `ASH_IRON_3C_WEB_PREVIEW` - rebuilt `PLAY.html`.\n\nAutomated checks passed; human visual acceptance and user-hardware performance remain pending.\n' "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
-      - name: Upload reports from this run
+          printf '## 3C.4 stabilization candidate\n\nSource: `%s`\n\nWindows: `ASH_IRON_3C_WIN_X64`; extract once and run `ASH_IRON.exe` with all adjacent files.\n\nAutomated checks and Defender scan completed. Inspect reports for measurements and executable signature status. Human visual acceptance, project publisher signing and user-hardware performance remain pending.\n' "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload diagnostic reports even on failure
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -136,5 +74,10 @@ jobs:
             docs/desktop-check.json
             docs/desktop-preview.png
             docs/typecheck.json
+            docs/stability-check.json
+            docs/stability-browser.json
+            docs/security-check.json
+            docs/security-scan.txt
             docs/ITERATION_3C_VISUAL_CHECK.md
+            docs/ITERATION_3C_4.md
           if-no-files-found: warn
