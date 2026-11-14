@@ -1,0 +1,4 @@
+import {objectById} from './registry.js';import {createGeometry} from './geometry.js';import {ARCHITECTURE_FAMILIES,buildArchitecture} from './models/architecture.js';
+export const NATIVE_FAMILIES=ARCHITECTURE_FAMILIES;
+export function nativeModelSupported(familyId){return NATIVE_FAMILIES.includes(familyId);}
+export function buildObjectGeometry(id,transform={}){const object=objectById(id);if(!object)throw Error('Unknown gallery object: '+id);if(!nativeModelSupported(object.familyId))throw Error('Native gallery model pending: '+object.familyId);const g=createGeometry(transform);buildArchitecture(object.familyId,object.variant,g);return{...g.finish(),objectId:object.id,familyId:object.familyId,variant:object.variant,role:object.role};}
