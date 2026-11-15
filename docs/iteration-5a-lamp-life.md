@@ -1,32 +1,29 @@
-# Iteration 5A: lamp life — implementation status
+# Iteration 5A: lamp life — source implementation
 
-Branch: iteration-5a-lamp-life. Core commit: 62c42481bce8fcbf3738996ed3a334e44a628ba5.
+Branch: iteration-5a-lamp-life. This package is based on 8a8749e684b66f28f476fd07804462cb024a28bc.
 
-## Published core
-- One-use last-ember protection for explicit door/ignite/campfire interactions.
-- A further hit at one HP is fatal; lethal damage cancels the interaction immediately.
-- Pure cost preview, one charge per interaction, cumulative campfire recovery credits.
-- Stale, completed, reset or dead action tokens cannot grant late recovery.
-- Hero commands lock during an interaction; enemy simulation continues.
-- Local core checks: 6 policy tests and 11 model contract tests with dependency stubs. Not actual project integration.
+## Existing packages
+- 62c4248: last-ember resource policy and guarded interaction lifecycle APIs.
+- 8a8749e: one LAMP HUD and death priority over stale actions/execution metadata.
+- F input, approach routing and authored interaction clips are not connected yet.
 
-## HUD and death-selector package
-- A single centered LAMP panel replaces mirrored HEALTH and LAMP panels.
-- ASCII warnings: LOW EMBER, LAST EMBER - ONE HIT LEFT, THE FLAME IS OUT.
-- The existing throne menu and ASCII glyph callback contract are retained.
-- Dead phase takes priority over stale dash, attack, sweep, hit and execution state.
-- Cancelled execution metadata cannot override the hero death clip.
-- Dead heroes bypass foot-contact/entry bridging and cannot emit lamp flame from stale charge.
-- Death sampling uses a clamped death clock; the settled pose does not follow the global clock.
-- The former frozen-hero execution regression is updated to expect a progressing death clip. Enemy choreography remains frozen after cancellation.
+## World-light package
+- Shared pure lampLighting profile is consumed by the actual app renderer and report.
+- Working tuning: fade begins below 15/100; at 1 HP power is 0.039754 of full-charge power and radius is 0.4 of the normal radius.
+- At 15 HP and above the old power/radius/warmth profile is retained. Below this threshold the fade is smooth and monotonic.
+- Zero or invalid charge and dead phase produce zero lamp power, radius and warmth; zero radius never enters the Gaussian division.
+- External lights, spark effects, ambient light and the existing hero-readability floor are not reduced by low lamp charge.
+- Native hero geometry and lampBeat are unchanged by this package.
+- Non-walking object-gallery preview remains lit independently of the combat death phase. Walking snapshots retain their own life/phase profile.
+- Report lampLight is the combat-world profile; per-frame lampLight additionally records radiusPixels. Gallery timings describe the gallery preview separately.
+- The obsolete HEALTH-mirrors-LAMP note is replaced. Public debug API, legacy build tag and export names remain unchanged for compatibility; this is not a new portable build.
 
-Local checks: 5 HUD tests with a mocked canvas and 4 death-selector contract tests with dependency stubs passed. The original-vendor execution-render suite is updated but NOT run locally. No visual acceptance is claimed.
+## Verification and status
+- 6 local native-JavaScript policy/wiring tests passed.
+- 8 additional contract scenarios exercised the actual renderer body with stubbed DOM, world, geometry, effects and ASCII I/O.
+- These are not native-browser visual acceptance, full project typecheck/build or complete CI.
+- Earlier original-vendor execution-render regressions still await the final shared run.
 
-## Still pending in iteration 1
-- Connect critical lamp intensity/radius to the world renderer.
-- Correct the obsolete HEALTH-mirrors-LAMP report note.
-- Actual-game integration and visual review, including the transition into death.
+The source scope of the first block is covered after this package, but end-to-end gameplay and visual acceptance remain pending. Future F targets must use the existing preview/spend/recovery APIs. No new door, ignition, campfire, AI or resurrection mechanics are added here.
 
-F targeting, pathfinding, doors, ignition effects and campfire choreography belong to later blocks. The preview warning API is not yet connected to an F target UI.
-
-Full project typecheck/build, browser tests and complete CI are deferred to the agreed final cross-block pass. A skip is not a passing CI run. No portable/Windows build or main merge is claimed. Original working branches remain untouched.
+Full CI is deferred until all functional blocks are complete. Commits use [skip ci]; skipped checks are not passed checks. No main merge, source-branch edits, portable rebuild or Windows release is claimed.
