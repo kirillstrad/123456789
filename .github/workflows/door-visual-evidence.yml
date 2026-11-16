@@ -1,0 +1,47 @@
+name: Door Visual Evidence
+on:
+  push:
+    branches: [iteration-5b-interaction-completion]
+    paths:
+      - 'src/**'
+      - 'tools/door-visual-check.mjs'
+      - 'tests/door-visual-check.test.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - '.github/workflows/door-visual-evidence.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: door-visual-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  evidence:
+    if: github.repository == 'kirillstrad/123456789'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm run build
+      - run: node --test tests/door-visual-check.test.mjs
+      - run: npx playwright install --with-deps chromium
+      - run: node tools/door-visual-check.mjs
+      - name: Evidence scope
+        if: always()
+        run: |
+          printf '\n## Door visual evidence\n\nCommit: %s\n\nReal ESM app, seeded near-door spawn, real pointer/F/player/renderer; read-only probe. Automated success is not human visual acceptance. Review PNGs and report.json; portable PLAY.html and normal spawn route are not tested.\n' "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: door-visual-evidence-${{ github.sha }}
+          path: door-visual-reports/**
+          retention-days: 7
+          if-no-files-found: warn
