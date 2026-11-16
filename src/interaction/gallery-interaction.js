@@ -2,12 +2,19 @@ import {createInteractionStartGate} from './start-gate.js';
 import {interactionFrame} from '../animation/interaction.js';
 
 // Simulation owns progress/events; rendering only samples the published frame.
-export function createGalleryInteraction(player,scene,targeting,{context=()=> 'gallery-walk'}={}){
+export function createGalleryInteraction(player,scene,targeting,{context=()=> 'gallery-walk',captureEvents=false}={}){
  for(const name of ['step','snapshot','approach','cancelApproach'])if(typeof player?.[name]!=='function')throw Error('Invalid gallery approach player');
- if(typeof scene?.getTarget!=='function'||typeof targeting?.intent!=='function'||typeof targeting?.cancelIntent!=='function'||typeof context!=='function')throw Error('Invalid gallery interaction dependencies');
+ if(typeof scene?.getTarget!=='function'||typeof targeting?.intent!=='function'||typeof targeting?.cancelIntent!=='function'||typeof context!=='function'||typeof captureEvents!=='boolean')throw Error('Invalid gallery interaction dependencies');
  let active=null,owner=null,boundParts=null,observed=null,armed=false,serial=0,disposed=false,effectSent=false;
- const events=[];
- const record=(type,reason=null)=>{events.push(Object.freeze({type,id:active?.id??null,intentId:active?.intentId??null,targetId:active?.targetId??null,reason}));if(events.length>200)events.shift();};
+ const events=[],delivery=[];
+ // Opt-in single-consumer transport, separate from the bounded diagnostic history.
+ const record=(type,reason=null)=>{
+  const event=Object.freeze({type,id:active?.id??null,intentId:active?.intentId??null,targetId:active?.targetId??null,reason});
+  events.push(event);if(events.length>200)events.shift();
+  if(captureEvents)delivery.push(event);
+ };
+ // Reading transfers the pending batch; it never samples or advances simulation.
+ function drainInteractionEvents(){return delivery.splice(0);}
  function abort(reason){if(!active)return false;record('interaction-cancelled',reason);active=null;owner=null;effectSent=false;gate.cancel();return true;}
  function validateActive(){
   if(!active)return false;
@@ -71,5 +78,5 @@ export function createGalleryInteraction(player,scene,targeting,{context=()=> 'g
  }
  function cancelApproach(reason='manual'){if(active)return false;armed=false;gate.cancel();player.cancelApproach(reason);return true;}
  function dispose(){if(disposed)return;disposed=true;abort('scene-closed');gate.cancel();player.cancelApproach('scene-closed');observed=null;armed=false;}
- return Object.freeze({step,snapshot,approach:()=>player.approach(),cancelApproach,interaction,interactionEvents:()=>events.map(e=>({...e})),finishInteraction,dispose});
+ return Object.freeze({step,snapshot,approach:()=>player.approach(),cancelApproach,interaction,interactionEvents:()=>events.map(e=>({...e})),drainInteractionEvents,finishInteraction,dispose});
 }
