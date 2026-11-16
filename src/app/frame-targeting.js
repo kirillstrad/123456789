@@ -1,3 +1,4 @@
+import {createInteractionIntent} from '../interaction/intent.js';
 import {containsTargetPoint,canvasTargetPointer,pickInteractionTarget} from '../interaction/targeting.js';
 function hitArea(part,p,project,zoom){
  if((part.alpha??1)<=0)return null;const v=part.v.map(q=>project(...q));
@@ -13,9 +14,18 @@ export function pickFrameTarget({parts,targets,point,project,zoom=1,viewport}){
  for(let i=parts.length-1;i>=0;i--){const p=parts[i],area=hitArea(p,point,project,zoom);if(!area)continue;const t=owners.get(p);if(!t||duplicates.has(t.id))return null;return pickInteractionTarget([{...t,hitArea:area,depth:p.d}],point,viewport);}
  return null;
 }
-export function installFrameTargeting(canvas){
- let pointer=null,selected=null,disposed=false;const original=canvas.style.cursor,doc=canvas.ownerDocument,win=doc?.defaultView;
- const clear=()=>{pointer=null;selected=null;canvas.style.cursor=original;},move=e=>{pointer={clientX:e.clientX,clientY:e.clientY};},visibility=()=>{if(doc.hidden)clear();};
- canvas.addEventListener('pointermove',move);canvas.addEventListener('pointerleave',clear);win?.addEventListener('blur',clear);doc?.addEventListener('visibilitychange',visibility);
- return Object.freeze({clear,current:()=>selected,frame(frame){if(disposed)return null;if(!frame.active){clear();return null;}selected=pickFrameTarget({...frame,point:canvasTargetPointer(pointer,canvas),viewport:{width:canvas.width,height:720}});canvas.style.cursor=selected?'pointer':original;return selected;},dispose(){if(disposed)return;disposed=true;clear();canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerleave',clear);win?.removeEventListener('blur',clear);doc?.removeEventListener('visibilitychange',visibility);}});
+export function installFrameTargeting(canvas,{canRequest=()=>false,resolve=()=>null,context=()=>''}={}){
+ let pointer=null,selected=null,lastFrame=null,held=false,disposed=false;const pending=createInteractionIntent(),original=canvas.style.cursor,doc=canvas.ownerDocument,win=doc?.defaultView;
+ const leave=()=>{pointer=null;selected=null;canvas.style.cursor=original;},clear=()=>{leave();lastFrame=null;held=false;pending.clear();},move=e=>{pointer={clientX:e.clientX,clientY:e.clientY};},visibility=()=>{if(doc.hidden)clear();};
+ const reconcile=()=>{const i=pending.current();return i?pending.reconcile(resolve(i.targetId),context(),canRequest()):null;};
+ const pick=()=>lastFrame?pickFrameTarget({...lastFrame,point:canvasTargetPointer(pointer,canvas),viewport:{width:canvas.width,height:720}}):null;
+ function keydown(e){
+  if(e.code!=='KeyF'||e.repeat||held||e.defaultPrevented||e.ctrlKey||e.altKey||e.metaKey||e.target?.isContentEditable||e.target?.closest?.('input,select,textarea,button,[contenteditable]'))return;
+  held=true;reconcile();if(disposed||!lastFrame?.active||!canRequest()||pending.current())return;
+  selected=pick();if(!selected)return;const live=resolve(selected.id),drawn=lastFrame.targets.find(t=>t.id===selected.id);
+  if(!live||live.parts!==drawn?.parts)return;if(pending.request(live,context()))e.preventDefault();
+ }
+ const keyup=e=>{if(e.code==='KeyF')held=false;};
+ canvas.addEventListener('pointermove',move);canvas.addEventListener('pointerleave',leave);win?.addEventListener('blur',clear);doc?.addEventListener('visibilitychange',visibility);win?.addEventListener('keydown',keydown);win?.addEventListener('keyup',keyup);
+ return Object.freeze({clear,current:()=>selected,intent:reconcile,frame(frame){if(disposed)return null;if(!frame.active){clear();return null;}lastFrame=frame;reconcile();selected=pick();canvas.style.cursor=selected?'pointer':original;return selected;},dispose(){if(disposed)return;disposed=true;clear();canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerleave',leave);win?.removeEventListener('blur',clear);doc?.removeEventListener('visibilitychange',visibility);win?.removeEventListener('keydown',keydown);win?.removeEventListener('keyup',keyup);}});
 }
