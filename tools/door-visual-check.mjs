@@ -12,15 +12,19 @@ export function seedDoorScene(source){
  scene.getSpawn=()=>{const t=scene.getTarget('prison-door.a');if(!t)throw Error('Missing door');return{x:t.approach.x,y:t.approach.y+1.5};};return scene;`);
 }
 export function bindingProbe(){return `
-import {bindGalleryDoorInteraction as original} from './__door-original-binding.js';
-import {buildPrisonDoorGeometry} from '../gallery/models/prison-door.js';
-export function bindGalleryDoorInteraction(lifecycle,scene){
+import {bindGalleryDoorInteraction as bindOriginal} from './__door-original-binding.js';
+import {buildPrisonDoorGeometry,PRISON_DOOR_OPEN_ANGLE} from '../gallery/models/prison-door.js';
+export function bindGalleryDoorInteraction(lifecycle,scene,refreshActor=null){
+ const original=(life,view)=>bindOriginal(life,view,refreshActor);
  const owner=original(lifecycle,scene),id='prison-door.a',target=scene.getTarget(id);
  const entry=scene.getFrame(target.approach,4).entries.find(e=>e.id===id);
- const split=buildPrisonDoorGeometry({transform:entry}).frameParts.length;
- const parts=target.parts,frame=parts.slice(0,split),approach=JSON.stringify(target.approach),colliders=JSON.stringify(scene.getColliders());
+ const model=buildPrisonDoorGeometry({transform:entry}),split=model.frameParts.length;
+ const parts=target.parts,frame=parts.slice(0,split),approach=JSON.stringify(target.approach),closed=scene.getColliders();
+ const leaf=closed.filter(c=>c.objectId===id).at(-1),h=model.hinge,a=PRISON_DOOR_OPEN_ANGLE*Math.PI/180,co=Math.cos(a),si=Math.sin(a);
+ const open=closed.map(c=>c!==leaf?c:{...c,points:c.points.map(([x,y])=>[h[0]+(x-h[0])*co-(y-h[1])*si,h[1]+(x-h[0])*si+(y-h[1])*co])});
+ const closedText=JSON.stringify(closed),openText=JSON.stringify(open);
  window.__ASH_DOOR_VISUAL__=Object.freeze({
-  sample(){const t=scene.getTarget(id),s=owner.snapshot();return{motion:owner.doorMotion(),animation:s.interactionAnimation,interaction:s.interaction,lamp:s.lamp,hero:{x:s.x,y:s.y},partsStable:t.parts===parts,frameStable:frame.every((p,i)=>t.parts[i]===p),approachStable:JSON.stringify(t.approach)===approach,collidersStable:JSON.stringify(scene.getColliders())===colliders,events:owner.interactionEvents()};},
+  sample(){const t=scene.getTarget(id),s=owner.snapshot(),motion=owner.doorMotion();return{motion,collisionRevision:scene.getCollisionRevision(),doorY:entry.y,animation:s.interactionAnimation,interaction:s.interaction,lamp:s.lamp,hero:{x:s.x,y:s.y},partsStable:t.parts===parts,frameStable:frame.every((p,i)=>t.parts[i]===p),approachStable:JSON.stringify(t.approach)===approach,collidersStable:JSON.stringify(scene.getColliders())===(motion.status==='open'?openText:closedText),events:owner.interactionEvents()};},
   candidates(){const project=window.__ASH_ITERATION_2__.project,c=document.getElementById('game'),r=c.getBoundingClientRect();return parts.map(p=>{const v=p.v.map(q=>project(...q)),x=v.reduce((n,q)=>n+q[0],0)/v.length,y=v.reduce((n,q)=>n+q[1],0)/v.length,area=(Math.max(...v.map(q=>q[0]))-Math.min(...v.map(q=>q[0])))*(Math.max(...v.map(q=>q[1]))-Math.min(...v.map(q=>q[1])));return{x:r.left+x*r.width/c.width,y:r.top+y*r.height/c.height,area,visible:x>0&&x<c.width&&y>0&&y<720};}).filter(p=>p.visible).sort((a,b)=>b.area-a.area).slice(0,40);}
  });
  return owner;
@@ -32,6 +36,7 @@ export function auditDoorSample(sample,previous=null){
  assert.ok(Number.isFinite(m.progress)&&m.progress>=0&&m.progress<=1,'invalid progress');
  for(const key of ['partsStable','frameStable','approachStable','collidersStable'])assert.equal(sample[key],true,key);
  assert.equal(sample.lamp,100,'unexpected lamp expenditure');
+ if('collisionRevision' in sample)assert.equal(sample.collisionRevision,m.status==='open'?1:0,'wrong collision revision');
  if(m.status==='closed'){assert.equal(m.angle,0);assert.equal(m.progress,0);}
  if(m.status==='open'){assert.equal(m.angle,-90);assert.equal(m.progress,1);}
  const effects=sample.events.filter(e=>e.type==='interaction-effect');
@@ -92,7 +97,16 @@ export async function runDoorVisualCheck(){
   for(const type of ['interaction-start','interaction-effect','interaction-end'])assert.equal(events.filter(e=>e.type===type).length,1,type);
   assert.ok(frames.at(-1).sample.hero.y<frames[0].sample.hero.y,'real player did not approach from fixture spawn');
   assert.deepEqual(errors,[]);
-  checks.push('real pointer and F, player approach, one effect/end, full opening, stable frame/identity/approach, unchanged colliders/lamp');
+  checks.push('real pointer/F/approach, one effect/end, opening, stable frame/target/approach, phase-correct colliders, unchanged lamp');
+  const beforePassage=previous;
+  await page.keyboard.down('KeyW');
+  try{await page.clock.runFor(1800);}finally{await page.keyboard.up('KeyW');}
+  await page.clock.runFor(200);
+  const traversed=await page.evaluate(()=>window.__ASH_DOOR_VISUAL__.sample());auditDoorSample(traversed,previous);trace.push(traversed);
+  assert.ok(beforePassage.hero.y>beforePassage.doorY,'hero must start in front of door');
+  assert.ok(traversed.hero.y<traversed.doorY-.5,'same player did not cross the open doorway');
+  await capture('passed-through',traversed);assert.deepEqual(errors,[]);
+  checks.push('same player crosses the open doorway using real KeyW input');
   await page.evaluate(()=>window.__ASH_GALLERY__.close());
   assert.equal(await page.evaluate(()=>window.__ASH_GALLERY__.player()),null);
   checks.push('gallery closes and releases its player');

@@ -83,5 +83,6 @@ export function createGalleryInteraction(player,scene,targeting,{context=()=> 'g
  function cancelApproach(reason='manual'){if(active)return false;armed=false;gate.cancel();player.cancelApproach(reason);return true;}
  function dispose(){if(disposed)return;disposed=true;abort('scene-closed');gate.cancel();player.cancelApproach('scene-closed');observed=null;armed=false;}
  const api=Object.freeze({step,snapshot,approach:()=>player.approach(),cancelApproach,interaction,interactionEvents:()=>events.map(e=>({...e})),drainInteractionEvents,finishInteraction,dispose});
- return doorScene?bindGalleryDoorInteraction(api,scene):api;
+ const refresh=typeof player.refreshColliders==='function'?source=>disposed?false:player.refreshColliders(source):null;
+ return doorScene?bindGalleryDoorInteraction(api,scene,refresh):api;
 }
