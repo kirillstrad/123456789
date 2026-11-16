@@ -1,0 +1,5 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {LABELS,defaults,covered,resumable,menuRects} from '../src/ui/throne-menu.js';
+test('five menu entries and original fire strength',()=>{assert.deepEqual([...LABELS],['NEW GAME','CONTINUE','LEVEL SELECT','SETTINGS','EXIT']);assert.equal(defaults().brightness,.86);});
+test('continue is a living in-memory run',()=>{const s=defaults();assert.equal(resumable(s,'playing'),false);s.hasRun=true;assert.ok(resumable(s,'playing'));assert.equal(resumable(s,'dead'),false);});
+test('ASCII alphabet covers labels and notices',()=>{for(const s of [...LABELS,'BRIGHTNESS 140%','CLOSE THIS BROWSER TAB','THE NAVE','MOTION OFF','NO SAINTS. NO ABSOLUTION.'])assert.ok(covered(s));});
+test('five enlarged text rows fit non-overlapping original menu hitboxes',()=>{const r=menuRects(5);for(let i=0;i<r.length;i++){assert.ok(410+i*49>=r[i].y);assert.ok(410+i*49+28<=r[i].y+r[i].h);assert.ok((LABELS[i].length*6-1)*4<r[i].w);if(i)assert.ok(r[i].y>=r[i-1].y+r[i-1].h);}assert.ok(r.at(-1).y+r.at(-1).h<675);});

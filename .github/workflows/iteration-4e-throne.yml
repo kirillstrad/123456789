@@ -1,0 +1,63 @@
+name: 4E Throne Engine Test
+on:
+  push:
+    branches: [iteration-4e-throne-test]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: throne-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/iteration-4e-throne-test'
+    runs-on: windows-2022
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Remove inherited reports
+        run: rm -f docs/throne-*.png docs/throne-check.json docs/throne-unit-tests.tap docs/browser-check.json docs/desktop-check.json docs/desktop-preview.png docs/typecheck.json
+      - name: Mark source commit
+        run: node --input-type=module -e "import fs from 'node:fs'; const p='BUILD_INFO.json', v=JSON.parse(fs.readFileSync(p)); v.menuTest={commit:process.env.GITHUB_SHA,branch:process.env.GITHUB_REF_NAME,visualAcceptance:'pending'}; fs.writeFileSync(p,JSON.stringify(v,null,2));"
+      - run: node tools/desktop-prepare.mjs
+      - run: npm ci
+      - run: npm run build
+      - run: npm run typecheck
+      - name: Unit tests
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee docs/throne-unit-tests.tap
+      - run: npx playwright install chromium
+      - run: npm run test:browser
+      - run: node tools/throne-check.mjs
+      - run: npm ci --prefix desktop
+      - run: node desktop/node_modules/electron/install.js
+      - run: node tools/desktop-build.mjs
+      - run: node tools/desktop-smoke.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ASH_IRON_4E_THRONE_WIN_X64
+          path: dist/ASH_IRON_3B_1_WIN_X64/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ASH_IRON_4E_THRONE_WEB
+          path: PLAY.html
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ASH_IRON_4E_THRONE_REPORTS_${{ github.run_id }}
+          path: |
+            docs/throne-*
+            docs/browser-check.json
+            docs/desktop-check.json
+            docs/desktop-preview.png
+            docs/typecheck.json
+          if-no-files-found: warn
