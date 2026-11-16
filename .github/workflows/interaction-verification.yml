@@ -1,0 +1,64 @@
+name: Interaction Verification
+on:
+  push:
+    branches: [iteration-5b-interaction-completion]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'tools/build.mjs'
+      - 'tsconfig.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/interaction-verification.yml'
+permissions:
+  contents: read
+concurrency:
+  group: interaction-verification-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    if: github.repository == 'kirillstrad/123456789'
+    runs-on: windows-2022
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Prepare fresh verification reports
+        run: |
+          rm -f docs/typecheck.json
+          mkdir -p interaction-reports
+          rm -f interaction-reports/focused.tap interaction-reports/full.tap
+      - run: npm ci
+      - run: npm run build
+      - run: npm run typecheck
+      - name: Joint interaction verification
+        run: |
+          mkdir -p interaction-reports
+          set -o pipefail
+          node --test tests/interaction-start-gate.test.mjs tests/gallery-approach.test.mjs tests/interaction-lifecycle.test.mjs tests/interaction-handoff.test.mjs 2>&1 | tee interaction-reports/focused.tap
+      - name: Full unit and integration suite
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee interaction-reports/full.tap
+      - name: Verification scope
+        if: always()
+        run: |
+          printf '\n## Interaction verification\n\nCommit: %s\n\nNode 22; source build, typecheck, focused interaction tests and full npm test. No browser/visual acceptance or demo publication. Generated files are not committed.\n' "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload verification reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: interaction-verification-${{ github.sha }}
+          path: |
+            interaction-reports/*.tap
+            docs/typecheck.json
+          retention-days: 7
+          if-no-files-found: warn
