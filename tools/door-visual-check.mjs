@@ -1,3 +1,4 @@
+import {movementInput} from '../src/app/movement-input.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -52,10 +53,19 @@ export function snapshotStage(sample,seen){
  if(sample.motion.status==='open'&&!sample.interaction&&!seen.has('open'))return'open';
  return null;
 }
+// W alone is diagonal in world space. W+D is the yaw-zero door's -Y direction.
+export async function driveDoorPassage(page){
+ await page.keyboard.down('KeyW');
+ try{
+  await page.keyboard.down('KeyD');
+  try{await page.clock.runFor(1800);}finally{await page.keyboard.up('KeyD');}
+ }finally{await page.keyboard.up('KeyW');}
+ await page.clock.runFor(200);
+}
 export async function runDoorVisualCheck(){
  const root=process.cwd(),folder=path.join(root,'door-visual-reports');fs.mkdirSync(folder,{recursive:true});
  const output=fs.mkdtempSync(path.join(folder,'run-')),errors=[],frames=[],trace=[],checks=[];
- let browser=null,server=null,page=null,failure=null,commit=null;
+ let browser=null,server=null,page=null,failure=null,commit=null,passage=null;
  try{commit=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();}catch{}
  try{
   assert.ok(fs.existsSync('runtime/index.html'),'run npm run build first');
@@ -99,20 +109,22 @@ export async function runDoorVisualCheck(){
   assert.deepEqual(errors,[]);
   checks.push('real pointer/F/approach, one effect/end, opening, stable frame/target/approach, phase-correct colliders, unchanged lamp');
   const beforePassage=previous;
-  await page.keyboard.down('KeyW');
-  try{await page.clock.runFor(1800);}finally{await page.keyboard.up('KeyW');}
-  await page.clock.runFor(200);
+  passage={keys:['KeyW','KeyD'],worldInput:movementInput(new Set(['KeyW','KeyD'])),durationMs:1800,before:beforePassage.hero,after:null,doorY:beforePassage.doorY};
+  await driveDoorPassage(page);
   const traversed=await page.evaluate(()=>window.__ASH_DOOR_VISUAL__.sample());auditDoorSample(traversed,previous);trace.push(traversed);
+  passage.after=traversed.hero;passage.crossed=traversed.hero.y<traversed.doorY-.5;passage.lateralDrift=Math.abs(traversed.hero.x-beforePassage.hero.x);
+  await capture('passage-attempt',traversed);
+  assert.ok(passage.lateralDrift<.1,'hero bypassed the doorway sideways');
   assert.ok(beforePassage.hero.y>beforePassage.doorY,'hero must start in front of door');
   assert.ok(traversed.hero.y<traversed.doorY-.5,'same player did not cross the open doorway');
   await capture('passed-through',traversed);assert.deepEqual(errors,[]);
-  checks.push('same player crosses the open doorway using real KeyW input');
+  checks.push('same player crosses the open doorway using real KeyW+KeyD input');
   await page.evaluate(()=>window.__ASH_GALLERY__.close());
   assert.equal(await page.evaluate(()=>window.__ASH_GALLERY__.player()),null);
   checks.push('gallery closes and releases its player');
  }catch(error){failure=String(error.stack??error);if(page)try{await page.screenshot({path:path.join(output,'failure.png'),fullPage:true,timeout:5000});}catch{}}
  finally{
-  fs.writeFileSync(path.join(output,'report.json'),JSON.stringify({commit,automationPassed:failure===null,visualAccepted:false,visualReview:'pending',fixture:{nearDoorSpawn:true,distanceBeyondApproach:1.5,readOnlyProbe:true,esmRuntime:true,portablePlayHtmlTested:false},checks,errors,failure,frames,trace},null,2));
+  fs.writeFileSync(path.join(output,'report.json'),JSON.stringify({commit,automationPassed:failure===null,visualAccepted:false,visualReview:'pending',fixture:{nearDoorSpawn:true,distanceBeyondApproach:1.5,readOnlyProbe:true,esmRuntime:true,portablePlayHtmlTested:false},checks,errors,failure,passage,frames,trace},null,2));
   if(browser)await browser.close();if(server)await new Promise(resolve=>server.close(resolve));
  }
  if(failure)throw Error(failure);
