@@ -5,7 +5,8 @@ try{
  const sample=()=>page.evaluate(()=>{const d=window.__ASH_ITERATION_2__;return{state:d.state(),door:d.combatDoor()};});const defs=await page.evaluate(()=>{const d=window.__ASH_ITERATION_2__;d.start();return d.combatDoor().scene.doors;});assert.equal(defs.length,6);
  for(const def of defs)for(const side of [-1,1]){
   const {x,y}=def.transform,name=def.modelId+'-'+side,check={id:def.id,side};report.checks.push(check);
-  await page.evaluate(({x,y,side})=>{const d=window.__ASH_ITERATION_2__;d.start();d.place(x+.2,y+side*1.1,x<8?15:2,15);d.render();},{x,y,side});
+  const start={x:x+.2,y:y+side*.95};assert.ok(start.x>=1.7&&start.x<=16&&start.y>=1.7&&start.y<=16,'Browser fixture must start inside walkable bounds: '+name);
+  await page.evaluate(({x,y,side})=>{const d=window.__ASH_ITERATION_2__;d.start();d.place(x+.2,y+side*.95,x<8?15:2,15);d.render();},{x,y,side});
   const capture=async stage=>{await page.evaluate(()=>window.__ASH_ITERATION_2__.render());await page.locator('#game').screenshot({path:path.join(dir,name+'-'+stage+'.png'),animations:'disabled'});};
   const box=await page.locator('#game').boundingBox();assert.ok(box);let hovered=false;
   for(const z of [.4,1,1.7]){for(let dx=-.7;dx<=.8;dx+=.08){const q=await page.evaluate(({x,y,z})=>{const d=window.__ASH_ITERATION_2__;return{p:d.project(x,y,z),v:d.viewport()};},{x:x+dx,y,z});await page.mouse.move(box.x+q.p[0]*box.width/q.v.width,box.y+q.p[1]*box.height/q.v.height);await page.evaluate(()=>window.__ASH_ITERATION_2__.render());if(await page.evaluate(id=>window.__ASH_ITERATION_2__.target()?.id===id,def.id)){hovered=true;break;}}if(hovered)break;}

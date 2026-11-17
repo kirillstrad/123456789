@@ -7,7 +7,7 @@ import {OBSTACLES,solid} from '../runtime/combat/geometry.js';
 import {sampleInteraction,interactionFrame} from '../src/animation/interaction.js';
 import {checkDoorHandContact,doorContactToWorld} from '../src/animation/door-contact.js';
 import {doorAssembly} from '../src/gallery/models/articulated-door.js';
-function fixture(def,side){const scene=createCombatDoorScene(OBSTACLES),world=new CombatWorld(scene.map);Object.assign(world.current,{x:def.x+.25,y:def.y+side*1.2,cameraX:def.x,cameraY:def.y});world.current.enemy.hp=0;let intent={id:1,targetId:def.id,kind:'door',context:'game'};const controller=createCombatDoorController({world,scene,targeting:{intent:()=>intent,cancelIntent:()=>intent=null}});return{scene,world,controller};}
+function fixture(def,side){const scene=createCombatDoorScene(OBSTACLES),world=new CombatWorld(scene.map),position={x:def.x+.25,y:def.y+side*.95,cameraX:def.x,cameraY:def.y};assert.equal(solid(position.x,position.y,scene.map),false,'Fixture must start inside walkable space: '+def.id+' side '+side);Object.assign(world.current,position);Object.assign(world.previous,position);world.current.enemy.hp=0;let intent={id:1,targetId:def.id,kind:'door',context:'game'};const controller=createCombatDoorController({world,scene,targeting:{intent:()=>intent,cancelIntent:()=>intent=null}});return{scene,world,controller};}
 for(const def of COMBAT_DOORS)for(const side of [-1,1])test(def.modelId+' real rig, full opening and passage from side '+side,()=>{
  const f=fixture(def,side);let contact=false;
  for(let i=0;i<1800;i++){
