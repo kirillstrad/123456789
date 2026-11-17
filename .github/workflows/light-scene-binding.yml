@@ -33,3 +33,4 @@ jobs:
           path: |
             docs/combat-light-check.json
             docs/combat-light-lit.png
+            docs/combat-light-failure.png

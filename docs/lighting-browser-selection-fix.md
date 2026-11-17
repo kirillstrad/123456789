@@ -1,0 +1,7 @@
+# Browser selection fixture correction
+
+The first browser run failed before F at the ordinary-pointer selection assertion on both platforms. It sampled fixed center heights rather than verified model surfaces. The low brazier.a body and the foreground hero can make those samples miss or be occluded. This is a source-grounded diagnosis of a fragile fixture, not a claim that a browser reproduction has already proved the sole cause.
+
+The corrected check reconstructs the unchanged initial environment plus the current hero and enemy geometry, projects actual polygon interior samples using the app projection, and filters them through the normal occlusion-aware picker. It then moves the actual Playwright mouse and waits for the live application target. It never sets target state, dispatches an intent directly, moves the hero out of the way, ignites via a debug call, or relaxes occlusion. No production input, ignition or payment behavior is changed.
+
+A pure helper regression covers a hero occluding the guessed center, full occlusion, viewport clipping and candidate bounds. A report is now saved on failure as well as success, with candidate coordinates, DOM coverage, live target, controller and canvas state, page errors and a failure screenshot. The artifact step includes that screenshot. If the live selector still fails, the assertion remains failing and the report provides evidence for a production fix. CI and visual acceptance remain pending for this correction.
