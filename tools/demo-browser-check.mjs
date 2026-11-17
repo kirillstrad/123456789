@@ -2,6 +2,11 @@ import {chromium} from 'playwright';import fs from 'node:fs';import path from 'n
 const browser=await chromium.launch({headless:true}),page=await browser.newPage({viewport:{width:1160,height:1120}}),checks=[],errors=[],report={sourceCommit:process.env.GITHUB_SHA??null,passed:false,checks,errors,fixtures:[],scope:'Rebuilt main demo in Chromium, not human visual acceptance or native input certification'};
 page.on('pageerror',e=>errors.push(e.message));const state=()=>page.evaluate(()=>window.__ASH_ITERATION_2__.state());
 async function clickAttack(kind){const box=await page.locator('#game').boundingBox();assert.ok(box);await page.mouse.click(box.x+box.width*.53,box.y+box.height*.44,{button:kind==='L'?'left':'right'});}
+async function waitForAttack(predicate,arg,label,timeout=6000){
+ for(let elapsed=0;elapsed<=timeout;elapsed+=17){if(await page.evaluate(predicate,arg))return;await page.clock.runFor(17);}
+ report.attackFailure={chain:report.attackChain,expected:label,state:await diagnostic(),events:await page.evaluate(()=>window.__ASH_ITERATION_2__.events())};
+ throw Error('Attack check timed out after '+timeout+'ms of controlled browser time: '+report.attackChain+' / '+label);
+}
 async function diagnostic(){return page.evaluate(()=>{const d=window.__ASH_ITERATION_2__;if(!d)return{api:false};const s=d.state(),dx=s.enemy.x-s.x,dy=s.enemy.y-s.y,distance=Math.hypot(dx,dy);return{mode:d.mode(),phase:s.phase,lamp:s.lamp,x:s.x,y:s.y,fx:s.fx,fy:s.fy,distance,facingDot:distance?(dx*s.fx+dy*s.fy)/distance:1,enemy:s.enemy,hitReaction:s.hitReaction,action:s.action,dash:s.dash,sweepProgress:s.sweepProgress,execution:s.execution,available:d.executionAvailable(),effects:d.executionEffects().counts};});}
 async function fixture(){
 const prepared=await page.evaluate(()=>{const d=window.__ASH_ITERATION_2__;d.start();d.freeze();d.place(8,8,15,15);d.damage(45);d.advance(1);for(let i=0;i<3;i++){if(!d.attack('light',9,8))throw Error('Fixture attack rejected');d.advance(.45);d.place(8,8,9,8);d.advance(.1);d.place(8,8,15,15);d.advance(.5);}if(d.state().enemy.hp!==16)throw Error('Fixture did not weaken enemy');d.place(8,8,9,8);const metrics=d.render(),s=d.state();if(metrics.executionCamera.zoom!==1)throw Error('Fixture camera did not reset');return{ready:d.executionAvailable(),s};});
@@ -12,6 +17,7 @@ await page.evaluate(()=>{const d=window.__ASH_ITERATION_2__;if(!d.executionAvail
 await page.waitForFunction(()=>window.__ASH_ITERATION_2__.executionAvailable(),null,{timeout:5000});report.fixtures.at(-1).resumed=await diagnostic();
 }
 try{
+await page.clock.install();
 await page.goto(pathToFileURL(path.resolve('PLAY.html')).href+'?desktop=1');await page.waitForFunction(()=>window.__ASH_ITERATION_2__?.executionEffects);assert.equal(await page.evaluate(()=>window.__ASH_ITERATION_2__.build),'ASH_IRON_DEMO_4BC');
 // Establish menu-owned run state before debug API resets used by later fixtures.
 await page.waitForFunction(()=>window.__ASH_THRONE__?.cpuMs()>0);
@@ -20,7 +26,17 @@ await page.locator('#game').focus();await page.keyboard.press('Enter');
 await page.waitForFunction(()=>window.__ASH_ITERATION_2__.mode()==='game',null,{timeout:5000});
 assert.equal(await page.evaluate(()=>window.__ASH_THRONE__.state().hasRun),true);
 checks.push('Real NEW GAME establishes a resumable menu session');
-for(const chain of ['LLL','LLH','HH']){await page.evaluate(()=>{const d=window.__ASH_ITERATION_2__;d.start();d.place(8,12,15,15);});await page.locator('#game').focus();await clickAttack(chain[0]);for(let i=1;i<chain.length;i++){await page.waitForFunction(stage=>{const a=window.__ASH_ITERATION_2__.state().action;return a&&a.stage===stage&&a.progress>.2&&a.progress<.65;},i-1,{timeout:5000});await clickAttack(chain[i]);}await page.waitForFunction(stage=>{const a=window.__ASH_ITERATION_2__.state().action;return a&&a.stage===stage&&a.progress>.2;},chain.length-1,{timeout:6000});const a=(await state()).action;assert.equal(a.kind,chain.at(-1)==='H'?'heavy':'light');assert.equal(a.animation4C,true);await page.locator('#game').screenshot({path:`docs/demo-${chain}.png`});await page.waitForFunction(()=>window.__ASH_ITERATION_2__.state().action===null,null,{timeout:6000});assert.equal(await page.evaluate(()=>window.__ASH_ITERATION_2__.events().filter(e=>e.type==='strike-start').length),chain.length);checks.push(`Real mouse input ${chain}, new pose path, no hidden repeat`);}
+await page.clock.pauseAt(new Date(await page.evaluate(()=>Date.now()+1000)));
+for(const chain of ['LLL','LLH','HH']){
+ report.attackChain=chain;
+ await page.evaluate(()=>{const d=window.__ASH_ITERATION_2__;d.start();d.place(8,12,15,15);});await page.locator('#game').focus();await clickAttack(chain[0]);
+ for(let i=1;i<chain.length;i++){await waitForAttack(stage=>{const a=window.__ASH_ITERATION_2__.state().action;return a&&a.stage===stage&&a.progress>.2&&a.progress<.65;},i-1,'input window of stage '+(i-1),5000);await clickAttack(chain[i]);}
+ await waitForAttack(stage=>{const a=window.__ASH_ITERATION_2__.state().action;return a&&a.stage===stage&&a.progress>.2;},chain.length-1,'final stage '+(chain.length-1));
+ const a=(await state()).action;assert.equal(a.kind,chain.at(-1)==='H'?'heavy':'light');assert.equal(a.animation4C,true);await page.locator('#game').screenshot({path:`docs/demo-${chain}.png`});
+ await waitForAttack(()=>window.__ASH_ITERATION_2__.state().action===null,null,'chain recovery');
+ assert.equal(await page.evaluate(()=>window.__ASH_ITERATION_2__.events().filter(e=>e.type==='strike-start').length),chain.length);checks.push(`Real mouse input ${chain}, new pose path, no hidden repeat`);
+}
+await page.clock.resume();
 await fixture();await page.keyboard.press('r');await page.waitForFunction(()=>!!window.__ASH_ITERATION_2__.state().execution,null,{timeout:3000});await page.keyboard.press('Escape');await page.waitForFunction(()=>window.__ASH_ITERATION_2__.mode()==='pause',null,{timeout:3000});const frozen=await page.evaluate(()=>{const d=window.__ASH_ITERATION_2__;return JSON.stringify({s:d.state(),fx:d.executionEffects()});});await page.waitForTimeout(180);assert.equal(await page.evaluate(()=>{const d=window.__ASH_ITERATION_2__;return JSON.stringify({s:d.state(),fx:d.executionEffects()});}),frozen);await page.keyboard.press('Escape');await page.waitForFunction(()=>window.__ASH_ITERATION_2__.mode()==='game',null,{timeout:3000});assert.ok((await state()).execution,'ESC must resume the existing execution');checks.push('Real R starts execution; ESC freezes and resumes world and effect state');
 await page.waitForFunction(()=>window.__ASH_ITERATION_2__.state().execution?.elapsed>=2.35,null,{timeout:7000});assert.equal((await page.evaluate(()=>window.__ASH_ITERATION_2__.executionEffects())).counts.blood,94);await page.locator('#game').screenshot({path:'docs/demo-execution-pin.png'});
 await page.waitForFunction(()=>window.__ASH_ITERATION_2__.state().execution?.elapsed>=4.5,null,{timeout:7000});await page.evaluate(()=>window.__ASH_ITERATION_2__.freeze());const metrics=await page.evaluate(()=>window.__ASH_ITERATION_2__.render()),fx=await page.evaluate(()=>window.__ASH_ITERATION_2__.executionEffects());assert.ok(metrics.executionCamera.zoom>1);assert.ok(fx.counts.ember>0&&fx.counts.soul>0);assert.ok(fx.stains.length>0);await page.locator('#game').screenshot({path:'docs/demo-execution-fire.png'});
