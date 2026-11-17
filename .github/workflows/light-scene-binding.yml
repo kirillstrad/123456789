@@ -1,7 +1,7 @@
 name: Light Scene Binding Verification
 on:
   push:
-    branches: [iteration-5h-light-scene-binding]
+    branches: [iteration-5h-light-scene-binding, iteration-5i-test-room-exploration]
   workflow_dispatch:
 permissions:
   contents: read
@@ -23,6 +23,8 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build
+      - name: Fire rule and release processor contracts
+        run: node --test tests/fire-rules.test.mjs
       - run: npm test
       - run: npx playwright install --with-deps chromium
       - name: Original brazier browser regression
