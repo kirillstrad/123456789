@@ -19,6 +19,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Prepare demo identity for browser regression
+        run: node tools/demo-prepare.mjs
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build
