@@ -1,0 +1,11 @@
+# Unified door variants / iron cursor patch: working candidate
+
+Base: main 52a792c. Work remains on iteration-5d-door-variants-cursor; this is not a complete or visually accepted release.
+
+Implemented in this working commit: twelve immutable authored action tracks (two for each door model), independently sampled hand, foot, torso, latch, wing and lift channels; custom iron/ember SVG cursor installed by frame targeting on the actual game canvas. Cursor states include menu, idle, interact, blocked, enemy aim and interaction progress. Native cursor is hidden by scoped CSS only while the overlay is installed. Overlay uses fixed CSS-pixel coordinates, pointer-events:none, and cleanup on disposal; touch, pointer leave, blur and hidden document suppress the overlay. Existing F dispatch and target occlusion logic are retained. Enemy aim uses a projected ellipse, not exact mesh picking and not an assertion that an attack can hit. Cursor readiness uses existing canRequest and target availability; it does not yet preflight navigation or sweep clearance.
+
+Not yet implemented: sampling these tracks into the live hero/door pipeline, world-valid foot IK, equipment stowing, moving latch mesh groups, safe selection of pull vs push, and sequential independent wing collision motion. The twelve tracks are authoring data, NOT twelve playable animations. Existing gameplay door animations remain unchanged. No visual claim or full-scope completion is made.
+
+Local native Node tests cover 12-track structure, finite sampling at 241 points per track, hand/foot trajectory differences, invalid input, cursor states/markup, and mock-DOM cursor lifecycle. These do not test real rig reach, browser rendering, Windows execution or the full game. The workflow runs build/typecheck/full unit tests on Windows and Ubuntu; configured is not passed.
+
+Remaining acceptance: integrate all twelve actions with real contact, equipment and collision semantics; force and capture every action from both sides, demonstrate blocked-space fallback, check gallery/menu/combat cursor states and native fallback, rerun existing browser regressions and obtain human visual review. Lighting and lamp-resource rules remain untouched. All work belongs to one final patch/PR; main is unchanged.
