@@ -1,4 +1,5 @@
 import {installIronCursor} from './iron-cursor.js';
+import {proximityFeedback} from '../render/interaction-proximity.js';
 import {createInteractionIntent} from '../interaction/intent.js';
 import {containsTargetPoint,canvasTargetPointer,pickInteractionTarget} from '../interaction/targeting.js';
 function hitArea(part,p,project,zoom){
@@ -12,7 +13,7 @@ function hitArea(part,p,project,zoom){
 export function pickFrameTarget({parts,targets,point,project,zoom=1,viewport}){
  if(!point||!targets.length||!Number.isFinite(zoom)||zoom<=0)return null;const owners=new Map(),ids=new Set(),duplicates=new Set();
  for(const t of targets){if(ids.has(t.id))duplicates.add(t.id);ids.add(t.id);for(const p of t.parts)owners.set(p,t);}
- for(let i=parts.length-1;i>=0;i--){const p=parts[i],area=hitArea(p,point,project,zoom);if(!area)continue;const t=owners.get(p);if(!t||duplicates.has(t.id))return null;return pickInteractionTarget([{...t,hitArea:area,depth:p.d}],point,viewport);}
+ for(let i=parts.length-1;i>=0;i--){const p=parts[i];if(p.interactionVapor)continue;const area=hitArea(p,point,project,zoom);if(!area)continue;const t=owners.get(p.interactionSource??p);if(!t||duplicates.has(t.id))return null;return pickInteractionTarget([{...t,hitArea:area,depth:p.d}],point,viewport);}
  return null;
 }
 export function installFrameTargeting(canvas,{canRequest=()=>false,resolve=()=>null,context=()=>''}={}){
@@ -33,5 +34,5 @@ export function installFrameTargeting(canvas,{canRequest=()=>false,resolve=()=>n
  }
  const keyup=e=>{if(e.code==='KeyF')held=false;};
  canvas.addEventListener('pointermove',move);canvas.addEventListener('pointerleave',leave);win?.addEventListener('blur',clear);doc?.addEventListener('visibilitychange',visibility);win?.addEventListener('keydown',keydown);win?.addEventListener('keyup',keyup);
- return Object.freeze({clear,cancelIntent:()=>pending.clear(),current:()=>selected,intent:reconcile,frame(frame){if(disposed)return null;if(!frame.active){clear();return null;}lastFrame=frame;reconcile();selected=pick();canvas.style.cursor=selected?'pointer':original;return selected;},dispose(){if(disposed)return;disposed=true;cursor?.dispose();clear();canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerleave',leave);win?.removeEventListener('blur',clear);doc?.removeEventListener('visibilitychange',visibility);win?.removeEventListener('keydown',keydown);win?.removeEventListener('keyup',keyup);}});
+ return Object.freeze({clear,cancelIntent:()=>pending.clear(),current:()=>selected,intent:reconcile,frame(frame){if(disposed)return null;if(!frame.active){clear();return null;}const mode=context(),actor=mode==='gallery-walk'?win?.__ASH_GALLERY__?.player?.():mode==='game'?win?.__ASH_ITERATION_2__?.state?.():null,parts=proximityFeedback({parts:frame.parts,targets:frame.targets,actor,time:actor?.time??0,enabled:!!actor&&canRequest(),reducedMotion:!!win?.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches});frame.parts.splice(0,frame.parts.length,...parts);lastFrame=frame;reconcile();selected=pick();canvas.style.cursor=selected?'pointer':original;return selected;},dispose(){if(disposed)return;disposed=true;cursor?.dispose();clear();canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerleave',leave);win?.removeEventListener('blur',clear);doc?.removeEventListener('visibilitychange',visibility);win?.removeEventListener('keydown',keydown);win?.removeEventListener('keyup',keyup);}});
 }
