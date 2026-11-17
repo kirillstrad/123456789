@@ -1,0 +1,51 @@
+name: Prayer Menu and Cursor Verification
+on:
+  push:
+    branches: [iteration-5e-prayer-menu-cursors]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node tools/demo-prepare.mjs
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - run: node tools/prayer-menu-browser-check.mjs
+      - run: npm run test:browser
+      - run: node tools/demo-browser-check.mjs
+      - run: node tools/dash-browser-check.mjs
+      - run: node tools/stability-browser.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: prayer-menu-evidence-${{ matrix.os }}-${{ github.sha }}
+          path: |
+            prayer-menu-reports/**
+            docs/*check.json
+            docs/demo-*.png
+            docs/dash-*.png
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: prayer-menu-play-${{ matrix.os }}-${{ github.sha }}
+          path: PLAY.html
+          if-no-files-found: error
