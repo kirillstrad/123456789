@@ -7,6 +7,7 @@ try{
   const {x,y}=def.transform,name=def.modelId+'-'+side,check={id:def.id,side};report.checks.push(check);
   const start={x:x+.2,y:y+side*.95};assert.ok(start.x>=1.7&&start.x<=16&&start.y>=1.7&&start.y<=16,'Browser fixture must start inside walkable bounds: '+name);
   await page.evaluate(({x,y,side})=>{const d=window.__ASH_ITERATION_2__;d.start();d.place(x+.2,y+side*.95,x<8?15:2,15);d.render();},{x,y,side});
+  const eventOffset=(await sample()).door.events.length;check.eventOffset=eventOffset;
   const capture=async stage=>{await page.evaluate(()=>window.__ASH_ITERATION_2__.render());await page.locator('#game').screenshot({path:path.join(dir,name+'-'+stage+'.png'),animations:'disabled'});};
   const box=await page.locator('#game').boundingBox();assert.ok(box);let hovered=false;
   for(const z of [.4,1,1.7]){for(let dx=-.7;dx<=.8;dx+=.08){const q=await page.evaluate(({x,y,z})=>{const d=window.__ASH_ITERATION_2__;return{p:d.project(x,y,z),v:d.viewport()};},{x:x+dx,y,z});await page.mouse.move(box.x+q.p[0]*box.width/q.v.width,box.y+q.p[1]*box.height/q.v.height);await page.evaluate(()=>window.__ASH_ITERATION_2__.render());if(await page.evaluate(id=>window.__ASH_ITERATION_2__.target()?.id===id,def.id)){hovered=true;break;}}if(hovered)break;}
@@ -18,7 +19,7 @@ try{
    if(d.status==='open'&&!s.door.interaction){assert.equal(d.side,side);opened=true;break;}
   }
   assert.ok(contact&&fx&&opened,'complete '+name);await capture('open');const before=await sample(),keys=side===1?['KeyW','KeyD']:['KeyS','KeyA'];for(const key of keys)await page.keyboard.down(key);try{await page.clock.runFor(1200);}finally{for(const key of keys)await page.keyboard.up(key);}
-  const after=await sample();assert.ok((after.state.y-y)*side<-.3,'passage '+name);assert.ok(Math.abs(after.state.x-before.state.x)<.12);assert.equal(after.door.events.filter(e=>e.type==='interaction-effect').length,1);assert.ok(after.door.scene.doors.filter(d=>d.id!==def.id).every(d=>d.status==='closed'));check.passed=true;await capture('passage');
+  const after=await sample();assert.ok((after.state.y-y)*side<-.3,'passage '+name);assert.ok(Math.abs(after.state.x-before.state.x)<.12);const scenarioEvents=after.door.events.slice(eventOffset);check.events=scenarioEvents;for(const type of ['interaction-start','interaction-effect','interaction-end']){const matches=scenarioEvents.filter(e=>e.type===type);assert.equal(matches.length,1,type+' exactly once in '+name);assert.equal(matches[0].targetId,def.id,type+' target in '+name);}assert.ok(after.door.scene.doors.filter(d=>d.id!==def.id).every(d=>d.status==='closed'));check.passed=true;await capture('passage');
  }
  assert.equal(new Set(report.checks.map(c=>c.style)).size,6);assert.deepEqual(report.errors,[]);await page.evaluate(()=>window.__ASH_ITERATION_2__.start());assert.ok((await sample()).door.scene.doors.every(d=>d.status==='closed'&&!d.blocked));report.automationPassed=true;
 }catch(e){report.failure=String(e.stack??e);if(page)try{await page.screenshot({path:path.join(dir,'failure.png'),fullPage:true});report.failureState=await page.evaluate(()=>window.__ASH_ITERATION_2__.report());}catch{}throw e;}finally{fs.writeFileSync(path.join(dir,'report.json'),JSON.stringify(report,null,2));await browser.close();}
