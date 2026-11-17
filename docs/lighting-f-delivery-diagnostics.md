@@ -1,0 +1,7 @@
+# F delivery checkpoint
+
+The supplied browser report confirmed live brazier selection, but the actor remained at spawn with walkDistance zero and LAMP 100. The source stayed off, pending intent was null, and controller approach/interaction/events were empty. This locates the observed failure before a recorded approach or ignition session; it does not prove a particular keyboard rejection reason.
+
+The browser fixture now explicitly focuses the game canvas without clicking (click would attack), sends physical KeyF and waits up to four seconds for evidence of intent acceptance or a controller event for the brazier. Only then does it wait for the contact effect. Capture and bubble keyboard records retain event code, key, modifiers, focus, editable guards, defaultPrevented, selected target, actor state, intent and controller state. Named stages distinguish selection, F delivery, contact, completion and restart.
+
+These observers do not create or modify gameplay intent, invoke ignition, move the hero, change input guards or extend the 30-second ignition timeout. The existing intent getter is used for diagnostics just as in the prior report. The trace is bounded to four events at each phase and exists only in the browser-check page. Gameplay is unchanged. Explicit canvas focus and physical key spelling are defensive fixture changes, not a claim that lack of focus or keyboard layout was established as the cause. A new successful browser run is still required.
