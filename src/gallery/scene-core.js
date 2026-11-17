@@ -1,10 +1,39 @@
 import {createGalleryFloor} from './floor.js';
-export function assembleGalleryScene(layout,build,{floorBuilder=createGalleryFloor}={}){const bounds={...layout.bounds},spawn={...layout.spawn};if(!['minX','maxX','minY','maxY'].every(k=>Number.isFinite(bounds[k]))||bounds.maxX<=bounds.minX||bounds.maxY<=bounds.minY||![spawn.x,spawn.y].every(Number.isFinite)||typeof build!=='function'||typeof floorBuilder!=='function')throw Error('Invalid gallery scene configuration');const records=new Map(),colliders=[],lights=[];let totalParts=0,disposed=false,floorKey=null,floorParts=[];
-for(const e of layout.entries){if(records.has(e.id))throw Error('Duplicate gallery placement: '+e.id);const mesh=build(e.id,{x:e.x,y:e.y,z:e.z??0,yaw:e.yaw??0});if(!mesh||mesh.objectId!==e.id||!Array.isArray(mesh.parts)||!mesh.parts.length||!Array.isArray(mesh.lights)||!Array.isArray(mesh.colliders)||!mesh.bounds||!['minX','maxX','minY','maxY'].every(k=>Number.isFinite(mesh.bounds[k])))throw Error('Invalid gallery mesh: '+e.id);records.set(e.id,{entry:{...e},mesh});totalParts+=mesh.parts.length;for(const c of mesh.colliders)colliders.push({...c,objectId:e.id});for(const l of mesh.lights)lights.push({...l,objectId:e.id});}
+import {buildPrisonDoorGeometry,PRISON_DOOR_OPEN_ANGLE} from './models/prison-door.js';
+export function assembleGalleryScene(layout,build,{floorBuilder=createGalleryFloor}={}){const bounds={...layout.bounds},spawn={...layout.spawn};if(!['minX','maxX','minY','maxY'].every(k=>Number.isFinite(bounds[k]))||bounds.maxX<=bounds.minX||bounds.maxY<=bounds.minY||![spawn.x,spawn.y].every(Number.isFinite)||typeof build!=='function'||typeof floorBuilder!=='function')throw Error('Invalid gallery scene configuration');const records=new Map(),colliders=[],lights=[];let collisionRevision=0,totalParts=0,disposed=false,floorKey=null,floorParts=[];
+for(const e of layout.entries){if(records.has(e.id))throw Error('Duplicate gallery placement: '+e.id);const mesh=build(e.id,{x:e.x,y:e.y,z:e.z??0,yaw:e.yaw??0});if(!mesh||mesh.objectId!==e.id||!Array.isArray(mesh.parts)||!mesh.parts.length||!Array.isArray(mesh.lights)||!Array.isArray(mesh.colliders)||!mesh.bounds||!['minX','maxX','minY','maxY'].every(k=>Number.isFinite(mesh.bounds[k])))throw Error('Invalid gallery mesh: '+e.id);records.set(e.id,{entry:{...e},mesh,doorAngle:0,approach:{x:e.x,y:mesh.bounds.maxY+.8,z:e.z??0}});totalParts+=mesh.parts.length;for(const c of mesh.colliders)colliders.push({...c,objectId:e.id});for(const l of mesh.lights)lights.push({...l,objectId:e.id});}
 function alive(){if(disposed)throw Error('Gallery scene disposed');}
 function stats(){alive();return{objects:records.size,parts:totalParts,colliders:colliders.length,lights:lights.length};}
-const describe=r=>({id:r.entry.id,kind:'door',availability:r.entry.availability??'ready',visible:r.entry.visible??true,enabled:r.entry.enabled??true,removed:r.entry.removed??false,approach:{x:r.entry.x,y:r.mesh.bounds.maxY+.8,z:r.entry.z??0},parts:r.mesh.parts});
+const describe=r=>({id:r.entry.id,kind:'door',availability:r.entry.availability??'ready',visible:r.entry.visible??true,enabled:r.entry.enabled??true,removed:r.entry.removed??false,approach:{...r.approach},parts:r.mesh.parts});
 function getTarget(id){alive();const r=records.get(id);return r?.entry.role==='door'?describe(r):null;}
+// Geometry publication only: the caller owns the state and simulation clock.
+function setPrisonDoorAngle(angle){
+ alive();
+ if(!Number.isFinite(angle)||angle<PRISON_DOOR_OPEN_ANGLE||angle>0)throw Error('Invalid prison door angle');
+ const r=records.get('prison-door.a');
+ if(r?.passageOpen&&angle!==PRISON_DOOR_OPEN_ANGLE)throw Error('Cannot close a committed open door');
+ if(!r||r.entry.role!=='door'||r.doorAngle===angle)return false;
+ const {x,y,z=0,yaw=0}=r.entry,next=buildPrisonDoorGeometry({angle,transform:{x,y,z,yaw}}),split=next.frameParts.length;
+ if(r.mesh.parts.length!==next.parts.length)throw Error('Incompatible prison door mesh');
+ // Keep the target array and authored frame objects; replace only leaf records.
+ for(let i=split;i<next.parts.length;i++)r.mesh.parts[i]=next.parts[i];
+ r.mesh.bounds=next.bounds;r.doorAngle=angle;
+ return true;
+}
+// Explicit endpoint commit; moving geometry alone never changes collisions.
+function openPrisonDoorPassage(door){
+ alive();
+ const id='prison-door.a',r=records.get(id);
+ if(!r||r.entry.role!=='door'||r.passageOpen||r.doorAngle!==PRISON_DOOR_OPEN_ANGLE||!door||door.id!==id||door.status!=='open'||door.angle!==PRISON_DOOR_OPEN_ANGLE||door.progress!==1||!Number.isSafeInteger(door.actionId)||door.actionId<=0)return false;
+ const {x,y,z=0,yaw=0}=r.entry,closed=buildPrisonDoorGeometry({transform:{x,y,z,yaw}}),owned=colliders.filter(c=>c.objectId===id);
+ // Fail atomically if the catalogue collision layout is no longer canonical.
+ if(JSON.stringify(owned.map(({objectId,...c})=>c))!==JSON.stringify(closed.colliders))throw Error('Incompatible prison door colliders');
+ const leaf=owned.at(-1),index=colliders.indexOf(leaf),h=closed.hinge,a=PRISON_DOOR_OPEN_ANGLE*Math.PI/180,co=Math.cos(a),si=Math.sin(a);
+ const next={...leaf,points:leaf.points.map(([px,py])=>[h[0]+(px-h[0])*co-(py-h[1])*si,h[1]+(px-h[0])*si+(py-h[1])*co])};
+ if(index<0||!next.points.every(p=>p.every(Number.isFinite)))throw Error('Invalid open prison door collider');
+ colliders[index]=next;r.passageOpen=true;collisionRevision++;return true;
+}
+function getCollisionRevision(){alive();return collisionRevision;}
 function getFrame(camera,range=16,lightPadding=6){alive();if(!camera||![camera.x,camera.y,range,lightPadding].every(Number.isFinite)||range<0||range>64||lightPadding<0||lightPadding>32)throw Error('Invalid gallery view');const intersects=(b,r)=>b.maxX>=camera.x-r&&b.minX<=camera.x+r&&b.maxY>=camera.y-r&&b.minY<=camera.y+r,visible=[...records.values()].filter(r=>intersects(r.mesh.bounds,range)),clipX=x=>Math.max(bounds.minX,Math.min(bounds.maxX,x)),clipY=y=>Math.max(bounds.minY,Math.min(bounds.maxY,y)),window={minX:clipX(Math.floor(camera.x-range)),maxX:clipX(Math.ceil(camera.x+range)),minY:clipY(Math.floor(camera.y-range)),maxY:clipY(Math.ceil(camera.y+range))},key=JSON.stringify(window);if(key!==floorKey){floorParts=floorBuilder(window);floorKey=key;}return{stage:'assembled-data',floorParts,parts:visible.flatMap(r=>r.mesh.parts),lights:lights.filter(l=>Math.abs(l.x-camera.x)<=range+lightPadding&&Math.abs(l.y-camera.y)<=range+lightPadding),targets:visible.filter(r=>r.entry.role==='door').map(describe),entries:visible.map(r=>r.entry),stats:{...stats(),visibleObjects:visible.length,floorParts:floorParts.length}};}
 function dispose(){if(disposed)return;records.clear();colliders.length=0;lights.length=0;floorParts=[];floorKey=null;totalParts=0;disposed=true;}
-return{name:layout.name,stage:'assembled-data',getFrame,getTarget,stats,getSpawn:()=>{alive();return{...spawn};},getBounds:()=>{alive();return{...bounds};},getColliders:()=>{alive();return colliders.slice();},dispose};}
+return{name:layout.name,stage:'assembled-data',getFrame,getTarget,setPrisonDoorAngle,openPrisonDoorPassage,getCollisionRevision,stats,getSpawn:()=>{alive();return{...spawn};},getBounds:()=>{alive();return{...bounds};},getColliders:()=>{alive();return colliders.slice();},dispose};}

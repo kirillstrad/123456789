@@ -52,5 +52,10 @@ export function createGalleryApproach(player,scene,targeting,{allowed=()=>true,m
   }catch(error){cancelApproach('invalid-scene');player.step(dt,{x:0,y:0});}
  }
  function approach(){if(current&&!targeting.intent())cancelApproach('intent-lost');return state;}
- return Object.freeze({step,snapshot:()=>player.snapshot(),approach,cancelApproach});
+ function refreshColliders(source){
+  const result=player.refreshColliders(source);
+  if(current)cancelApproach('obstacles-changed');
+  return result;
+ }
+ return Object.freeze({...(typeof player.refreshColliders==='function'?{refreshColliders}:{}),step,snapshot:()=>player.snapshot(),approach,cancelApproach});
 }

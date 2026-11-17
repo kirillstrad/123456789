@@ -1,13 +1,25 @@
+import {bindGalleryDoorInteraction} from './gallery-door-binding.js';
 import {createInteractionStartGate} from './start-gate.js';
+import {interactionFrame} from '../animation/interaction.js';
 
-// Development lifecycle: action creation is real, an authored clip driver is not.
-export function createGalleryInteraction(player,scene,targeting,{context=()=> 'gallery-walk'}={}){
+// Simulation owns progress/events; rendering only samples the published frame.
+export function createGalleryInteraction(player,scene,targeting,{context=()=> 'gallery-walk',captureEvents=false}={}){
  for(const name of ['step','snapshot','approach','cancelApproach'])if(typeof player?.[name]!=='function')throw Error('Invalid gallery approach player');
- if(typeof scene?.getTarget!=='function'||typeof targeting?.intent!=='function'||typeof targeting?.cancelIntent!=='function'||typeof context!=='function')throw Error('Invalid gallery interaction dependencies');
- let active=null,owner=null,boundParts=null,observed=null,armed=false,serial=0,disposed=false;
- const events=[];
- const record=(type,reason=null)=>{events.push(Object.freeze({type,id:active?.id??null,intentId:active?.intentId??null,targetId:active?.targetId??null,reason}));if(events.length>200)events.shift();};
- function abort(reason){if(!active)return false;record('interaction-cancelled',reason);active=null;owner=null;gate.cancel();return true;}
+ if(typeof scene?.getTarget!=='function'||typeof targeting?.intent!=='function'||typeof targeting?.cancelIntent!=='function'||typeof context!=='function'||typeof captureEvents!=='boolean')throw Error('Invalid gallery interaction dependencies');
+ // The existing app factory call opts in only for a scene that can publish this door.
+ const doorScene=typeof scene.setPrisonDoorAngle==='function'&&scene.getTarget('prison-door.a')?.kind==='door';
+ if(doorScene)captureEvents=true;
+ let active=null,owner=null,boundParts=null,observed=null,armed=false,serial=0,disposed=false,effectSent=false;
+ const events=[],delivery=[];
+ // Opt-in single-consumer transport, separate from the bounded diagnostic history.
+ const record=(type,reason=null)=>{
+  const event=Object.freeze({type,id:active?.id??null,intentId:active?.intentId??null,targetId:active?.targetId??null,reason});
+  events.push(event);if(events.length>200)events.shift();
+  if(captureEvents)delivery.push(event);
+ };
+ // Reading transfers the pending batch; it never samples or advances simulation.
+ function drainInteractionEvents(){return delivery.splice(0);}
+ function abort(reason){if(!active)return false;record('interaction-cancelled',reason);active=null;owner=null;effectSent=false;gate.cancel();return true;}
  function validateActive(){
   if(!active)return false;
   const actor=player.snapshot();
@@ -21,10 +33,11 @@ export function createGalleryInteraction(player,scene,targeting,{context=()=> 'g
   if(disposed||active||request.context!=='gallery-walk'||context()!==request.context)return null;
   const target=scene.getTarget(request.targetId),actor=player.snapshot();
   if(!target||target.parts!==boundParts||target.id!==request.targetId||target.kind!==request.kind||target.removed||target.enabled===false||target.visible===false||(target.availability??'ready')!=='ready'||actor.phase!=='playing'||!Number.isFinite(actor.lamp)||actor.lamp<=0||actor.interaction)return null;
-  // The gate already reserved this request. Stop navigation before taking ownership.
+  interactionFrame(request.kind,0);
   player.cancelApproach('interaction-start');targeting.cancelIntent();
+  // Preserve the zero-tick launch marker for existing consumers; the next tick advances it.
   active=Object.freeze({id:++serial,intentId:request.intentId,targetId:request.targetId,kind:request.kind,context:request.context,phase:'awaiting-animation',elapsed:0});
-  owner=target.parts;record('interaction-start');return active.id;
+  owner=target.parts;effectSent=false;record('interaction-start');return active.id;
  }
  const gate=createInteractionStartGate({getIntent:()=>targeting.intent(),begin});
  function step(dt,input={x:0,y:0}){
@@ -32,8 +45,16 @@ export function createGalleryInteraction(player,scene,targeting,{context=()=> 'g
   if(disposed)return;
   if(active){
    try{validateActive();}catch{abort('invalid-scene');}
-   if(active){player.step(dt,{x:0,y:0});try{if(validateActive())active=Object.freeze({...active,elapsed:active.elapsed+dt});}catch{abort('invalid-scene');}return;}
-   player.step(dt,{x:0,y:0});return;
+   if(!active){player.step(dt,{x:0,y:0});return;}
+   try{player.step(dt,{x:0,y:0});}catch{abort('animation-error');return;}
+   try{if(!validateActive())return;}catch{abort('invalid-scene');return;}
+   try{
+    const frame=interactionFrame(active.kind,active.elapsed+dt);
+    active=Object.freeze({...active,elapsed:frame.elapsed,phase:frame.phase});
+    if(frame.effectDue&&!effectSent){effectSent=true;record('interaction-effect');}
+    if(frame.complete)finishInteraction(active.id);
+   }catch{abort('animation-error');}
+   return;
   }
   let intent;
   try{
@@ -51,14 +72,17 @@ export function createGalleryInteraction(player,scene,targeting,{context=()=> 'g
    }
   }catch{armed=false;gate.cancel();player.cancelApproach('invalid-scene');}
  }
- function snapshot(){if(active)try{validateActive();}catch{abort('invalid-scene');}const s=player.snapshot();return{...s,interaction:active?{...active}:s.interaction??null};}
+ function snapshot(){if(active)try{validateActive();}catch{abort('invalid-scene');}const s=player.snapshot();return{...s,interaction:active?{...active}:s.interaction??null,interactionAnimation:active?interactionFrame(active.kind,active.elapsed):null};}
  function interaction(){snapshot();return active?{...active}:null;}
  function finishInteraction(id){
   if(disposed||!active||active.id!==id)return false;
   try{if(!validateActive())return false;}catch{abort('invalid-scene');return false;}
-  record('interaction-end');active=null;owner=null;return true;
+  // Retained matching-ID completion signal; an early signal never fabricates an effect marker.
+  record('interaction-end');active=null;owner=null;effectSent=false;return true;
  }
  function cancelApproach(reason='manual'){if(active)return false;armed=false;gate.cancel();player.cancelApproach(reason);return true;}
  function dispose(){if(disposed)return;disposed=true;abort('scene-closed');gate.cancel();player.cancelApproach('scene-closed');observed=null;armed=false;}
- return Object.freeze({step,snapshot,approach:()=>player.approach(),cancelApproach,interaction,interactionEvents:()=>events.map(e=>({...e})),finishInteraction,dispose});
+ const api=Object.freeze({step,snapshot,approach:()=>player.approach(),cancelApproach,interaction,interactionEvents:()=>events.map(e=>({...e})),drainInteractionEvents,finishInteraction,dispose});
+ const refresh=typeof player.refreshColliders==='function'?source=>disposed?false:player.refreshColliders(source):null;
+ return doorScene?bindGalleryDoorInteraction(api,scene,refresh):api;
 }
