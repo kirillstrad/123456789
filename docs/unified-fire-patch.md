@@ -1,0 +1,7 @@
+# Unified fire patch: first code commit
+
+Branch: iteration-5i-test-room-exploration. Main is unchanged. This commit adds routing rules, owned release-event processing, light profiles and hint appearance contracts with tests. It is NOT the completed requested patch.
+
+Remaining in the same combined patch: call the processor from the real simulation; enforce E/F routing in production; connect the faint cone, larger flames, light profiles and moving hints to rendering; compute real illumination and occlusion for hints; migrate legacy decorative candles; implement/place oven and campfire models where needed; update browser scenarios and CI; perform visual acceptance. Policy flags alone do not change the E lifecycle. Model-name support in rules alone does not create models. Tests and CI have not yet been run for this commit. Numeric light/range values are initial tuning candidates.
+
+Approved behavior: E ignites small floor sources only at spark release, with no per-object payment or precise height aiming and no ordinary damage/movement cancellation. Wall sources, large braziers, ovens and campfires use lantern F for six LAMP with one reserved. Walls block ignition. Unlit hints are cool-white, visible in darkness, brighter in lantern light, and hidden by opaque geometry. Sources burn until reset. Ovens/campfires reference lantern light at 70 LAMP. Post-kill exploration and enemy light reactions are separate work.
