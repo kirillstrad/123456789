@@ -6,7 +6,7 @@ export const COMBAT_LIGHTS=Object.freeze([TEST_BRAZIER,...[
  ['nave.candlestick-a','candlesticks.a',4.2,6.7,0],
  ['nave.candlestick-b','candlesticks.b',8.9,5.8,0],
  ['nave.candlestick-c','candlesticks.c',12.9,14.4,0],
- ['nave.wall-light-a','wall-light.a',5.5,1.55,180],
+ ['nave.wall-light-a','wall-light.a',4.6,1.55,180],
  ['nave.wall-light-b','wall-light.b',10.5,1.55,180],
  ['nave.wall-light-c','wall-light.c',13.8,1.55,180]
 ].map(([id,modelId,x,y,yaw])=>Object.freeze({id,modelId,initialStatus:'off',transform:Object.freeze({x,y,yaw})}))]);
