@@ -13,7 +13,13 @@ function hitArea(part,p,project,zoom){
 export function pickFrameTarget({parts,targets,point,project,zoom=1,viewport}){
  if(!point||!targets.length||!Number.isFinite(zoom)||zoom<=0)return null;const owners=new Map(),ids=new Set(),duplicates=new Set();
  for(const t of targets){if(ids.has(t.id))duplicates.add(t.id);ids.add(t.id);for(const p of t.parts)owners.set(p,t);}
- for(let i=parts.length-1;i>=0;i--){const p=parts[i];if(p.interactionVapor)continue;const area=hitArea(p,point,project,zoom);if(!area)continue;const t=owners.get(p.interactionSource??p);if(!t||duplicates.has(t.id))return null;return pickInteractionTarget([{...t,hitArea:area,depth:p.d}],point,viewport);}
+ for(let i=parts.length-1;i>=0;i--){const p=parts[i];if(p.interactionVapor)continue;const area=hitArea(p,point,project,zoom);if(!area)continue;const t=owners.get(p.interactionSource??p);if(!t||duplicates.has(t.id))return null;
+  const selected=pickInteractionTarget([{...t,hitArea:area,depth:p.d}],point,viewport);if(!selected)return null;
+  // Keep the validated generic descriptor. Restore only authored presentation
+  // metadata from the actual visible mesh owner, never from a different target.
+  const metadata={parts:t.parts};for(const key of ['modelId','contactPoint','emissionPoints','facePoint','activation','row'])if(t[key]!==undefined)metadata[key]=t[key];
+  return Object.freeze({...selected,...metadata});
+ }
  return null;
 }
 export function installFrameTargeting(canvas,{canRequest=()=>false,resolve=()=>null,context=()=>''}={}){
