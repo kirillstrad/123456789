@@ -30,9 +30,9 @@ jobs:
         with:
           node-version: '22'
       - run: npm ci
-      - run: npm test
       - run: npm run typecheck
       - run: npm run build
+      - run: npm test
       - run: node --test tools/combat-door-integration-test.mjs
       - run: npx playwright install --with-deps chromium
       - run: node tools/combat-door-visual-check.mjs
