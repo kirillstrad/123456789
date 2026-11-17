@@ -1,0 +1,15 @@
+# Integrated door completion candidate
+
+Target: iteration-5c-lighting, after 1464e04. Not merged or visually accepted. Existing lighting patches remain untouched.
+
+The scene now owns assembled swing/double/lift motion and uses checkDoorSweep before opening and before every proposed motion step. An occupied sweep does not move the mesh or advance its clock. A conservative swept reservation is inserted into the same CombatWorld map for the duration of opening, preventing normal actor movement into the reserved area. Dynamic actors are read after the world's step. Diagnostic teleports are rechecked, not claimed to be a general penetration solver. Opening blocked before contact is rejected; retry uses a fresh interaction. Same-door frames are intentionally excluded from sweep obstacles; static map obstacles and all other door geometry are included. Render-only environment geometry not present in the collision map is not magically added as a physical wall.
+
+Approach selects the hero's plane-relative side first and tries an alternate reachable side only if routing fails. Supported placements remain quarter-turn yaw only. Hands touch model-local authored contact points; the reverse combatHero transform is used for pose targets. The original vendor rig performs IK, and actual arm ends are measured during the contact window. Error above 0.04 world units throws rather than passing an animation silently. Single-door reverse-side interaction uses the opposite arm; two-wing and lifting actions bind both hands. Release happens after the contact marker. This is not full-body motion capture or an approved visual result.
+
+Profiles: prison A barred push, B shoulder push, C two-hand heave; iron A paired wings, B vertical gate, C heavy paired wings. Original catalogue builders remain unchanged. Scene contacts and colliders use the same assembly. Two auxiliary prison positions move to provide more swing clearance; exit ID and position stay unchanged.
+
+Door highlight is consumed by the actual decorate/render path. Environment appends door-local sparks, smoke/puffs and a transient light. Lamp-resource rules and the pending interactive-light integration are unchanged.
+
+Legacy map tests now assert the blocked aperture rather than byte-identical rectangles during movement: the new swept reservation deliberately changes the map. Raised gates are checked for retained solid frames instead of an obsolete ground-level open leaf. Legacy raw-geometry API tests remain.
+
+The new workflow prepares the correct demo identity, builds, typechecks, runs the full unit suite, legacy runtime door integration, input/dash/execution/stability/gallery browser regressions, existing all-door browser checks and 12 model/side sequences against PLAY.html. It uploads the exact candidate build only on success. This describes configured checks, not executed/passed CI. Native tests load the real vendor hero rig. Full runtime and browser results, profile appearance, seams and hand/sword plausibility still require actual execution and visual review.

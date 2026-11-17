@@ -1,0 +1,54 @@
+name: Door Completion Verification
+on:
+  push:
+    branches: [iteration-5c-lighting]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: door-completion-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node tools/demo-prepare.mjs
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+      - run: node --test tools/combat-door-integration-test.mjs
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+      - run: node tools/dash-browser-check.mjs
+      - run: node tools/demo-browser-check.mjs
+      - run: node tools/stability-browser.mjs
+      - run: node tools/door-visual-check.mjs
+      - run: node tools/all-doors-browser-check.mjs
+      - run: node tools/door-completion-browser-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: door-completion-evidence-${{ github.sha }}
+          path: |
+            door-completion-reports/**
+            all-door-reports/**
+            door-visual-reports/**
+            docs/*check.json
+            docs/demo-*.png
+            docs/dash-*.png
+            docs/throne-browser-failure.png
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: door-completion-play-${{ github.sha }}
+          path: PLAY.html
+          if-no-files-found: error
