@@ -14,9 +14,42 @@ function fixture(){
  return{scene,world,owner,target,request:()=>intent={id:1,targetId:target.id,kind:'door',context:'game',approach:target.approach},tick(n,input={x:0,y:0}){for(let i=0;i<n;i++)owner.step(1/60,input);}};
 }
 test('actual authored door keeps target and frame references stable',()=>{const f=fixture(),parts=f.target.parts,first=parts[0];f.scene.open(f.target.id,1);for(let i=0;i<72;i++)f.scene.step(1/60);assert.equal(f.target.parts,parts);assert.equal(parts[0],first);assert.equal(f.scene.snapshot().angle,-90);});
-test('actual collision map blocks closed doorway and retains closure during motion',()=>{const f=fixture(),before=JSON.stringify(f.scene.map);assert.ok(solid(8,2.8,f.scene.map));f.scene.open(f.target.id,1);f.scene.step(1/60);assert.equal(JSON.stringify(f.scene.map),before);for(let i=0;i<72;i++)f.scene.step(1/60);assert.equal(solid(8,2.8,f.scene.map),false);assert.ok(solid(7.2,3.6,f.scene.map),'open leaf remains solid');});
+test('actual collision map blocks closed doorway and retains closure during motion',()=>{
+ const f=fixture(),before=JSON.stringify(f.scene.map);
+ assert.ok(solid(8,2.8,f.scene.map));
+ f.scene.open(f.target.id,1);f.scene.step(1/60);
+ assert.equal(JSON.stringify(f.scene.map),before);
+ for(let i=0;i<72;i++)f.scene.step(1/60);
+ assert.equal(f.scene.snapshot().status,'open');
+ assert.equal(solid(8,2.8,f.scene.map),false);
+ // A -90 degree turn about (7.2,2.8) maps the closed leaf to Y=1.2..2.8.
+ const leaf=f.scene.map.rects.find(r=>Math.abs(r.minX-7.125)<1e-9&&Math.abs(r.maxX-7.275)<1e-9&&Math.abs(r.minY-1.2)<1e-9&&Math.abs(r.maxY-2.8)<1e-9);
+ assert.ok(leaf,'open leaf collider matches the authored hinge rotation');
+ assert.ok(solid(7.2,2.0,f.scene.map),'open leaf remains solid');
+});
 test('actual CombatWorld approaches, animates and traverses without replacing player',()=>{const f=fixture(),actor=f.world.current;f.request();let done=false,sawAnimation=false;for(let i=0;i<600;i++){f.tick(1);sawAnimation||=!!f.owner.decorate(f.world.snapshot()).interactionAnimation;if(f.scene.snapshot().status==='open'&&!f.owner.snapshot().interaction){done=true;break;}}assert.ok(done);assert.ok(sawAnimation);assert.equal(f.world.current,actor);assert.equal(f.owner.snapshot().events.filter(e=>e.type==='interaction-effect').length,1);assert.equal(actor.lamp,100);const x=actor.x;assert.ok(actor.y>2.8);f.tick(120,{x:0,y:-1});assert.ok(actor.y<2.3);assert.ok(Math.abs(actor.x-x)<.1);});
-test('death before contact never emits opening effect',()=>{const f=fixture();Object.assign(f.world.current,{x:8,y:3.76});f.request();for(let i=0;i<120&&!f.owner.snapshot().interaction;i++)f.tick(1);assert.ok(f.owner.snapshot().interaction);f.world.damage(10000);f.tick(1);assert.equal(f.scene.snapshot().status,'closed');assert.equal(f.owner.snapshot().interaction,null);});
+test('death before contact never emits opening effect',()=>{
+ const f=fixture();Object.assign(f.world.current,{x:8,y:3.76});f.request();
+ for(let i=0;i<120&&!f.owner.snapshot().interaction;i++)f.tick(1);
+ assert.ok(f.owner.snapshot().interaction);
+ assert.equal(f.scene.snapshot().status,'closed');
+ assert.equal(f.owner.snapshot().events.filter(e=>e.type==='interaction-effect').length,0);
+ f.world.damage(10000);
+ assert.equal(f.world.current.lamp,1);
+ assert.equal(f.world.current.phase,'playing');
+ assert.equal(f.world.current.interaction.lastEmberUsed,true);
+ assert.ok(f.owner.snapshot().interaction);
+ f.world.damage(1);
+ assert.equal(f.world.current.lamp,0);
+ assert.equal(f.world.current.phase,'dead');
+ assert.equal(f.world.current.interaction,null);
+ f.tick(1);
+ assert.equal(f.scene.snapshot().status,'closed');
+ assert.equal(f.owner.snapshot().interaction,null);
+ f.tick(300);
+ assert.equal(f.scene.snapshot().status,'closed');
+ assert.equal(f.owner.snapshot().events.filter(e=>e.type==='interaction-effect').length,0);
+});
 test('queued attack cannot cancel an active interaction lock',()=>{const f=fixture();Object.assign(f.world.current,{x:8,y:3.76});f.request();for(let i=0;i<120&&!f.owner.snapshot().interaction;i++)f.tick(1);assert.ok(f.owner.snapshot().interaction);assert.equal(f.owner.cancel('combat-command'),false);assert.equal(f.world.attack({kind:'light',aim:{x:8,y:2}}),false);});
 test('reset restores closed colliders without mutating OBSTACLES template',()=>{const before=JSON.stringify(OBSTACLES),f=fixture(),closed=JSON.stringify(f.scene.map);f.scene.open(f.target.id,1);for(let i=0;i<72;i++)f.scene.step(1/60);f.owner.cancel('reset');f.scene.reset();f.world.reset();assert.equal(JSON.stringify(f.scene.map),closed);assert.equal(JSON.stringify(OBSTACLES),before);assert.equal(f.scene.snapshot().status,'closed');});
 test('environment removes only legacy bars and exposes the live door parts',()=>{const f=fixture(),env=createCombatDoorEnvironment(f.scene);assert.equal(env.targets[0],f.target);assert.ok(f.scene.parts.every(p=>env.parts.includes(p)));assert.ok(env.lights.length>0);});
