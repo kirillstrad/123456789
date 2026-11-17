@@ -4,8 +4,9 @@ import {interactionInputAllowed} from './intent.js';
 import {createMotion} from '../animation/motion.js';
 import {findCombatLights} from '../game/combat-light-context.js';
 import {createLightIgnitionController,IGNITION_POLICY} from './light-ignition-controller.js';
+import {createSparkIgnitionProcessor} from './fire-rules.js';
 export function createCombatDoorController({world,scene,targeting,active=()=>true,plan=planApproachRoute}){
- let route=null,session=null,lastIntent=null,elapsed=0,stalled=0;const events=[],lighting=findCombatLights(scene),ignition=lighting?createLightIgnitionController({world,scene:lighting,allowed:()=>active()&&(typeof document==='undefined'||!document.hidden)}):null;
+ let route=null,session=null,lastIntent=null,elapsed=0,stalled=0;const events=[],lighting=findCombatLights(scene),ignition=lighting?createLightIgnitionController({world,scene:lighting,allowed:()=>active()&&(typeof document==='undefined'||!document.hidden)}):null,sparks=lighting?createSparkIgnitionProcessor({world,scene:lighting,map:scene.map}):null;
  scene.setActors?.(()=>[{...world.current,radius:.24},...(world.current.enemy.hp>0?[{...world.current.enemy,radius:.35}]:[])]);
  const record=(type,extra={})=>{events.push({type,time:world.current.time,...extra});if(events.length>200)events.shift();};
  const stop=()=>{const s=world.current;s.moving=false;s.motion=createMotion(s.fx,s.fy);s.footContacts=null;s.combatEntry=null;};
@@ -33,27 +34,31 @@ export function createCombatDoorController({world,scene,targeting,active=()=>tru
  }
  function step(dt,input={x:0,y:0}){
   if(!Number.isFinite(dt)||dt<=0||dt>1/30||![input.x,input.y].every(Number.isFinite))throw Error('Invalid combat door tick');if(!active()){cancel('inactive');return;}const s=world.current;
-  if(ignition?.snapshot()){const before=ignition.snapshot();world.step(dt,{x:0,y:0});scene.step(dt);ignition.step(dt);const after=ignition.snapshot();if(!before.paid&&after?.paid)record('interaction-effect',{id:before.id,targetId:before.targetId,kind:'ignite'});if(!after)record('interaction-end',{id:before.id,targetId:before.targetId,kind:'ignite',result:ignition.result()});return;}
-  if(session){
-   world.step(dt,{x:0,y:0});if(s.phase!=='playing'||s.interaction?.id!==session.id){cancel('actor-interrupted');scene.step(dt);return;}
-   const t=scene.getTarget(session.targetId);if(!t||t.parts!==session.parts){cancel('target-lost');scene.step(dt);return;}
-   scene.step(dt);if(!session.effect||!scene.isBlocked?.(session.targetId))elapsed+=dt;const frame=interactionFrame('door',elapsed);
-   if(frame.effectDue&&!session.effect){if(!scene.open(session.targetId,session.id,session.side)){cancel('door-obstructed');return;}session.effect=true;record('interaction-effect',{id:session.id,targetId:session.targetId});}
-   if(frame.complete&&t.availability==='open'){world.finishInteraction(session.id);record('interaction-end',{id:session.id,targetId:session.targetId});session=null;}return;
+  try{
+   if(ignition?.snapshot()){const before=ignition.snapshot();world.step(dt,{x:0,y:0});scene.step(dt);ignition.step(dt);const after=ignition.snapshot();if(!before.paid&&after?.paid)record('interaction-effect',{id:before.id,targetId:before.targetId,kind:'ignite'});if(!after)record('interaction-end',{id:before.id,targetId:before.targetId,kind:'ignite',result:ignition.result()});return;}
+   if(session){
+    world.step(dt,{x:0,y:0});if(s.phase!=='playing'||s.interaction?.id!==session.id){cancel('actor-interrupted');scene.step(dt);return;}
+    const t=scene.getTarget(session.targetId);if(!t||t.parts!==session.parts){cancel('target-lost');scene.step(dt);return;}
+    scene.step(dt);if(!session.effect||!scene.isBlocked?.(session.targetId))elapsed+=dt;const frame=interactionFrame('door',elapsed);
+    if(frame.effectDue&&!session.effect){if(!scene.open(session.targetId,session.id,session.side)){cancel('door-obstructed');return;}session.effect=true;record('interaction-effect',{id:session.id,targetId:session.targetId});}
+    if(frame.complete&&t.availability==='open'){world.finishInteraction(session.id);record('interaction-end',{id:session.id,targetId:session.targetId});session=null;}return;
+   }
+   scene.step(dt);if(Math.hypot(input.x,input.y)>.001){cancel('manual');world.step(dt,input);return;}
+   if(!interactionInputAllowed({mode:'game',actor:s})){cancel('actor-busy');world.step(dt,input);return;}
+   const intent=targeting.intent();if(!intent){if(route)cancel('intent-lost');world.step(dt,input);return;}
+   if(intent.context!=='game'||!['door','ignite'].includes(intent.kind)||(intent.kind==='ignite'&&!ignition)){cancel('unsupported-intent');world.step(dt,input);return;}
+   const target=targetFor(intent.targetId,intent.kind);if(!target||target.availability!=='ready'){cancel('target-unavailable');world.step(dt,input);return;}
+   if(intent.kind==='ignite'&&s.lamp<IGNITION_POLICY.lampCost+IGNITION_POLICY.reserve){s.note='NOT ENOUGH LAMP TO IGNITE';cancel('insufficient-lamp');world.step(dt,input);return;}
+   if(intent!==lastIntent){
+    if(route){route=null;stop();}stalled=0;let choice=null,result=null;
+    const candidates=intent.kind==='ignite'?[{side:1,goal:target.approach}]:(scene.approachCandidates?.(target.id,s)??[{side:1,goal:target.approach}]);
+    for(const c of candidates){const r=plan({start:{x:s.x,y:s.y},goal:c.goal,colliders:scene.getColliders(),bounds:scene.getBounds()});if(['ready','arrived'].includes(r.status)){choice=c;result=r;break;}}
+    if(!choice){s.note='NO CLEAR PATH TO THE OBJECT';cancel('route-unreachable');world.step(dt,input);return;}
+    route={targetId:target.id,kind:intent.kind,parts:target.parts,goal:choice.goal,side:choice.side,points:[...result.waypoints],index:0,revision:scene.revision(),lightRevision:lighting?.revision(),total:0};lastIntent=intent;stop();
+   }navigate(dt);
+  }finally{
+   if(sparks)for(const event of world.events){if(event.type!=='sweep'||Math.abs(event.time-world.current.time)>1e-7)continue;for(const targetId of sparks.release(event))record('spark-ignited',{targetId,kind:'ignite',method:'E'});}
   }
-  scene.step(dt);if(Math.hypot(input.x,input.y)>.001){cancel('manual');world.step(dt,input);return;}
-  if(!interactionInputAllowed({mode:'game',actor:s})){cancel('actor-busy');world.step(dt,input);return;}
-  const intent=targeting.intent();if(!intent){if(route)cancel('intent-lost');world.step(dt,input);return;}
-  if(intent.context!=='game'||!['door','ignite'].includes(intent.kind)||(intent.kind==='ignite'&&!ignition)){cancel('unsupported-intent');world.step(dt,input);return;}
-  const target=targetFor(intent.targetId,intent.kind);if(!target||target.availability!=='ready'){cancel('target-unavailable');world.step(dt,input);return;}
-  if(intent.kind==='ignite'&&s.lamp<IGNITION_POLICY.lampCost+IGNITION_POLICY.reserve){s.note='NOT ENOUGH LAMP TO IGNITE';cancel('insufficient-lamp');world.step(dt,input);return;}
-  if(intent!==lastIntent){
-   if(route){route=null;stop();}stalled=0;let choice=null,result=null;
-   const candidates=intent.kind==='ignite'?[{side:1,goal:target.approach}]:(scene.approachCandidates?.(target.id,s)??[{side:1,goal:target.approach}]);
-   for(const c of candidates){const r=plan({start:{x:s.x,y:s.y},goal:c.goal,colliders:scene.getColliders(),bounds:scene.getBounds()});if(['ready','arrived'].includes(r.status)){choice=c;result=r;break;}}
-   if(!choice){s.note='NO CLEAR PATH TO THE OBJECT';cancel('route-unreachable');world.step(dt,input);return;}
-   route={targetId:target.id,kind:intent.kind,parts:target.parts,goal:choice.goal,side:choice.side,points:[...result.waypoints],index:0,revision:scene.revision(),lightRevision:lighting?.revision(),total:0};lastIntent=intent;stop();
-  }navigate(dt);
  }
  function decorate(s){scene.highlight?.(session?.targetId??route?.targetId??targeting.current?.()?.id??null);if(ignition?.snapshot())return ignition.decorate(s);if(!session||s.interaction?.id!==session.id)return{...s,interactionAnimation:null};let points=scene.contacts?.(session.targetId)??[];if(points.length===2&&session.side<0)points=[...points].reverse();return{...s,interactionAnimation:{...interactionFrame('door',elapsed),doorModelId:session.modelId,...(points.length?{doorContact:{actor:{x:s.x,y:s.y,heading:s.motion?.heading??Math.atan2(s.fy,s.fx)},points,arms:points.length===1?[session.side>0?0:1]:[1,0]}}:{})}};}
  return Object.freeze({step,cancel,decorate,snapshot:()=>({approach:route?{targetId:route.targetId,kind:route.kind,side:route.side,goal:{...route.goal},waypoint:route.index}:null,interaction:session?{id:session.id,targetId:session.targetId,elapsed,side:session.side}:ignition?.snapshot()??null,lighting:lighting?{states:lighting.snapshot(),lightCount:lighting.getFrame().lights.length}:null,events:events.map(e=>({...e}))})});
