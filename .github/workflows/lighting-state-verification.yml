@@ -1,0 +1,19 @@
+name: Lighting State Verification
+on:
+  push:
+    branches: [iteration-5c-lighting]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  state:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/light-state.test.mjs
