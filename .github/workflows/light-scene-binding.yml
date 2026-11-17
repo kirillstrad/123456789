@@ -26,6 +26,10 @@ jobs:
       - run: npm test
       - run: npx playwright install --with-deps chromium
       - run: node tools/combat-light-browser-check.mjs
+      - name: Print combat light diagnostic report
+        if: always()
+        run: >-
+          node -e "const fs=require('node:fs');const p='docs/combat-light-check.json';if(fs.existsSync(p)){process.stdout.write(fs.readFileSync(p,'utf8')+'\n');}else{console.error('Combat light diagnostic report was not generated; inspect earlier steps.');}"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
