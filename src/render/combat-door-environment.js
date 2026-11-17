@@ -1,4 +1,5 @@
 import {createEnvironment} from './environment.js';
+import {enableCombatLights} from '../game/combat-light-context.js';
 function feedback(d){
  if(d.status!=='opening'||d.elapsed>1.15)return{parts:[],lights:[]};const {x,y,yaw=0}=d.transform,a=yaw*Math.PI/180,t=d.elapsed;
  const point=(u,v,z)=>[x+u*Math.cos(a)-v*Math.sin(a),y+u*Math.sin(a)+v*Math.cos(a),z];
@@ -8,8 +9,8 @@ function feedback(d){
  return{parts,lights:t<.22?[{x,y,z:1.1,r:28,power:.4*(1-t/.22)}]:[]};
 }
 export function createCombatDoorEnvironment(door){
- const env=createEnvironment(),isOldBar=p=>p.kind===1&&p.v.length===2&&p.v[0][1]===2.8&&p.v[1][1]===2.8&&p.v[0][2]===.05&&p.v[1][2]===2.4&&p.v[0][0]===p.v[1][0]&&p.v[0][0]>=7.29&&p.v[0][0]<=8.71;
+ const env=createEnvironment(),lighting=enableCombatLights(door),isOldBar=p=>p.kind===1&&p.v.length===2&&p.v[0][1]===2.8&&p.v[1][1]===2.8&&p.v[0][2]===.05&&p.v[1][2]===2.4&&p.v[0][0]===p.v[1][0]&&p.v[0][0]>=7.29&&p.v[0][0]<=8.71;
  if(env.parts.filter(isOldBar).length!==8)throw Error('Nave gate geometry changed; review integration');const staticParts=env.parts.filter(p=>!isOldBar(p));
  const effects=()=>door.snapshot().doors.map(feedback);
- return Object.freeze({get parts(){return[...staticParts,...door.parts,...effects().flatMap(e=>e.parts)];},get lights(){return[...env.lights,...effects().flatMap(e=>e.lights)];},targets:door.targets});
+ return Object.freeze({get parts(){return[...staticParts,...door.parts,...lighting.getFrame().parts,...effects().flatMap(e=>e.parts)];},get lights(){return[...env.lights,...lighting.getFrame().lights,...effects().flatMap(e=>e.lights)];},get targets(){return[...door.targets,...lighting.getFrame().targets];}});
 }
