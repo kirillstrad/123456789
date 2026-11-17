@@ -48,5 +48,5 @@ export function createLightIgnitionController({world,scene,allowed=()=>false}={}
   }
   if(frame.complete){lastResult={ok:current.paid,reason:current.failed};world.finishInteraction(current.id);session=null;}return frame;
  }
- return Object.freeze({start,step,cancel,snapshot:()=>session?{id:session.id,targetId:session.targetId,elapsed:session.elapsed,paid:session.paid,failed:session.failed}:null,result:()=>lastResult?{...lastResult}:null,decorate(s){return{...s,interactionAnimation:session&&s.interaction?.id===session.id?interactionFrame('ignite',session.elapsed):null};}});
+ return Object.freeze({start,step,cancel,snapshot:()=>session?{id:session.id,targetId:session.targetId,elapsed:session.elapsed,paid:session.paid,failed:session.failed}:null,result:()=>lastResult?{...lastResult}:null,decorate(s){return{...s,interactionAnimation:session&&s.interaction?.id===session.id?{...interactionFrame('ignite',session.elapsed),lightContact:{actor:{x:s.x,y:s.y,heading:s.motion?.heading??Math.atan2(s.fy,s.fx)},point:[...session.target.contactPoint]}}:null};}});
 }
