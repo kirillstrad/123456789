@@ -1,13 +1,14 @@
 import {createLightRegistry} from '../interaction/light-state.js';
 import {buildLightGeometry} from '../gallery/models/light-geometry.js';
-// Opt-in scene adapter. No input, clock, resource payment or app placement.
+import {NATIVE_FIRE_MODELS,buildInteractiveFire} from '../gallery/models/interactive-fire.js';
+import {ignitionMethod} from '../interaction/fire-rules.js';
 export function createLightScene(definitions=[]){
  if(!Array.isArray(definitions))throw Error('Invalid light scene definitions');
  const registry=createLightRegistry(definitions),entries=new Map(),owners=new Map(),parts=[],lights=[],targets=[],colliders=[];let revision=0;
- for(const definition of definitions){const transform={...(definition.transform??{})},meshes=new Map();for(const status of ['off','smoldering','igniting','lit'])meshes.set(status,buildLightGeometry({modelId:definition.modelId,status,transform}));entries.set(definition.id,{definition:{...definition,transform},meshes});}
+ for(const definition of definitions){const transform={...(definition.transform??{})},meshes=new Map(),build=NATIVE_FIRE_MODELS.includes(definition.modelId)?buildInteractiveFire:buildLightGeometry;for(const status of ['off','smoldering','igniting','lit'])meshes.set(status,build({modelId:definition.modelId,status,transform}));entries.set(definition.id,{definition:{...definition,transform},meshes});}
  function publish(){const nextParts=[],nextLights=[],nextTargets=[],nextColliders=[];
   for(const [id,{definition,meshes}]of entries){const state=registry.get(id).snapshot(),mesh=meshes.get(state.status);nextParts.push(...mesh.parts);nextLights.push(...mesh.lights);nextColliders.push(...mesh.colliders);
-   if(['off','smoldering'].includes(state.status)&&definition.enabled!==false&&definition.visible!==false)nextTargets.push(Object.freeze({id,kind:'ignite',modelId:state.modelId,availability:'ready',enabled:true,visible:true,removed:false,parts:mesh.parts,approach:mesh.approach,contactPoint:mesh.contactPoint,emissionPoints:mesh.emissionPoints,facePoint:mesh.facePoint}));
+   if(['off','smoldering'].includes(state.status)&&definition.enabled!==false&&definition.visible!==false)nextTargets.push(Object.freeze({id,kind:'ignite',modelId:state.modelId,activation:ignitionMethod(state.modelId),row:definition.row??null,availability:'ready',enabled:true,visible:true,removed:false,parts:mesh.parts,approach:mesh.approach,contactPoint:mesh.contactPoint,emissionPoints:mesh.emissionPoints,facePoint:mesh.facePoint}));
   }
   parts.splice(0,parts.length,...nextParts);lights.splice(0,lights.length,...nextLights);targets.splice(0,targets.length,...nextTargets);colliders.splice(0,colliders.length,...nextColliders);revision++;
  }

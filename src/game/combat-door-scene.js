@@ -1,13 +1,7 @@
 import {doorAssembly} from '../gallery/models/articulated-door.js';
 import {checkDoorSweep} from '../interaction/door-sweep.js';
-export const COMBAT_DOORS=Object.freeze([
- {id:'nave.exit-door',modelId:'prison-door.a',x:8,y:2.8},
- {id:'nave.prison-b',modelId:'prison-door.b',x:3.3,y:3.6},
- {id:'nave.prison-c',modelId:'prison-door.c',x:15,y:3.6},
- {id:'nave.iron-a',modelId:'iron-door.a',x:3.3,y:11},
- {id:'nave.iron-b',modelId:'iron-door.b',x:14.1,y:12.8},
- {id:'nave.iron-c',modelId:'iron-door.c',x:8,y:14.7}
-].map(d=>Object.freeze({...d,yaw:0})));
+import {ROOM_DOORS,ROOM_WORLD_BOUNDS,ROOM_ROUTE_BOUNDS} from './interaction-room-layout.js';
+export const COMBAT_DOORS=ROOM_DOORS;
 const rect=c=>({minX:Math.min(...c.points.map(p=>p[0])),maxX:Math.max(...c.points.map(p=>p[0])),minY:Math.min(...c.points.map(p=>p[1])),maxY:Math.max(...c.points.map(p=>p[1]))});
 const polygon=r=>({kind:'polygon',points:[[r.minX,r.minY],[r.maxX,r.minY],[r.maxX,r.maxY],[r.minX,r.maxY]],minZ:0,maxZ:3});
 export function createCombatDoorScene(base,definitions=COMBAT_DOORS){
@@ -21,7 +15,7 @@ export function createCombatDoorScene(base,definitions=COMBAT_DOORS){
   return{target,transform,assembly,closed,mesh:closed,normal,goal,status:'closed',elapsed:0,progress:0,side:1,actionId:null,blocked:false,reservation:[],colors:new WeakMap()};
  });
  const byId=new Map(doors.map(d=>[d.target.id,d])),matches=base.rects.filter(r=>r.minX===7.15&&r.maxX===8.85&&r.minY===2.52&&r.maxY===3.08);if(matches.length!==1)throw Error('Nave gate collider changed; review integration');
- const staticRects=base.rects.filter(r=>r!==matches[0]).map(r=>({...r})),map={circles:base.circles.map(c=>({...c})),rects:[]};
+ const staticRects=base.rects.filter(r=>r!==matches[0]).map(r=>({...r})),map={circles:base.circles.map(c=>({...c})),rects:[],bounds:{...ROOM_WORLD_BOUNDS}};
  const physical=d=>[...d.mesh.frameColliders,...d.mesh.leafColliders].filter(c=>c.minZ<2.2&&c.maxZ>0);
  function obstacles(d){return[...staticRects.map(polygon),...map.circles.map(c=>({kind:'circle',center:[c.x,c.y],radius:c.r,minZ:0,maxZ:3})),...doors.filter(o=>o!==d).flatMap(physical),...actors().map(a=>({kind:'circle',center:[a.x,a.y],radius:a.radius??.24,minZ:0,maxZ:a.height??2.2}))];}
  function sync(){map.rects.splice(0,map.rects.length,...staticRects,...doors.flatMap(d=>d.status==='opening'?[...d.closed.frameColliders.map(rect),...d.reservation]:physical(d).map(rect)));}
@@ -30,28 +24,14 @@ export function createCombatDoorScene(base,definitions=COMBAT_DOORS){
  function publish(d){d.mesh=d.assembly.mesh(d.progress,d.side);d.target.parts.splice(d.closed.frameParts.length,d.target.parts.length-d.closed.frameParts.length,...d.mesh.leafParts);}
  sync();
  return Object.freeze({map,targets:doors.map(d=>d.target),get parts(){return doors.flatMap(d=>d.target.parts);},
-  setActors(provider){if(typeof provider!=='function')throw Error('Invalid door actor provider');actors=provider;},
-  highlight(id){for(const d of doors)shade(d,id);},
+  setActors(provider){if(typeof provider!=='function')throw Error('Invalid door actor provider');actors=provider;},highlight(id){for(const d of doors)shade(d,id);},
   getTarget:id=>byId.get(id)?.target??null,facePoint:id=>{const d=byId.get(id),p=d?.assembly.world([0,0,0]);return p?{x:p[0],y:p[1]}:null;},
   approachCandidates(id,actor){const d=byId.get(id);if(!d)return[];const dot=(actor.x-d.transform.x)*d.normal.x+(actor.y-d.transform.y)*d.normal.y,side=dot<0?-1:1;return[{side,goal:d.goal(side)},{side:-side,goal:d.goal(-side)}];},
-  contacts(id){const d=byId.get(id);return d?d.assembly.contacts(d.progress,d.side):[];},
-  isBlocked:id=>byId.get(id)?.blocked??false,
-  getBounds:()=>({minX:1.46,maxX:16.24,minY:1.46,maxY:16.24}),revision:()=>revision,
+  contacts(id){const d=byId.get(id);return d?d.assembly.contacts(d.progress,d.side):[];},isBlocked:id=>byId.get(id)?.blocked??false,
+  getBounds:()=>({...ROOM_ROUTE_BOUNDS}),revision:()=>revision,
   getColliders:()=>[...map.rects.map(polygon),...map.circles.map(c=>({kind:'polygon',points:Array.from({length:32},(_,i)=>{const a=i*Math.PI/16,r=c.r/Math.cos(Math.PI/32);return[c.x+r*Math.cos(a),c.y+r*Math.sin(a)];}),minZ:0,maxZ:3}))],
-  open(id,owner,side=1){
-   const d=byId.get(id);if(!d||d.status!=='closed'||!Number.isSafeInteger(owner)||owner<1||![1,-1].includes(side))return false;
-   const checked=checkDoorSweep({leaves:d.assembly.sweep(0,1,side),obstacles:obstacles(d)});if(!checked.clear){d.blocked=true;return false;}
-   const poses=Array.from({length:129},(_,i)=>d.assembly.mesh(i/128,side));const count=poses[0].leafColliders.length;
-   d.reservation=Array.from({length:count},(_,j)=>{const vertices=poses.flatMap(m=>m.leafColliders[j].points),r=rect({points:vertices});return{minX:r.minX-.03,maxX:r.maxX+.03,minY:r.minY-.03,maxY:r.maxY+.03};});
-   d.side=side;d.actionId=owner;d.status='opening';d.blocked=false;d.target.availability='busy';sync();revision++;return true;
-  },
-  step(dt){
-   if(!Number.isFinite(dt)||dt<=0||dt>1/30)throw Error('Invalid combat door tick');let changed=false;
-   for(const d of doors){if(d.status!=='opening')continue;const next=Math.min(1.2,d.elapsed+dt),p=next>=1.2-1e-9?1:next/1.2;
-    const check=checkDoorSweep({leaves:d.assembly.sweep(d.progress,p,d.side),obstacles:obstacles(d)});d.blocked=!check.clear;if(d.blocked)continue;
-    d.elapsed=p===1?1.2:next;d.progress=p;publish(d);if(p===1){d.status='open';d.target.availability='open';d.reservation=[];changed=true;}
-   }if(changed){sync();revision++;}
-  },
-  reset(){for(const d of doors){d.status='closed';d.elapsed=0;d.progress=0;d.side=1;d.actionId=null;d.blocked=false;d.reservation=[];d.target.availability='ready';publish(d);shade(d,null);}sync();revision++;},
-  snapshot:()=>({...snap(byId.get('nave.exit-door')??doors[0]),doors:doors.map(snap)})});
+  open(id,owner,side=1){const d=byId.get(id);if(!d||d.status!=='closed'||!Number.isSafeInteger(owner)||owner<1||![1,-1].includes(side))return false;const checked=checkDoorSweep({leaves:d.assembly.sweep(0,1,side),obstacles:obstacles(d)});if(!checked.clear){d.blocked=true;return false;}const poses=Array.from({length:129},(_,i)=>d.assembly.mesh(i/128,side)),count=poses[0].leafColliders.length;
+   d.reservation=Array.from({length:count},(_,j)=>{const vertices=poses.flatMap(m=>m.leafColliders[j].points),r=rect({points:vertices});return{minX:r.minX-.03,maxX:r.maxX+.03,minY:r.minY-.03,maxY:r.maxY+.03};});d.side=side;d.actionId=owner;d.status='opening';d.blocked=false;d.target.availability='busy';sync();revision++;return true;},
+  step(dt){if(!Number.isFinite(dt)||dt<=0||dt>1/30)throw Error('Invalid combat door tick');let changed=false;for(const d of doors){if(d.status!=='opening')continue;const next=Math.min(1.2,d.elapsed+dt),p=next>=1.2-1e-9?1:next/1.2;const check=checkDoorSweep({leaves:d.assembly.sweep(d.progress,p,d.side),obstacles:obstacles(d)});d.blocked=!check.clear;if(d.blocked)continue;d.elapsed=p===1?1.2:next;d.progress=p;publish(d);if(p===1){d.status='open';d.target.availability='open';d.reservation=[];changed=true;}}if(changed){sync();revision++;}},
+  reset(){for(const d of doors){d.status='closed';d.elapsed=0;d.progress=0;d.side=1;d.actionId=null;d.blocked=false;d.reservation=[];d.target.availability='ready';publish(d);shade(d,null);}sync();revision++;},snapshot:()=>({...snap(byId.get('nave.exit-door')??doors[0]),doors:doors.map(snap)})});
 }
