@@ -1,0 +1,50 @@
+name: All Doors Verification
+on:
+  push:
+    branches: [iteration-5b-all-doors]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: all-doors-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+      - run: node --test tools/combat-door-integration-test.mjs
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+      - run: node tools/dash-browser-check.mjs
+      - run: node tools/demo-browser-check.mjs
+      - run: node tools/door-visual-check.mjs
+      - run: node tools/all-doors-browser-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: all-door-evidence-${{ github.sha }}
+          path: |
+            all-door-reports/**
+            door-visual-reports/**
+            docs/*check.json
+            docs/demo-*.png
+            docs/dash-*.png
+            docs/throne-browser-failure.png
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: all-door-play-${{ github.sha }}
+          path: PLAY.html
+          if-no-files-found: error
