@@ -8,9 +8,24 @@ async function waitForAttack(predicate,arg,label,timeout=6000){
  throw Error('Attack check timed out after '+timeout+'ms of controlled browser time: '+report.attackChain+' / '+label);
 }
 async function diagnostic(){return page.evaluate(()=>{const d=window.__ASH_ITERATION_2__;if(!d)return{api:false};const s=d.state(),dx=s.enemy.x-s.x,dy=s.enemy.y-s.y,distance=Math.hypot(dx,dy);return{mode:d.mode(),phase:s.phase,lamp:s.lamp,x:s.x,y:s.y,fx:s.fx,fy:s.fy,distance,facingDot:distance?(dx*s.fx+dy*s.fy)/distance:1,enemy:s.enemy,hitReaction:s.hitReaction,action:s.action,dash:s.dash,sweepProgress:s.sweepProgress,execution:s.execution,available:d.executionAvailable(),effects:d.executionEffects().counts};});}
+function prepareExecutionFixture(){
+ const d=window.__ASH_ITERATION_2__,hero={x:8,y:8},target={x:8,y:9},parked={x:15,y:15},expectedHp=[52,34,16],trace=[];
+ const details=()=>({positions:{hero,target,parked},trace,state:d.state(),events:d.events()});
+ d.start();d.freeze();d.place(hero.x,hero.y,parked.x,parked.y);d.damage(45);d.advance(1);
+ for(let i=0;i<3;i++){
+  const eventStart=d.events().length;
+  if(!d.attack('light',target.x,target.y))throw Error('Fixture attack rejected: '+JSON.stringify(details()));
+  d.advance(.45);d.place(hero.x,hero.y,target.x,target.y);d.advance(.1);d.place(hero.x,hero.y,parked.x,parked.y);d.advance(.5);
+  const s=d.state(),hits=d.events().slice(eventStart).filter(e=>e.type==='hit');trace.push({strike:i+1,expectedHp:expectedHp[i],actualHp:s.enemy.hp,hits,hero:{x:s.x,y:s.y},action:s.action});
+  if(hits.length!==1||hits[0].amount!==18||s.enemy.hp!==expectedHp[i])throw Error('Fixture strike '+(i+1)+' failed: '+JSON.stringify(details()));
+ }
+ d.place(hero.x,hero.y,target.x,target.y);const metrics=d.render(),s=d.state();if(metrics.executionCamera.zoom!==1)throw Error('Fixture camera did not reset');
+ const ready=d.executionAvailable();if(!ready)throw Error('Fixture not execution-ready: '+JSON.stringify(details()));
+ return{ready,s,trace,positions:{hero,target,parked}};
+}
 async function fixture(){
-const prepared=await page.evaluate(()=>{const d=window.__ASH_ITERATION_2__;d.start();d.freeze();d.place(8,8,15,15);d.damage(45);d.advance(1);for(let i=0;i<3;i++){if(!d.attack('light',9,8))throw Error('Fixture attack rejected');d.advance(.45);d.place(8,8,9,8);d.advance(.1);d.place(8,8,15,15);d.advance(.5);}if(d.state().enemy.hp!==16)throw Error('Fixture did not weaken enemy');d.place(8,8,9,8);const metrics=d.render(),s=d.state();if(metrics.executionCamera.zoom!==1)throw Error('Fixture camera did not reset');return{ready:d.executionAvailable(),s};});
-report.fixtures.push({prepared:await diagnostic()});assert.equal(prepared.ready,true,'Frozen execution fixture must already satisfy gameplay rules');
+const prepared=await page.evaluate(prepareExecutionFixture);
+report.fixtures.push({positions:prepared.positions,strikes:prepared.trace,prepared:await diagnostic()});assert.equal(prepared.ready,true,'Frozen execution fixture must already satisfy gameplay rules');
 const box=await page.locator('#game').boundingBox();assert.ok(box);const size=await page.locator('#game').evaluate(c=>({width:c.width,height:c.height})),s=prepared.s,dx=s.enemy.x-s.cameraX,dy=s.enemy.y-s.cameraY,px=504+(dx-dy)*65*.76,py=430+(dx+dy)*65*.43;
 await page.mouse.move(box.x+px/size.width*box.width,box.y+py/size.height*box.height);await page.locator('#game').focus();
 await page.evaluate(()=>{const d=window.__ASH_ITERATION_2__;if(!d.executionAvailable())throw Error('Fixture lost readiness before resume');document.getElementById('freeze').click();});
