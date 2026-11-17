@@ -12,7 +12,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -25,11 +25,14 @@ jobs:
       - run: npm run build
       - run: npm test
       - run: npx playwright install --with-deps chromium
-      - run: node tools/combat-light-browser-check.mjs
-      - name: Print combat light diagnostic report
+      - name: Original brazier browser regression
+        run: node tools/combat-light-browser-check.mjs
+      - name: Nine light variants and lifecycle browser acceptance
+        run: node tools/light-variants-browser-check.mjs
+      - name: Print combat light diagnostic reports
         if: always()
         run: >-
-          node -e "const fs=require('node:fs');const p='docs/combat-light-check.json';if(fs.existsSync(p)){process.stdout.write(fs.readFileSync(p,'utf8')+'\n');}else{console.error('Combat light diagnostic report was not generated; inspect earlier steps.');}"
+          node -e "const fs=require('node:fs');for(const p of ['docs/combat-light-check.json','docs/light-acceptance/report.json']){console.log('\nREPORT '+p);if(fs.existsSync(p)){process.stdout.write(fs.readFileSync(p,'utf8')+'\n');}else{console.error('Report was not generated; inspect earlier steps.');}}"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -38,3 +41,4 @@ jobs:
             docs/combat-light-check.json
             docs/combat-light-lit.png
             docs/combat-light-failure.png
+            docs/light-acceptance/**
