@@ -1,7 +1,7 @@
 name: Prayer Menu and Cursor Verification
 on:
   push:
-    branches: [iteration-5e-prayer-menu-cursors]
+    branches: [iteration-5e-prayer-menu-cursors, iteration-5f-fire-menu-ascii-cursors]
   workflow_dispatch:
 permissions:
   contents: read
