@@ -1,3 +1,4 @@
+import {installIronCursor} from './iron-cursor.js';
 import {createInteractionIntent} from '../interaction/intent.js';
 import {containsTargetPoint,canvasTargetPointer,pickInteractionTarget} from '../interaction/targeting.js';
 function hitArea(part,p,project,zoom){
@@ -16,6 +17,11 @@ export function pickFrameTarget({parts,targets,point,project,zoom=1,viewport}){
 }
 export function installFrameTargeting(canvas,{canRequest=()=>false,resolve=()=>null,context=()=>''}={}){
  let pointer=null,selected=null,lastFrame=null,held=false,disposed=false;const pending=createInteractionIntent(),original=canvas.style.cursor,doc=canvas.ownerDocument,win=doc?.defaultView;
+ const cursor=installIronCursor(canvas,{read(){
+  const api=win?.__ASH_ITERATION_2__,mode=context(),s=api?.state?.(),gallery=mode.startsWith('gallery')?win?.__ASH_GALLERY__:null,session=gallery?.interaction?.();let enemy=false;
+  if(mode==='game'&&s?.phase==='playing'&&s.enemy?.hp>0&&lastFrame?.project&&pointer){const p=canvasTargetPointer(pointer,canvas),q=lastFrame.project(s.enemy.x,s.enemy.y,.9),z=lastFrame.zoom??1;enemy=!!p&&((p[0]-q[0])/(20*z))**2+((p[1]-q[1])/(38*z))**2<=1;}
+  return{mode,target:selected,allowed:canRequest(),busy:!!s?.interaction||!!pending.current()||!!session,enemy,progress:session?.progress??s?.interactionAnimation?.progress??0};
+ }});
  const leave=()=>{pointer=null;selected=null;canvas.style.cursor=original;},clear=()=>{leave();lastFrame=null;held=false;pending.clear();},move=e=>{pointer={clientX:e.clientX,clientY:e.clientY};},visibility=()=>{if(doc.hidden)clear();};
  const reconcile=()=>{const i=pending.current();return i?pending.reconcile(resolve(i.targetId),context(),canRequest()):null;};
  const pick=()=>lastFrame?pickFrameTarget({...lastFrame,point:canvasTargetPointer(pointer,canvas),viewport:{width:canvas.width,height:720}}):null;
@@ -27,5 +33,5 @@ export function installFrameTargeting(canvas,{canRequest=()=>false,resolve=()=>n
  }
  const keyup=e=>{if(e.code==='KeyF')held=false;};
  canvas.addEventListener('pointermove',move);canvas.addEventListener('pointerleave',leave);win?.addEventListener('blur',clear);doc?.addEventListener('visibilitychange',visibility);win?.addEventListener('keydown',keydown);win?.addEventListener('keyup',keyup);
- return Object.freeze({clear,cancelIntent:()=>pending.clear(),current:()=>selected,intent:reconcile,frame(frame){if(disposed)return null;if(!frame.active){clear();return null;}lastFrame=frame;reconcile();selected=pick();canvas.style.cursor=selected?'pointer':original;return selected;},dispose(){if(disposed)return;disposed=true;clear();canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerleave',leave);win?.removeEventListener('blur',clear);doc?.removeEventListener('visibilitychange',visibility);win?.removeEventListener('keydown',keydown);win?.removeEventListener('keyup',keyup);}});
+ return Object.freeze({clear,cancelIntent:()=>pending.clear(),current:()=>selected,intent:reconcile,frame(frame){if(disposed)return null;if(!frame.active){clear();return null;}lastFrame=frame;reconcile();selected=pick();canvas.style.cursor=selected?'pointer':original;return selected;},dispose(){if(disposed)return;disposed=true;cursor?.dispose();clear();canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerleave',leave);win?.removeEventListener('blur',clear);doc?.removeEventListener('visibilitychange',visibility);win?.removeEventListener('keydown',keydown);win?.removeEventListener('keyup',keyup);}});
 }
