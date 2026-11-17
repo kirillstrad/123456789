@@ -1,0 +1,60 @@
+name: Combat Door Verification
+on:
+  push:
+    branches: [iteration-5b-interaction-completion]
+    paths:
+      - 'src/**'
+      - 'tools/**'
+      - 'tests/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - '.github/workflows/combat-door-verification.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: combat-door-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    if: github.repository == 'kirillstrad/123456789'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run build
+      - run: node --test tools/combat-door-integration-test.mjs
+      - run: npx playwright install --with-deps chromium
+      - run: node tools/combat-door-visual-check.mjs
+      - run: node tools/door-visual-check.mjs
+      - name: Evidence scope
+        if: always()
+        run: |
+          printf '\n## Combat door integration\n\nCommit: %s\n\nActual combat world and authored door mesh. Browser fixture places player near door and enemy far away, then uses real pointer/F/W+D. Automated success is not human visual acceptance. PLAY.html is a build artifact, not browser-tested here. Normal spawn route and post-victory exit are not accepted by this job.\n' "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: combat-door-evidence-${{ github.sha }}
+          path: |
+            combat-door-reports/**
+            door-visual-reports/**
+            docs/typecheck.json
+          retention-days: 7
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: combat-door-play-${{ github.sha }}
+          path: PLAY.html
+          retention-days: 7
+          if-no-files-found: error
