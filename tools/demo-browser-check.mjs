@@ -20,7 +20,7 @@ try{
 await page.clock.install();
 await page.goto(pathToFileURL(path.resolve('PLAY.html')).href+'?desktop=1');await page.waitForFunction(()=>window.__ASH_ITERATION_2__?.executionEffects);assert.equal(await page.evaluate(()=>window.__ASH_ITERATION_2__.build),'ASH_IRON_DEMO_4BC');
 // Establish menu-owned run state before debug API resets used by later fixtures.
-await page.waitForFunction(()=>window.__ASH_THRONE__?.cpuMs()>0);
+await page.waitForFunction(()=>!!window.__ASH_THRONE__);
 assert.equal(await page.evaluate(()=>window.__ASH_ITERATION_2__.mode()),'menu');
 await page.locator('#game').focus();await page.keyboard.press('Enter');
 await page.waitForFunction(()=>window.__ASH_ITERATION_2__.mode()==='game',null,{timeout:5000});

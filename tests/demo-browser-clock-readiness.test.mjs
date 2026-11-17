@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+const source=fs.readFileSync('tools/demo-browser-check.mjs','utf8');
+const match=source.match(/await page\.waitForFunction\((\(\)=>[^\n]*__ASH_THRONE__[^\n]*)\);/);
+assert.ok(match,'Browser bootstrap must wait for menu readiness');
+const ready=menu=>vm.runInNewContext('('+match[1]+')()',{window:{__ASH_THRONE__:menu}});
+test('menu readiness waits for the menu API to be installed',()=>{assert.equal(ready(undefined),false);assert.equal(ready(null),false);});
+test('installed menu is ready with zero virtual-clock render duration',()=>{assert.equal(ready({cpuMs:()=>0,state:()=>({hasRun:false})}),true);});
+test('readiness does not invoke a performance metric',()=>{assert.equal(ready({cpuMs:()=>{throw Error('Performance is not readiness');},state:()=>({hasRun:false})}),true);});
