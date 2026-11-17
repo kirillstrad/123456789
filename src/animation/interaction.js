@@ -1,5 +1,6 @@
 import {doorProfile} from './door-motion.js';
 import {doorContactToPose,doorContactToWorld,checkDoorHandContact} from './door-contact.js';
+import {sampleLightContact} from './light-contact.js';
 const specs=Object.freeze({door:Object.freeze({duration:3,clip:'interact-door'}),ignite:Object.freeze({duration:3.2,clip:'interact-ignite'}),campfire:Object.freeze({duration:3.2,clip:'interact-campfire'})});
 const smooth=x=>{x=Math.max(0,Math.min(1,x));return x*x*(3-2*x);};
 export function interactionFrame(kind,elapsed){
@@ -20,5 +21,6 @@ export function sampleInteraction(frame,module,time){
   if(checked.progress>=.55&&checked.progress<=.61){bind.points.forEach((target,i)=>{const arm=bind.arms?.[i]??(bind.points.length===1?0:i===0?1:0),actual=doorContactToWorld(bind.actor,pose.root,rig.arms[arm].end),check=checkDoorHandContact(actual,target);if(!check.matches)throw Error('Door hand contact error: '+check.error);});}
   return{pose,rig,clip:'interact-door-'+profile.style};
  }
+ if(frame.kind==='ignite'&&frame.lightContact)return sampleLightContact(pose,frame,module);
  return{pose,rig:module.rig(pose),clip:checked.clip};
 }
