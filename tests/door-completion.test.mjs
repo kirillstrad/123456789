@@ -1,0 +1,33 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import '../public/vendor/hero.js';
+import {createCombatDoorScene,COMBAT_DOORS} from '../runtime/game/combat-door-scene.js';
+import {createCombatDoorController} from '../runtime/interaction/combat-door-controller.js';
+import {CombatWorld} from '../runtime/game/combat-world.js';
+import {OBSTACLES,solid} from '../runtime/combat/geometry.js';
+import {sampleInteraction,interactionFrame} from '../src/animation/interaction.js';
+import {checkDoorHandContact,doorContactToWorld} from '../src/animation/door-contact.js';
+import {doorAssembly} from '../src/gallery/models/articulated-door.js';
+function fixture(def,side){const scene=createCombatDoorScene(OBSTACLES),world=new CombatWorld(scene.map);Object.assign(world.current,{x:def.x+.25,y:def.y+side*1.2,cameraX:def.x,cameraY:def.y});world.current.enemy.hp=0;let intent={id:1,targetId:def.id,kind:'door',context:'game'};const controller=createCombatDoorController({world,scene,targeting:{intent:()=>intent,cancelIntent:()=>intent=null}});return{scene,world,controller};}
+for(const def of COMBAT_DOORS)for(const side of [-1,1])test(def.modelId+' real rig, full opening and passage from side '+side,()=>{
+ const f=fixture(def,side);let contact=false;
+ for(let i=0;i<1800;i++){
+  f.controller.step(1/60);const state=f.controller.decorate(f.world.snapshot()),frame=state.interactionAnimation;
+  if(frame?.progress>=.55&&frame.progress<=.61){
+   const sampled=sampleInteraction(frame,globalThis.IronPilgrim,state.time);frame.doorContact.points.forEach((target,j)=>{const arm=frame.doorContact.arms[j],hand=doorContactToWorld(frame.doorContact.actor,sampled.pose.root,sampled.rig.arms[arm].end);assert.ok(checkDoorHandContact(hand,target).matches);});contact=true;
+  }
+  if(f.scene.getTarget(def.id).availability==='open'&&!f.controller.snapshot().interaction)break;
+ }
+ const door=f.scene.snapshot().doors.find(d=>d.id===def.id);assert.equal(door.status,'open',JSON.stringify(f.controller.snapshot()));assert.equal(door.side,side);assert.ok(contact);assert.equal(solid(f.world.current.x,f.world.current.y,f.scene.map),false);assert.equal(f.controller.snapshot().events.filter(e=>e.type==='interaction-effect').length,1);
+ for(let i=0;i<70;i++)f.controller.step(1/60,{x:0,y:-side});assert.ok((f.world.current.y-def.y)*side<-.3);
+});
+test('obstacle entering mid-motion stops clock and mesh; clearing resumes',()=>{
+ const scene=createCombatDoorScene(OBSTACLES),id=COMBAT_DOORS[0].id;let actors=[];scene.setActors(()=>actors);assert.equal(scene.open(id,1,1),true);for(let i=0;i<8;i++)scene.step(1/60);
+ actors=[{x:7.2+1.2*Math.cos(-.15),y:2.8+1.2*Math.sin(-.15),radius:.4}];const before=scene.snapshot().elapsed,parts=JSON.stringify(scene.getTarget(id).parts);scene.step(1/60);assert.equal(scene.isBlocked(id),true);assert.equal(scene.snapshot().elapsed,before);assert.equal(JSON.stringify(scene.getTarget(id).parts),parts);
+ actors=[];for(let i=0;i<100;i++)scene.step(1/60);assert.equal(scene.snapshot().status,'open');
+});
+test('static obstacle anywhere in sweep rejects activation before moving',()=>{const base={circles:[...OBSTACLES.circles,{x:8,y:2.1,r:.2}],rects:OBSTACLES.rects};const scene=createCombatDoorScene(base);assert.equal(scene.open('nave.exit-door',1,1),false);assert.equal(scene.snapshot().status,'closed');});
+test('double wings and lifted gate have coherent end geometry and height',()=>{
+ for(const modelId of ['iron-door.a','iron-door.c']){const a=doorAssembly(modelId),closed=a.mesh(),open=a.mesh(1,1);assert.equal(open.leafColliders.length,2);assert.deepEqual(open.frameColliders,closed.frameColliders);assert.ok(open.leafColliders.every(c=>c.points.every(p=>Math.abs(Math.abs(p[0])-1.1)<.11)));}
+ const gate=doorAssembly('iron-door.b'),closed=gate.mesh(),open=gate.mesh(1,1);assert.deepEqual(open.frameParts,closed.frameParts);assert.ok(open.leafColliders.every(c=>c.minZ>2.2));assert.ok(open.leafParts.every((p,i)=>p.v.every((v,j)=>Math.abs(v[2]-closed.leafParts[i].v[j][2]-2.85)<1e-9)));
+});
+test('orientation transforms both-side approach candidates',()=>{for(const yaw of [0,90,180,270]){const d={...COMBAT_DOORS[0],x:8,y:8,yaw},s=createCombatDoorScene(OBSTACLES,[d]),c=s.approachCandidates(d.id,{x:10,y:10});assert.equal(c.length,2);assert.ok(Math.abs(Math.hypot(c[0].goal.x-8,c[0].goal.y-8)-.72)<1e-9);}});
