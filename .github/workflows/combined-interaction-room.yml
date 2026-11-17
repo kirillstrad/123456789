@@ -1,0 +1,71 @@
+name: Combined Interaction Room Verification
+on:
+  push:
+    branches: [iteration-5j-interaction-room-visibility]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Tested source
+        run: git rev-parse HEAD
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Build source and portable HTML
+        id: build
+        run: npm run build
+      - name: Full unit and integration suite
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee docs/combined-unit-tests.tap
+      - name: Install Chromium
+        id: chromium
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: npx playwright install --with-deps chromium
+      - name: Physical E-F, all sources and doors, hints and execution
+        if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
+        run: node tools/interaction-room-browser-check.mjs
+      - name: Portable HTML boot, combat, pause and export regression
+        if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
+        run: npm run test:browser
+      - name: Pause and held-input stability regression
+        if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
+        run: node tools/stability-browser.mjs
+      - name: Scope summary
+        if: always()
+        run: |
+          printf '%s\n' 'Combined candidate: packages 1, 2 and 3. The checkout SHA identifies tested code.' 'The complete unit suite is required. Browser diagnostics run after a successful build even if unit tests fail; failures are not suppressed.' 'Source-local placement isolates individual interactions; the spawn travel case uses physical movement. Synthetic Canvas occlusion is not full-room visual certification. Native desktop packaging and human visual acceptance are not claimed.' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: combined-room-${{ matrix.os }}-${{ github.sha }}
+          path: |
+            docs/combined-unit-tests.tap
+            docs/combined-acceptance/**
+            docs/typecheck.json
+            docs/browser-check.json
+            docs/browser-runtime-report.json
+            docs/stability-browser.json
+            docs/menu.png
+            docs/gameplay.png
+            docs/sweep.png
+            docs/throne-browser-failure.png
+            PLAY.html
+          if-no-files-found: warn
