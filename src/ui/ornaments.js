@@ -1,4 +1,4 @@
-import {throneMenu} from './throne-menu.js';
+import {throneMenu} from './bright-throne-menu.js';
 export function makeUI(out,glyph){
  document.documentElement.dataset.ashMenu='throne';
  const ui=document.createElement('canvas'),hudView=document.createElement('canvas');
