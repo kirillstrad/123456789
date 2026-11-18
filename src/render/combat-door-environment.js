@@ -8,9 +8,4 @@ function feedback(d){
  for(let i=0;i<7;i++){const age=t-i*.08;if(age<0||age>.65)continue;const u=-.7+i*.22,v=d.side*.12+Math.sin(i)*age*.15,z=.08+age*.7,r=.05+age*.16;parts.push(part(0,[point(u-r,v,z),point(u,v-r,z+r),point(u+r,v,z),point(u,v+r,z-r*.3)],[107,98,110],.24*(1-age/.65)));}
  return{parts,lights:t<.22?[{x,y,z:1.1,r:28,power:.4*(1-t/.22)}]:[]};
 }
-export function createCombatDoorEnvironment(door){
- const env=createEnvironment(),lighting=enableCombatLights(door),isOldBar=p=>p.kind===1&&p.v.length===2&&p.v[0][1]===2.8&&p.v[1][1]===2.8&&p.v[0][2]===.05&&p.v[1][2]===2.4&&p.v[0][0]===p.v[1][0]&&p.v[0][0]>=7.29&&p.v[0][0]<=8.71;
- if(env.parts.filter(isOldBar).length!==8)throw Error('Nave gate geometry changed; review integration');const staticParts=env.parts.filter(p=>!isOldBar(p));
- const effects=()=>door.snapshot().doors.map(feedback);
- return Object.freeze({get parts(){return[...staticParts,...door.parts,...lighting.getFrame().parts,...effects().flatMap(e=>e.parts)];},get lights(){return[...env.lights,...lighting.getFrame().lights,...effects().flatMap(e=>e.lights)];},get targets(){return[...door.targets,...lighting.getFrame().targets];}});
-}
+export function createCombatDoorEnvironment(door){const env=createEnvironment(),lighting=enableCombatLights(door),effects=()=>door.snapshot().doors.map(feedback);return Object.freeze({get parts(){return[...env.parts,...door.parts,...lighting.getFrame().parts,...effects().flatMap(e=>e.parts)];},get lights(){return[...lighting.getFrame().lights,...effects().flatMap(e=>e.lights)];},get targets(){return[...door.targets,...lighting.getFrame().targets.filter(t=>t.activation==='lantern')];}});}

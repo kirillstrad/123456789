@@ -1,0 +1,7 @@
+# Hover presentation metadata fix
+
+The first combined browser run stopped on the first E source before pressing E. The authored frame sampler could find visible surfaces, but main's hover path passed its result through pickInteractionTarget/createInteractionTarget, which intentionally normalizes to generic interaction fields. That result lacked modelId and contactPoint; door fallback anchoring also lacked parts. The hint generator therefore produced no E/F action label. A null manual target for a floor source is intentional and is not the failure by itself.
+
+The frame adapter now retains the validated generic descriptor and restores only parts, modelId, contactPoint, emissionPoints, facePoint, activation and row from the same visible mesh owner. Generic normalization is unchanged; arbitrary unknown fields are not copied. Foreground geometry, target eligibility, duplicate checks, viewport clipping, manual intent resolution and E/F source lists are unchanged. New tests reproduce the loss and cover the picker-to-hint bridge for E sources, manual fires and doors, plus blocking cases.
+
+The browser hover assertion remains unchanged. This commit triggers the combined workflow again; no passing result is claimed. The pasted unit-test excerpt has no final TAP pass/fail totals and does not establish unit-suite success or failure. Inspect the full saved TAP and browser report for the new head. Main is unchanged.

@@ -1,0 +1,65 @@
+name: Verify spark integration 28ebbb6
+on:
+  push:
+    branches: [iteration-5j-interaction-room-visibility]
+    paths: ['.github/workflows/spark-integration-28ebbb6.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    name: Spark integration 28ebbb6 (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 28ebbb6479a4dc681cea6e03094a77a7f47e5a9b
+          persist-credentials: false
+      - name: Verify tested source identity
+        run: |
+          test "$(git rev-parse HEAD)" = 28ebbb6479a4dc681cea6e03094a77a7f47e5a9b
+          git rev-parse HEAD
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Spark rules and real combat integration tests
+        run: |
+          set -o pipefail
+          node --test tests/fire-rules.test.mjs tests/spark-room-integration.test.mjs 2>&1 | tee docs/spark-integration-tests.tap
+      - name: Full unit and integration suite
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee docs/spark-full-tests.tap
+      - run: npx playwright install --with-deps chromium
+      - name: Existing brazier browser regression
+        run: node tools/combat-light-browser-check.mjs
+      - name: Existing nine-variant browser regression
+        run: node tools/light-variants-browser-check.mjs
+      - name: Record verification scope
+        if: always()
+        run: |
+          printf '%s\n' 'Tested source: 28ebbb6479a4dc681cea6e03094a77a7f47e5a9b' 'Focused tests cover E release through real world/controller ticks. Existing browser scenarios cover prior light interactions, not physical E input. No visual acceptance or full-patch completion is claimed.' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: spark-28ebbb6-${{ matrix.os }}-${{ github.run_id }}
+          path: |
+            docs/spark-integration-tests.tap
+            docs/spark-full-tests.tap
+            docs/typecheck.json
+            docs/combat-light-check.json
+            docs/combat-light-lit.png
+            docs/combat-light-failure.png
+            docs/light-acceptance/**
+          if-no-files-found: warn
