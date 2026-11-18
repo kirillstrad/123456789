@@ -4,6 +4,17 @@ server.on('error',e=>serverError=e.message);
 const safe=s=>s.replace(/[^a-z0-9.-]/gi,'-');
 async function pump(ms){await page.clock.runFor(ms);}
 async function until(fn,arg,label,max=20000){for(let elapsed=0;elapsed<=max;elapsed+=17){if(await page.evaluate(fn,arg))return;await pump(17);}throw Error('Timed out in controlled browser time: '+label);}
+// The physical keys are screen-relative. Chords cancel the unwanted world axis.
+const worldKeys = { positiveX: ['KeyD','KeyS'], negativeX: ['KeyA','KeyW'], positiveY: ['KeyS','KeyA'], negativeY: ['KeyW','KeyD'] };
+async function holdWorldDirection(direction,fn){
+ const held=[];
+ try{
+  for(const key of worldKeys[direction]){await page.keyboard.down(key);held.push(key);}
+  return await fn();
+ }finally{
+  for(const key of held.reverse())await page.keyboard.up(key);
+ }
+}
 async function snapshot(){return page.evaluate(()=>{const a=window.__ASH_ITERATION_2__,s=a.state();return{actor:{x:s.x,y:s.y,lamp:s.lamp,phase:s.phase,time:s.time,sweepProgress:s.sweepProgress,interaction:s.interaction,animation:s.interactionAnimation},controller:a.combatDoor(),target:a.target()?.id??null,intent:a.intent(),spent:a.events().filter(e=>e.type==='lamp-spent'),metrics:a.render(),mode:a.mode()};});}
 async function capture(name){await page.evaluate(()=>window.__ASH_ITERATION_2__.render());const data=await page.locator('#game').evaluate(c=>c.toDataURL('image/png').split(',')[1]);await fs.writeFile(root+'/'+safe(name)+'.png',Buffer.from(data,'base64'));}
 async function runCase(id,fn){report.stage=id;const entry={id,ok:false};report.cases.push(entry);await fn(entry);entry.ok=true;}
@@ -24,8 +35,53 @@ try{
  const small=fixtures.lights.filter(f=>f.method==='sparks'),manual=fixtures.lights.filter(f=>f.method==='lantern');assert.equal(small.length,21);assert.equal(manual.length,8);assert.equal(fixtures.doors.length,12);report.fixtures=fixtures;
  for(const [index,f]of small.entries())await runCase('E-'+f.id,async entry=>{entry.before=await fresh(f);entry.hover=await hover(f);await page.keyboard.press('KeyF');await pump(350);const rejected=await snapshot();assert.equal(rejected.actor.x,entry.before.actor.x);assert.equal(rejected.actor.y,entry.before.actor.y);assert.equal(rejected.controller.approach,null);assert.equal(rejected.actor.interaction,null);assert.equal(rejected.spent.length,0);assert.ok(rejected.controller.lighting.states.every(s=>s.status==='off'));await capture(f.id+'-unlit');await aimBeyond(f);await page.keyboard.press('KeyE');await until(()=>window.__ASH_ITERATION_2__.state().sweepProgress!==null,null,'E starts');await pump(200);assert.equal((await snapshot()).controller.lighting.states.find(s=>s.id===f.id).status,'off');await until(id=>window.__ASH_ITERATION_2__.combatDoor().lighting.states.find(s=>s.id===id)?.status==='lit',f.id,'E release ignites');entry.flash=await verifyFlash();entry.after=await snapshot();assert.equal(entry.after.actor.lamp,100);assert.equal(entry.after.spent.length,0);assert.equal(entry.after.controller.lighting.states.filter(s=>s.status==='lit').length,1);assert.equal(entry.after.controller.lighting.lightCount,f.emitters);assert.equal(entry.after.metrics.fireHintParts,2*28+Number(entry.after.metrics.actionHint!==null));await capture(f.id+'-lit');if(index===0){await waitFree();await page.keyboard.press('KeyE');await pump(2000);const repeat=await snapshot();assert.equal(repeat.actor.lamp,100);assert.equal(repeat.controller.events.filter(e=>e.type==='spark-ignited'&&e.targetId===f.id).length,1);}});
  for(const f of manual)await runCase('F-'+f.id,async entry=>{entry.before=await fresh(f);entry.hover=await hover(f);await aimBeyond(f);await page.keyboard.press('KeyE');await pump(1900);const rejected=await snapshot();assert.ok(rejected.controller.lighting.states.every(s=>s.status==='off'),'E must not ignite manual sources in this isolated fixture');assert.equal(rejected.actor.lamp,100);await waitFree();await hover(f);await capture(f.id+'-before-F');await pressF(f);await until(()=>{const f=window.__ASH_ITERATION_2__.state().interactionAnimation;return f?.kind==='ignite'&&f.progress>=.5&&f.progress<=.65;},null,'manual contact');entry.contact=await page.evaluate(async()=>{const {combatHero}=await import('/animation/combat-hero.js'),a=window.__ASH_ITERATION_2__,s=a.state(),f=s.interactionAnimation;if(!f?.lightContact||f.progress<.5||f.progress>.65)throw Error('Contact plateau missed');const lamp=combatHero(s).lamp,target=f.lightContact.point;return{lamp,target,error:Math.hypot(...lamp.map((v,i)=>v-target[i]))};});assert.ok(entry.contact.error<.04,'lamp contact '+f.id);await capture(f.id+'-contact');await until(id=>{const a=window.__ASH_ITERATION_2__;return a.combatDoor().lighting.states.find(s=>s.id===id)?.status==='lit'&&!a.state().interaction;},f.id,'F completion');entry.after=await snapshot();assert.equal(entry.after.actor.lamp,94);assert.equal(entry.after.spent.length,1);assert.equal(entry.after.spent[0].amount,6);assert.equal(entry.after.controller.lighting.lightCount,f.emitters);await capture(f.id+'-lit');await page.keyboard.press('KeyF');await pump(300);assert.equal((await snapshot()).spent.length,1);});
- for(const f of fixtures.doors)await runCase('door-'+f.id+'-'+f.side,async entry=>{entry.before=await fresh(f);entry.hover=await hover(f);await pressF(f);await until(id=>{const a=window.__ASH_ITERATION_2__;return a.combatDoor().scene.doors.find(d=>d.id===id)?.status==='open'&&!a.state().interaction;},f.id,'door opening');const open=await snapshot();assert.equal(open.controller.scene.doors.find(d=>d.id===f.id).side,f.side);assert.equal(open.actor.lamp,100);assert.equal(open.spent.length,0);const key=f.side>0?'KeyW':'KeyS';await page.keyboard.down(key);try{await until(f=>(window.__ASH_ITERATION_2__.state().y-f.center.y)*f.side<-.35,f,'physical passage',5000);}finally{await page.keyboard.up(key);}entry.after=await snapshot();await capture(f.id+'-side-'+f.side);});
- await runCase('physical-travel-from-spawn',async entry=>{const f=manual[0];await fresh({start:{x:8,y:12}});await page.keyboard.down('KeyS');try{await until(()=>window.__ASH_ITERATION_2__.state().y>=14,null,'south aisle',8000);}finally{await page.keyboard.up('KeyS');}await pump(500);await page.keyboard.down('KeyD');try{await until(()=>window.__ASH_ITERATION_2__.state().x>=18.2,null,'expanded room movement',20000);}finally{await page.keyboard.up('KeyD');}await pump(500);await hover(f);await pressF(f);await until(id=>{const a=window.__ASH_ITERATION_2__;return a.combatDoor().lighting.states.find(s=>s.id===id)?.status==='lit'&&!a.state().interaction;},f.id,'walked approach ignition',30000);entry.after=await snapshot();assert.equal(entry.after.actor.lamp,94);await capture('spawn-to-interaction-row');});
+ for (const f of fixtures.doors) await runCase('door-'+f.id+'-'+f.side, async entry => {
+  entry.before = await fresh(f);
+  entry.hover = await hover(f);
+  await pressF(f);
+  await until(id => {
+   const a = window.__ASH_ITERATION_2__;
+   return a.combatDoor().scene.doors.find(d => d.id === id)?.status === 'open'
+    && !a.state().interaction;
+  }, f.id, 'door opening');
+
+  const open = entry.afterOpen = await snapshot();
+  assert.equal(open.controller.scene.doors.find(d => d.id === f.id).side, f.side);
+  assert.equal(open.actor.lamp, 100);
+  assert.equal(open.spent.length, 0);
+
+  const tolerance = 0.08;
+  if (Math.abs(open.actor.x - f.center.x) > tolerance) {
+   const direction = open.actor.x < f.center.x ? 'positiveX' : 'negativeX';
+   try {
+    await holdWorldDirection(direction, () => until(({ x, tolerance }) =>
+     Math.abs(window.__ASH_ITERATION_2__.state().x - x) <= tolerance,
+     { x: f.center.x, tolerance }, 'align with open doorway', 2000));
+   } finally {
+    entry.afterAlignment = await snapshot();
+   }
+  } else {
+   entry.afterAlignment = open;
+  }
+
+  assert.ok(
+   (entry.afterAlignment.actor.y - f.center.y) * f.side > 0,
+   'alignment must leave the actor on the approach side',
+  );
+
+  const direction = f.side > 0 ? 'negativeY' : 'positiveY';
+  try {
+   await holdWorldDirection(direction, () => until(f =>
+    (window.__ASH_ITERATION_2__.state().y - f.center.y) * f.side < -0.35,
+    f, 'physical passage', 5000));
+  } finally {
+   entry.afterPassage = await snapshot();
+  }
+
+  entry.after = entry.afterPassage;
+  await capture(f.id+'-side-'+f.side);
+ });
+ await runCase('physical-travel-from-spawn',async entry=>{const f=manual[0];await fresh({start:{x:8,y:12}});await holdWorldDirection('positiveY',()=>until(()=>window.__ASH_ITERATION_2__.state().y>=14,null,'south aisle',8000));await pump(500);await holdWorldDirection('positiveX',()=>until(()=>window.__ASH_ITERATION_2__.state().x>=18.2,null,'expanded room movement',20000));await pump(500);await hover(f);await pressF(f);await until(id=>{const a=window.__ASH_ITERATION_2__;return a.combatDoor().lighting.states.find(s=>s.id===id)?.status==='lit'&&!a.state().interaction;},f.id,'walked approach ignition',30000);entry.after=await snapshot();assert.equal(entry.after.actor.lamp,94);await capture('spawn-to-interaction-row');});
  for(const [lamp,damage]of [[6,94],[7,93]])await runCase('manual-budget-'+lamp,async entry=>{const f=manual[0];entry.before=await fresh(f,damage);await hover(f);await page.keyboard.press('KeyF');if(lamp===6){await pump(500);entry.after=await snapshot();assert.equal(entry.after.actor.x,entry.before.actor.x);assert.equal(entry.after.actor.y,entry.before.actor.y);assert.equal(entry.after.controller.approach,null);assert.equal(entry.after.spent.length,0);assert.equal(entry.after.actor.lamp,6);}else{await until(id=>{const a=window.__ASH_ITERATION_2__;return a.combatDoor().lighting.states.find(s=>s.id===id)?.status==='lit'&&!a.state().interaction;},f.id,'seven-LAMP ignition');entry.after=await snapshot();assert.equal(entry.after.actor.lamp,1);assert.equal(entry.after.spent.length,1);}});
  for(const action of ['manual','pause'])await runCase('cancel-approach-'+action,async entry=>{const f=manual[0];await fresh(f);await hover(f);await pressF(f);await until(()=>!!window.__ASH_ITERATION_2__.combatDoor().approach,null,'active approach');if(action==='manual'){await page.keyboard.down('KeyD');try{await pump(200);}finally{await page.keyboard.up('KeyD');}}else{await page.keyboard.press('Escape');await pump(300);assert.equal(await page.evaluate(()=>window.__ASH_ITERATION_2__.mode()),'pause');}entry.after=await snapshot();assert.equal(entry.after.controller.approach,null);assert.equal(entry.after.actor.lamp,100);assert.equal(entry.after.spent.length,0);});
  await runCase('damage-before-manual-contact',async entry=>{const f=manual[0];await fresh(f);await hover(f);await pressF(f);await until(()=>{const f=window.__ASH_ITERATION_2__.state().interactionAnimation;return f?.kind==='ignite'&&f.elapsed>=.2&&f.elapsed<1;},null,'precontact');await page.evaluate(()=>window.__ASH_ITERATION_2__.damage(94));await until(()=>!window.__ASH_ITERATION_2__.state().interaction,null,'insufficient-resource recovery');entry.after=await snapshot();assert.equal(entry.after.actor.lamp,6);assert.equal(entry.after.spent.length,0);assert.equal(entry.after.controller.lighting.states.find(s=>s.id===f.id).status,'off');});

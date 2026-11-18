@@ -1,5 +1,20 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import crypto from 'node:crypto';import vm from 'node:vm';import {CombatWorld} from '../runtime/game/combat-world.js';
-test('original hero and environment retained',()=>{for(const[p,h]of[['public/vendor/hero.js','96a7de64ec52577f69aa3ca0ae3ca49edd4ff795b315e61ef1df6d13c243a1e8'],['src/render/environment.js','52abae03531417bf5a49ba420a6cd584e61c537154878d54e2a51cbb8f57015d']])assert.equal(crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex'),h);});
+import {createEnvironment} from '../runtime/render/environment.js';
+test('original hero asset retained',()=>{assert.equal(crypto.createHash('sha256').update(fs.readFileSync('public/vendor/hero.js')).digest('hex'),'96a7de64ec52577f69aa3ca0ae3ca49edd4ff795b315e61ef1df6d13c243a1e8');});
+test('expanded environment covers the room, retains boundary walls and emits no static light',()=>{
+  const {parts,lights}=createEnvironment();
+  const floor=parts.filter(p=>p.v.every(v=>v[2]===0));
+  const tile=(x,y)=>`${x},${y}`;
+  const cells=new Set(floor.map(p=>tile(Math.floor(p.v[0][0]),Math.floor(p.v[0][1]))));
+  assert.equal(floor.length,43*25);
+  const vertices=parts.flatMap(p=>p.v);
+  for(let x=1;x<44;x++){
+    for(let y=1;y<26;y++)assert.ok(cells.has(tile(x,y)),`missing floor tile ${x},${y}`);
+    assert.ok(vertices.some(([a,b,z])=>a===x&&b===1&&z>=2.65),`missing north wall at ${x}`);
+  }
+  for(let y=1;y<26;y++)assert.ok(vertices.some(([x,b,z])=>x===1&&b===y&&z>=2.7),`missing west wall at ${y}`);
+  assert.deepEqual(lights,[]);
+});
 test('4C LLL and LLH reject queue spam and fourth strike',()=>{
   for(const third of ['light','heavy']){
     const w=new CombatWorld({circles:[],rects:[]});w.current.enemy.x=15;
