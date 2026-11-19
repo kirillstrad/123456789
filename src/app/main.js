@@ -13,7 +13,7 @@ import {installExecutionInput} from './execution-input.js';
 import {movementInput} from './movement-input.js';
 import {DASH,dashVisual} from '../combat/ash-dash.js';
 import {createRitualBonfire} from '../interaction/ritual-bonfire.js';
-import {drawDashHud} from '../ui/dash-hud.js';
+import {drawCombatHud} from '../ui/combat-hud.js';
 import {interactionCamera} from '../render/interaction-camera.js';
 import {isDesktopMode,desktopItems,installDesktop} from './desktop-mode.js';
 const DESKTOP=isDesktopMode();
@@ -94,9 +94,7 @@ function render(s=world.snapshot(),galleryFrame=null){
  const heroBackdropCells=galleryFrame?0:applyHeroBackdrop(data,ma,COLS,ROWS);
  const lightingMs=performance.now()-t,glyphAt=performance.now();out.fillStyle='#000';out.fillRect(0,0,W,864);ascii.paint(data,COLS,ROWS);if(!galleryFrame)fireHintLayer.composite(out);
  out.save();out.beginPath();out.rect(0,0,W,H);out.clip();out.textAlign='center';out.textBaseline='middle';out.font=`${11*view.zoom}px monospace`;for(const p of s.particles){out.globalAlpha=Math.min(1,p.life*2.2);out.fillStyle=p.life>.55?'#fff0c0':p.life>.28?'#ffb04a':'#d9622c';out.fillText(p.glyph,...pr(p.x,p.y,p.z));}out.restore();if(!galleryFrame){
-  ui.hud(s.lamp);
-  drawDashHud(out,dashHud,s,world.dashReady(),DASH.cooldown);
-  if(ritualArt?.hint){out.save();part(out,ritualArt.hint,drawState,false);out.restore();}
+  drawCombatHud(out,dashHud,s,world.dashReady(),DASH.cooldown,W,ritualArt?.hint);
  }
  renderCount++;
  return{geometryMs,lightingMs,glyphMs:performance.now()-glyphAt,cpuMs:performance.now()-start,lampLight:{...lampProfile,radiusPixels:radius},coneBoost,sparkFlashGain:sparkFlash.gain,fireHintParts:parts.filter(p=>p.fireHint).length,actionHint:parts.find(p=>p.actionLabel)?.text??null,heroBackdropCells,dashVisibility:dashEffect.visibility,dashFlare:dashEffect.flare,executionCamera:{...view},executionParticles:galleryFrame?0:effects.particles.length,gallery:galleryFrame?{objects:galleryFrame.stats.objects,visibleObjects:galleryFrame.stats.visibleObjects,floorParts:galleryFrame.floorParts.length,objectParts:galleryFrame.parts.length,lights:galleryFrame.lights.length,heroParts:hero.parts.length,heroClip:hero.clip??null}:undefined};
