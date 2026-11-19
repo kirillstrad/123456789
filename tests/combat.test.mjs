@@ -1,14 +1,36 @@
+import {attackTiming} from '../runtime/combat/attack-timing.js';
 import test from 'node:test';import assert from 'node:assert/strict';import {CombatWorld} from '../runtime/game/combat-world.js';import {ActionMachine} from '../runtime/combat/action-machine.js';import {SparkSystem} from '../runtime/combat/sparks.js';import {blocked,inArc,solid} from '../runtime/combat/geometry.js';import {COMBAT,SPARKS,MENU_PROFILE,DRAFT_RULES} from '../runtime/combat/config.js';import {enemyStep,makeEnemy} from '../runtime/combat/enemy.js';
 const empty={circles:[],rects:[]};function scene(){const w=new CombatWorld(empty);Object.assign(w.current,{x:8,y:8,fx:0,fy:-1});Object.assign(w.current.enemy,{x:8,y:6.5,mode:'wait',cooldown:100});return w;}function advance(w,n=120){for(let i=0;i<n;i++)w.step(1/60);}
 test('light hits exactly once during its active window',()=>{let w=scene();w.attack({kind:'light',aim:{x:8,y:6.5}});advance(w);assert.equal(w.current.enemy.hp,52);assert.equal(w.events.filter(e=>e.type==='hit').length,1);});
 test('heavy damage uses existing value',()=>{let w=scene();w.attack({kind:'heavy',aim:{x:8,y:6.5}});advance(w,160);assert.equal(w.current.enemy.hp,36);});
 test('cursor direction is locked during a strike',()=>{let w=scene();w.attack({kind:'light',aim:{x:8,y:4}});let a=w.actions.current;assert.equal(a.fx,0);assert.equal(a.fy,-1);w.step(.1,{x:0,y:0,aim:{x:12,y:8}});assert.equal(w.current.fx,0);assert.equal(w.current.fy,-1);});
 test('ordinary damage does not cancel active strike',()=>{let w=scene();w.attack({kind:'heavy',aim:{x:8,y:4}});w.damage(12);assert.equal(w.current.lamp,88);assert.equal(w.current.phase,'playing');assert.ok(w.actions.current);});
-test('4C rejects LH and permits a separately clicked LL',()=>{let w=scene();w.current.enemy.x=14;w.attack({kind:'light',aim:{x:8,y:4}});advance(w,12);assert.equal(w.attack({kind:'heavy',aim:{x:12,y:8}}),false);assert.ok(w.attack({kind:'light',aim:{x:12,y:8}}));advance(w,45);assert.equal(w.actions.current.kind,'light');assert.equal(w.actions.current.stage,1);assert.ok(w.actions.current.fx>.9);});
+test('4C separately clicked LL queues once and starts after the first strike',()=>{
+ const w=scene();w.current.enemy.x=14;
+ assert.ok(w.attack({kind:'light',aim:{x:8,y:4}}));
+ const first=w.actions.current;
+ advance(w,Math.ceil(first.duration*.3*60));
+ assert.ok(w.attack({kind:'light',aim:{x:12,y:8}}));
+ assert.equal(w.attack({kind:'light',aim:null}),false);
+ assert.equal(w.attack({kind:'heavy',aim:null}),false);
+ for(let i=0;i<Math.ceil(first.duration*60)+2&&w.actions.current?.id===first.id;i++)w.step(1/60);
+ assert.ok(w.actions.current);assert.notEqual(w.actions.current.id,first.id);
+ assert.equal(w.actions.current.kind,'light');assert.equal(w.actions.current.stage,1);
+ assert.ok(w.actions.current.fx>.9);
+});
 test('single click never automatically repeats',()=>{let w=scene();w.current.enemy.x=14;w.attack({kind:'light',aim:{x:8,y:4}});advance(w,180);assert.equal(w.actions.started,1);assert.equal(w.actions.current,null);});
 test('too early queue input is rejected explicitly',()=>{let w=scene();w.attack({kind:'light',aim:null});assert.equal(w.attack({kind:'heavy',aim:null}),false);});
 test('movement cannot cancel early strike',()=>{let w=scene();w.current.enemy.x=14;w.attack({kind:'light',aim:null});w.step(.1,{x:1,y:0});assert.ok(w.actions.current);});
-test('movement can leave late recovery',()=>{let w=scene();w.current.enemy.x=14;w.attack({kind:'light',aim:null});advance(w,46);w.step(1/60,{x:1,y:0});assert.equal(w.actions.current,null);});
+test('movement cancels only after the configured recovery release',()=>{
+ for(const kind of ['light','heavy']){
+  const w=scene();w.current.enemy.x=14;assert.ok(w.attack({kind,aim:null}));
+  const a=w.actions.current,release=Math.max(DRAFT_RULES.allowMoveCancelAfter,attackTiming(kind).release);
+  const before=Math.max(0,Math.floor(a.duration*release*60)-1);
+  advance(w,before);w.step(1/60,{x:1,y:0});assert.ok(w.actions.current);
+  for(let i=0;i<4&&w.actions.current;i++)w.step(1/60,{x:1,y:0});
+  assert.equal(w.actions.current,null);
+ }
+});
 test('obstacle blocks sword hit',()=>{let w=new CombatWorld({circles:[{x:8,y:7.2,r:.35}],rects:[]});Object.assign(w.current,{x:8,y:8,fx:0,fy:-1});Object.assign(w.current.enemy,{x:8,y:6.5,mode:'wait',cooldown:100});w.attack({kind:'heavy',aim:{x:8,y:5}});advance(w,160);assert.equal(w.current.enemy.hp,70);});
 test('arc rejects targets behind hero',()=>{assert.equal(inArc({x:0,y:0},{x:0,y:1},{x:0,y:-1},2.35,160),false);assert.equal(inArc({x:0,y:0},{x:1,y:-1},{x:0,y:-1},2.35,160),true);});
 test('column and gate block line of attack',()=>{assert.ok(blocked({x:5,y:4},{x:5,y:6}));assert.ok(blocked({x:8,y:2},{x:8,y:4}));assert.ok(!blocked({x:8,y:11},{x:8,y:10}));});

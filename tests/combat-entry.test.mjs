@@ -78,13 +78,42 @@ test('combat entry: snapshots own entry arrays and rendering cannot mutate simul
   const frame=combatHero(w.snapshot());assert.deepEqual(frame,combatHero(w.snapshot()));
 });
 
-test('combat entry: authored attack takes over without changing sword or lamp endpoints',()=>{
-  const w=make();step(w,30);w.attack({kind:'light',aim:null});
+test('combat entry: attack footwork changes legs but preserves sword, lamp and render purity',()=>{
+  const w=make();
+  step(w,30);
+  w.attack({kind:'light',aim:null});
+
+  const rounded=parts=>parts.map(p=>({
+    ...p,
+    d:Number(p.d.toFixed(10)),
+    v:p.v.map(v=>v.map(n=>Number(n.toFixed(10)))),
+  }));
+
   for(const progress of [0,.04,.08,.12,.5,.85,1]){
-    const s=w.snapshot();s.action.progress=progress;
-    const a=combatHero(s),b=combatHero({...s,combatEntry:null});
-    assert.deepEqual(a.tip,b.tip);assert.deepEqual(a.lamp,b.lamp);
-    if(progress>=.12)assert.deepEqual(a.parts,b.parts);
+    const s=w.snapshot();
+    s.action.progress=progress;
+
+    const before=JSON.stringify(s);
+    const a=combatHero(s);
+    const b=combatHero({...s,combatEntry:null});
+
+    // Шаг ногой не меняет положения меча и лампы.
+    assert.deepEqual(a.tip,b.tip);
+    assert.deepEqual(a.lamp,b.lamp);
+
+    // В середине атаки работа ног меняет геометрию.
+    if(progress===.5){
+      assert.notDeepEqual(a.parts,b.parts);
+    }
+
+    // На границах допускаем только погрешность координат.
+    if(progress===0||progress===1){
+      assert.deepEqual(rounded(a.parts),rounded(b.parts));
+    }
+
+    // Повторный рендер строго идентичен и не меняет снимок.
+    assert.deepEqual(a,combatHero(s));
+    assert.equal(JSON.stringify(s),before);
   }
 });
 
