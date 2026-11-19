@@ -1,3 +1,4 @@
+import {attackTiming} from './attack-timing.js';
 import {COMBAT,DRAFT_RULES} from './config.js';
 import {allowedContinuation,inertiaDelta} from './mechanics-4c.js';
 import type {AttackCommand,AttackHooks,Strike,ActionView} from './types.js';
@@ -8,7 +9,8 @@ canContinue(kind?:AttackCommand['kind']):boolean{
 const action=this.current;
 if(!action||this.queued)return false;
 const progress=action.elapsed/action.duration;
-if(progress<COMBAT.queueStart||progress>COMBAT.activeEnd)return false;
+const timing=attackTiming(action.kind);
+if(progress<timing.queueStart||progress>timing.queueEnd)return false;
 return kind===undefined?allowedContinuation(this.chain,'light')||allowedContinuation(this.chain,'heavy'):allowedContinuation(this.chain,kind);
 }
 request(command:AttackCommand,hooks:AttackHooks):boolean{
@@ -24,9 +26,9 @@ step(dt:number,movingInput:boolean,hooks:AttackHooks):void{
 if(!Number.isFinite(dt)||dt<=0||!this.current)return;
 const a=this.current,prev=a.elapsed/a.duration;a.elapsed=Math.min(a.duration,a.elapsed+dt);const t=a.elapsed/a.duration;
 const d=inertiaDelta(a.kind,a.stage,prev,t,a.fx,a.fy);hooks.lunge(d.x,d.y);
-const contact=(COMBAT.activeStart+COMBAT.activeEnd)/2;
+const contact=attackTiming(a.kind).contact;
 if(!this.contactFired&&prev<contact&&t>=contact){this.contactFired=true;hooks.hit(a);}
-if(movingInput&&!this.queued&&t>=DRAFT_RULES.allowMoveCancelAfter){this.clear();return;}
+if(movingInput&&!this.queued&&t>=Math.max(DRAFT_RULES.allowMoveCancelAfter,attackTiming(a.kind).release)){this.clear();return;}
 if(t>=1){if(this.queued){const next=this.queued;this.begin(next,a.stage+1,hooks);}else this.clear();}
 }
 view():ActionView|null{const a=this.current;return a?{id:a.id,kind:a.kind,stage:a.stage,progress:a.elapsed/a.duration,fx:a.fx,fy:a.fy,clip:(a.kind==='heavy'?'heavy':'light')+(a.stage+1),animation4C:true,continuation:this.queued?.kind??null}:null;}
