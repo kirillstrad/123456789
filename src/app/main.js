@@ -1,3 +1,4 @@
+import {installAttackInput} from './attack-input.js';
 import {createGalleryInteraction} from '../interaction/gallery-interaction.js';
 import {createGalleryApproach} from '../interaction/gallery-approach.js';
 import {interactionInputAllowed} from '../interaction/intent.js';
@@ -13,7 +14,7 @@ import {installExecutionInput} from './execution-input.js';
 import {movementInput} from './movement-input.js';
 import {DASH,dashVisual} from '../combat/ash-dash.js';
 import {createRitualBonfire} from '../interaction/ritual-bonfire.js';
-import {drawCombatHud} from '../ui/combat-hud.js';
+import { composeCombatHud } from '../ui/combat-hud.js';
 import {interactionCamera} from '../render/interaction-camera.js';
 import {isDesktopMode,desktopItems,installDesktop} from './desktop-mode.js';
 const DESKTOP=isDesktopMode();
@@ -91,11 +92,50 @@ function render(s=world.snapshot(),galleryFrame=null){
  for(const q of visual.lights)lights.push({p:pr(...q.position),r:q.radius*view.zoom,v:q.power});
  const dashEffect=s.dash?dashVisual(s.dash):{visibility:1,flare:0};if(dashEffect.flare>0)lights.push({p:pr(s.x,s.y,.7),r:115*view.zoom,v:dashEffect.flare*.8});const t=performance.now();coneBoost=0;
  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){const k=(y*COLS+x)*4,px=(x+.5)*W/COLS,py=(y+.5)*H/ROWS,h=ma[k]>127,n=power>0?Math.exp(-((px-lamp[0])**2+(py-lamp[1])**2)/(2*radius**2)):0;let l=.018+(h?.065:.12)+n*.82*1.6*power*(1+Math.sin(s.time*2.2)*.035),f=0;for(const q of lights){const dx=px-q.p[0],dy=py-q.p[1];if(Math.abs(dx)>q.r*3||Math.abs(dy)>q.r*3)continue;l+=Math.exp(-(dx*dx+dy*dy)/(2*q.r*q.r))*q.v;}if(!h&&s.cone&&sparkFlash.gain>0){const q=unpr({x:px,y:py}),c=s.cone,dx=q.x-c.x,dy=q.y-c.y,d=Math.hypot(dx,dy),front=(dx*c.fx+dy*c.fy)/Math.max(.01,d),edge=Math.cos(80*Math.PI/180);if(d>.2&&d<sparkFlash.range&&front>edge){f=sparkFlash.gain*smooth((front-edge)/.16)*smooth((d-.2)/.35)*(1-smooth((d-(sparkFlash.range-.5))/.5));l+=f;coneBoost+=f;}}if(h)l=Math.max(.3,Math.min(.8,l));const v=Math.max(.25,1-((px-W/2)/(700*W/1008))**2*.32-((py-360)/600)**2*.2),warm=Math.min(1,n*lampProfile.warmth+f),base=l*v*(h?1:1.25);data[k]*=base*(1+warm*.19);data[k+1]*=base*(1-warm*.1);data[k+2]*=base*(1-warm*.32);}
- const heroBackdropCells=galleryFrame?0:applyHeroBackdrop(data,ma,COLS,ROWS);
- const lightingMs=performance.now()-t,glyphAt=performance.now();out.fillStyle='#000';out.fillRect(0,0,W,864);ascii.paint(data,COLS,ROWS);if(!galleryFrame)fireHintLayer.composite(out);
- out.save();out.beginPath();out.rect(0,0,W,H);out.clip();out.textAlign='center';out.textBaseline='middle';out.font=`${11*view.zoom}px monospace`;for(const p of s.particles){out.globalAlpha=Math.min(1,p.life*2.2);out.fillStyle=p.life>.55?'#fff0c0':p.life>.28?'#ffb04a':'#d9622c';out.fillText(p.glyph,...pr(p.x,p.y,p.z));}out.restore();if(!galleryFrame){
-  drawCombatHud(out,dashHud,s,world.dashReady(),DASH.cooldown,W,ritualArt?.hint);
+  const heroBackdropCells = galleryFrame
+   ? 0
+   : applyHeroBackdrop(data, ma, COLS, ROWS);
+
+ const frameHeight = 864;
+ const frameRows = Math.round(ROWS * frameHeight / H);
+ const frame = galleryFrame
+   ? data
+   : composeCombatHud(
+       data, COLS, ROWS, frameRows,
+       dashHud, s, world.dashReady(), DASH.cooldown,
+     );
+
+ const lightingMs = performance.now() - t;
+ const glyphAt = performance.now();
+
+ out.fillStyle = '#000';
+ out.fillRect(0, 0, W, frameHeight);
+ ascii.paint(
+   frame,
+   COLS,
+   galleryFrame ? ROWS : frameRows,
+   0,
+   galleryFrame ? H : frameHeight,
+ );
+
+ if (!galleryFrame) fireHintLayer.composite(out);
+
+ out.save();
+ out.beginPath();
+ out.rect(0, 0, W, H);
+ out.clip();
+ out.textAlign = 'center';
+ out.textBaseline = 'middle';
+ out.font = `${11 * view.zoom}px monospace`;
+
+ for (const p of s.particles) {
+   out.globalAlpha = Math.min(1, p.life * 2.2);
+   out.fillStyle = p.life > .55 ? '#fff0c0' : p.life > .28 ? '#ffb04a' : '#d9622c';
+   out.fillText(p.glyph, ...pr(p.x, p.y, p.z));
  }
+
+ out.restore();
+ renderCount++;
  renderCount++;
  return{geometryMs,lightingMs,glyphMs:performance.now()-glyphAt,cpuMs:performance.now()-start,lampLight:{...lampProfile,radiusPixels:radius},coneBoost,sparkFlashGain:sparkFlash.gain,fireHintParts:parts.filter(p=>p.fireHint).length,actionHint:parts.find(p=>p.actionLabel)?.text??null,heroBackdropCells,dashVisibility:dashEffect.visibility,dashFlare:dashEffect.flare,executionCamera:{...view},executionParticles:galleryFrame?0:effects.particles.length,gallery:galleryFrame?{objects:galleryFrame.stats.objects,visibleObjects:galleryFrame.stats.visibleObjects,floorParts:galleryFrame.floorParts.length,objectParts:galleryFrame.parts.length,lights:galleryFrame.lights.length,heroParts:hero.parts.length,heroClip:hero.clip??null}:undefined};
 }
@@ -132,6 +172,11 @@ if(now-drawAt>=33){const frameMs=drawAt?now-drawAt:0,t=render(world.snapshot(fro
 if(world.current.phase!=='playing'&&!frozen){endTime+=real;if(endTime>(world.current.phase==='dead'?2.7:1.5)){targeting.clear();mode=world.current.phase;selected=0;keys.clear();commands.length=0;}}requestAnimationFrame(tick);}
 window.__ASH_ITERATION_2__=Object.freeze({build:report.build,start,pause,resume,home,viewport:()=>({width:W,height:864,cols:COLS,rows:ROWS}),project:(x,y,z=0)=>pr(x,y,z),unproject:(x,y)=>unpr({x,y}),state:()=>combatDoor.decorate(world.snapshot()),combatDoor:()=>({scene:doorScene.snapshot(),...combatDoor.snapshot()}),events:()=>world.events.slice(),report:getReport,mode:()=>mode,menuTime:()=>time,target:()=>targeting.current(),intent:()=>targeting.intent(),render:()=>mode==='gallery'?renderGallery():render(),coneBoost:()=>coneBoost,freeze:()=>{frozen=true;combatDoor.cancel('freeze');keys.clear();simLast=null;acc=0;},advance:advanceWorld,place:(x,y,ex,ey)=>{Object.assign(world.current,{x,y,cameraX:x,cameraY:y});Object.assign(world.previous,{x,y,cameraX:x,cameraY:y});camera={x,y};if(ex!==undefined)Object.assign(world.current.enemy,{x:ex,y:ey});},damage:n=>world.damage(n),dash:(x,y)=>world.dash({x,y}),attack:(kind,x,y)=>world.attack({kind,aim:{x,y}}),execute:()=>world.execute(),executionAvailable:()=>world.executionAvailable(),executionEffects:()=>effects.snapshot(),executionOptions:()=>({...executionOptions})});
 installExecutionInput({world,keys,commands,isActive:()=>mode==='game'&&!frozen,focus:()=>cv.focus()});
+installAttackInput({
+ active:()=>mode==='game'&&!frozen&&!document.hidden&&world.current.phase==='playing'&&!world.current.dash,
+ commands,
+ aim:()=>unpr(aimPoint),
+});
 installViewport(cv,m=>{targeting.clear();W=m.width;COLS=m.cols;cv.width=W;cv.height=m.height;scene.width=mask.width=W;fireHintLayer.resize(W,H);aimPoint=null;commands.length=0;keys.clear();simLast=null;acc=0;drawAt=0;fireAt=-1;});
 installDesktop(start,pause);
 requestAnimationFrame(tick);
