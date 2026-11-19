@@ -4,8 +4,15 @@ import type {AttackCommand,AttackHooks,Strike,ActionView} from './types.js';
 export class ActionMachine{
 current:Strike|null=null;queued:AttackCommand|null=null;private serial=0;private chain='';private contactFired=false;started=0;hits=0;
 clear():void{this.current=null;this.queued=null;this.chain='';this.contactFired=false;}
+canContinue(kind?:AttackCommand['kind']):boolean{
+const action=this.current;
+if(!action||this.queued)return false;
+const progress=action.elapsed/action.duration;
+if(progress<COMBAT.queueStart||progress>COMBAT.activeEnd)return false;
+return kind===undefined?allowedContinuation(this.chain,'light')||allowedContinuation(this.chain,'heavy'):allowedContinuation(this.chain,kind);
+}
 request(command:AttackCommand,hooks:AttackHooks):boolean{
-if(this.current){const progress=this.current.elapsed/this.current.duration;if(progress<COMBAT.queueStart||progress>COMBAT.activeEnd||this.queued||!allowedContinuation(this.chain,command.kind))return false;this.queued={kind:command.kind,aim:command.aim?{...command.aim}:null};return true;}
+if(this.current){if(!this.canContinue(command.kind))return false;this.queued={kind:command.kind,aim:command.aim?{...command.aim}:null};return true;}
 this.begin(command,0,hooks);return true;
 }
 private begin(command:AttackCommand,stage:number,hooks:AttackHooks):void{
