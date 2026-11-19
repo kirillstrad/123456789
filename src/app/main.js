@@ -11,7 +11,10 @@ import {ExecutionEffects,projectExecution,unprojectExecution} from '../render/ex
 import {installExecutionOptions} from './execution-options.js';
 import {installExecutionInput} from './execution-input.js';
 import {movementInput} from './movement-input.js';
-import {dashVisual} from '../combat/ash-dash.js';
+import {DASH,dashVisual} from '../combat/ash-dash.js';
+import {createRitualBonfire} from '../interaction/ritual-bonfire.js';
+import {drawDashHud} from '../ui/dash-hud.js';
+import {interactionCamera} from '../render/interaction-camera.js';
 import {isDesktopMode,desktopItems,installDesktop} from './desktop-mode.js';
 const DESKTOP=isDesktopMode();
 import {CombatWorld} from '../game/combat-world.js';
@@ -35,13 +38,15 @@ const ascii=new ASCII(out),maskReader=new ASCII(out),uiASCII=new ASCII(out,1008)
 const fireHintLayer=createFireHintLayer(canvas(W,H));
 const doorScene=createCombatDoorScene(OBSTACLES),env=createCombatDoorEnvironment(doorScene),world=new CombatWorld(doorScene.map,s=>combatHero(s).tip),effects=new ExecutionEffects(),executionOptions=installExecutionOptions(),keys=new Set(),commands=[],report={build:'ASH_IRON_ITERATION_4A',errors:[],frames:[],backend:'Canvas2D / ASCII cell lighting',gpuTime:null};
 const fireLighting=findCombatLights(doorScene);
+const ritualBonfire=createRitualBonfire(world,doorScene.map);
+const dashHud={ready:false,at:-Infinity};
 let mode='menu',selected=0,menuPage=false,time=0,last=0,drawAt=0,simLast=null,acc=0,paused=false,frozen=false,endTime=0,aimPoint=null,camera={x:8,y:12},view={zoom:1,dx:0,dy:0},renderCount=0,fireAt=-1,coneBoost=0;
 let manualAdvance=false;
 let galleryScene=null,galleryCamera=null,galleryReturn=null,galleryTimings=null,galleryTime=0,galleryPlayer=null;
 const interactionContext=()=>mode==='gallery'?(galleryPlayer?'gallery-walk':'gallery-preview'):mode;
 const targeting=installFrameTargeting(cv,{context:interactionContext,resolve:id=>mode==='gallery'?galleryScene?.getTarget(id):(env.targets??[]).find(t=>t.id===id),canRequest:()=>interactionInputAllowed({mode:interactionContext(),actor:mode==='gallery'?galleryPlayer?.snapshot():world.current,frozen,hidden:document.hidden,queued:commands.length>0})});
 const combatDoor=createCombatDoorController({world,scene:doorScene,targeting,active:()=>mode==='game'&&(!frozen||manualAdvance)});
-function stepWorld(dt,input){combatDoor.step(dt,input);effects.step(dt,world.current,world.events);}
+function stepWorld(dt,input){combatDoor.step(dt,input);ritualBonfire.step();effects.step(dt,world.current,world.events);}
 function advanceWorld(seconds){
  if(!Number.isFinite(seconds)||seconds<0||seconds>120)throw Error('Invalid manual advance duration');
  if(mode!=='game'||document.hidden)return false;
@@ -49,7 +54,7 @@ function advanceWorld(seconds){
  try{for(let i=0;i<Math.round(seconds*60);i++)stepWorld(1/60);}finally{manualAdvance=previous;simLast=null;acc=0;}
  return true;
 }
-function resetWorld(){targeting.clear();combatDoor.cancel('reset');doorScene.reset();world.reset();effects.reset();fireHintLayer.clear();view={zoom:1,dx:0,dy:0};}
+function resetWorld(){targeting.clear();combatDoor.cancel('reset');doorScene.reset();world.reset();ritualBonfire.reset();dashHud.ready=false;dashHud.at=-Infinity;effects.reset();fireHintLayer.clear();view={zoom:1,dx:0,dy:0};}
 const fire=canvas(192,165),fg=fire.getContext('2d',{willReadFrequently:true}),fireASCII=new ASCII(out);
 const basePr=(x,y,z,cx=camera.x,cy=camera.y)=>[504+((x-cx)-(y-cy))*65*.76,430+((x-cx)+(y-cy))*65*.43-z*65*.87];
 const pr=(x,y,z,cx=camera.x,cy=camera.y)=>screenPoint(projectExecution(basePr(x,y,z,cx,cy),view),W);
@@ -58,10 +63,19 @@ const color=c=>Array.isArray(c)?`rgb(${c.map(v=>Math.round(Math.max(0,Math.min(2
 function part(ctx,p,s,isMask){if(p.alpha===0)return;const previousAlpha=ctx.globalAlpha;ctx.globalAlpha=Math.max(0,Math.min(1,p.alpha??1));ctx.fillStyle=isMask?(p.hero?'#fff':'#000'):color(p.c);ctx.strokeStyle=ctx.fillStyle;ctx.lineWidth=(p.w||1)*(s.visualZoom??1);ctx.lineCap='round';ctx.lineJoin='round';if(p.kind===3){const q=pr(...p.v[0],s.cameraX,s.cameraY);ctx.font=`${(p.size??10)*(s.visualZoom??1)}px monospace`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(p.text,...q);ctx.globalAlpha=previousAlpha;return;}if(p.kind===2){const q=pr(...p.v[0],s.cameraX,s.cameraY),r=(p.r||0)*65/94*(s.visualZoom??1);ctx.beginPath();ctx.ellipse(q[0],q[1],r,r*.85,0,0,7);ctx.fill();ctx.globalAlpha=previousAlpha;return;}ctx.beginPath();p.v.forEach((v,i)=>{const q=pr(...v,s.cameraX,s.cameraY);i?ctx.lineTo(...q):ctx.moveTo(...q);});if(p.kind===1)ctx.stroke();else{ctx.closePath();ctx.fill();if(p.s){ctx.strokeStyle=isMask?ctx.fillStyle:color(p.s);ctx.stroke();}}ctx.globalAlpha=previousAlpha;}
 const smooth=x=>{x=Math.max(0,Math.min(1,x));return x*x*(3-2*x);};
 function render(s=world.snapshot(),galleryFrame=null){
- if(!galleryFrame)s=combatDoor.decorate(s);
- const start=performance.now(),hero=galleryFrame&&!galleryPlayer?{parts:[],lamp:[s.cameraX,s.cameraY,1.1]}:combatHero(s),visual=galleryFrame?{camera:{focusX:s.cameraX,focusY:s.cameraY,focusZ:0,zoom:1,weight:0,shakeX:0,shakeY:0},parts:[],lights:[]}:effects.frame(s,hero.lamp,executionOptions),v=visual.camera,focus=basePr(v.focusX,v.focusY,v.focusZ,s.cameraX,s.cameraY);
+ const rite=galleryFrame?null:ritualBonfire.frame();
+ const ritualArt=galleryFrame?null:ritualBonfire.art(s,ritualInputAllowed()&&!targeting.current());
+ if(!galleryFrame){
+  s=combatDoor.decorate(s);
+  s={...s,interactionAnimation:rite??s.interactionAnimation,comboEdgeActive:s.phase==='playing'&&world.actions.canContinue()};
+ }
+ const start=performance.now(),hero=galleryFrame&&!galleryPlayer?{parts:[],lamp:[s.cameraX,s.cameraY,1.1]}:combatHero(s),visual=galleryFrame?{camera:{focusX:s.cameraX,focusY:s.cameraY,focusZ:0,zoom:1,weight:0,shakeX:0,shakeY:0},parts:[],lights:[]}:effects.frame(s,hero.lamp,executionOptions);
+ const doorFrame=s.interactionAnimation;
+ const doorPassable=doorFrame?.kind==='door'&&doorScene.snapshot().doors.some(door=>door.actionId===s.interaction?.id&&door.status==='open');
+ const v=galleryFrame||rite?visual.camera:interactionCamera(s,visual.camera,doorPassable);
+ const focus=basePr(v.focusX,v.focusY,v.focusZ,s.cameraX,s.cameraY);
  camera={x:s.cameraX,y:s.cameraY};view={zoom:v.zoom,dx:(504-focus[0])*(v.zoom-1)+v.weight*(504-focus[0])*.3+v.shakeX,dy:(430-focus[1])*(v.zoom-1)+v.weight*(430-focus[1])*.3+v.shakeY};
- const drawState={...s,visualZoom:view.zoom},galleryDraw=galleryFrame?galleryRenderLayers(galleryFrame):null,parts=galleryDraw?[...galleryDraw.objects,...hero.parts].sort((a,b)=>a.d-b.d):[...env.parts,...enemyParts(s.enemy,s),...hero.parts,...visual.parts].sort((a,b)=>a.d-b.d);
+ const drawState={...s,visualZoom:view.zoom},galleryDraw=galleryFrame?galleryRenderLayers(galleryFrame):null,parts=galleryDraw?[...galleryDraw.objects,...hero.parts].sort((a,b)=>a.d-b.d):[...env.parts,...enemyParts(s.enemy,s),...hero.parts,...visual.parts,...(ritualArt?.parts??[])].sort((a,b)=>a.d-b.d);
  targeting.frame({parts,targets:galleryFrame?.targets??env.targets??[],project:pr,zoom:view.zoom,active:(mode==='gallery'&&!galleryPlayer)||((mode==='game'||mode==='gallery')&&s.phase==='playing')});
  const lamp=pr(...hero.lamp),lampProfile=lampLighting(s.lamp,galleryFrame&&!galleryPlayer?'playing':s.phase),radius=146*65/94*1.2*view.zoom*lampProfile.radiusScale,power=lampProfile.power;
  if(!galleryFrame){
@@ -72,14 +86,19 @@ function render(s=world.snapshot(),galleryFrame=null){
  sg.fillStyle='#020306';sg.fillRect(0,0,W,H);mg.fillStyle='#000';mg.fillRect(0,0,W,H);if(galleryDraw)for(const p of galleryDraw.floor)part(sg,p,drawState,false);
  let marked=false;for(const p of parts){if(p.fireHint)continue;part(sg,p,drawState,false);if(p.hero)marked=true;if(marked)part(mg,p,drawState,true);}
  if(!galleryFrame)fireHintLayer.render(parts,(ctx,p)=>part(ctx,p,drawState,false));else fireHintLayer.clear();
- const data=ascii.read(scene,COLS,ROWS),ma=maskReader.read(mask,COLS,ROWS),geometryMs=performance.now()-start,lights=(galleryFrame?galleryFrame.lights:env.lights).map(l=>({p:pr(l.x,l.y,l.z),r:l.r*view.zoom,v:l.power})),sparkFlash=sparkFlashProfile(s.cone);
+ const data=ascii.read(scene,COLS,ROWS),ma=maskReader.read(mask,COLS,ROWS),geometryMs=performance.now()-start,lights=(galleryFrame?galleryFrame.lights:[...env.lights,...(ritualArt?.lights??[])]).map(l=>({p:pr(l.x,l.y,l.z),r:l.r*view.zoom,v:l.power})),sparkFlash=sparkFlashProfile(s.cone);
  for(const p of (sparkFlash.gain>0?s.particles.filter(p=>p.glow&&p.life>.08).slice(0,12):[]))lights.push({p:pr(p.x,p.y,p.z),r:sparkFlash.particleRadius*view.zoom,v:sparkFlash.particlePower*Math.min(1,p.life*2)});
  for(const q of visual.lights)lights.push({p:pr(...q.position),r:q.radius*view.zoom,v:q.power});
  const dashEffect=s.dash?dashVisual(s.dash):{visibility:1,flare:0};if(dashEffect.flare>0)lights.push({p:pr(s.x,s.y,.7),r:115*view.zoom,v:dashEffect.flare*.8});const t=performance.now();coneBoost=0;
  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){const k=(y*COLS+x)*4,px=(x+.5)*W/COLS,py=(y+.5)*H/ROWS,h=ma[k]>127,n=power>0?Math.exp(-((px-lamp[0])**2+(py-lamp[1])**2)/(2*radius**2)):0;let l=.018+(h?.065:.12)+n*.82*1.6*power*(1+Math.sin(s.time*2.2)*.035),f=0;for(const q of lights){const dx=px-q.p[0],dy=py-q.p[1];if(Math.abs(dx)>q.r*3||Math.abs(dy)>q.r*3)continue;l+=Math.exp(-(dx*dx+dy*dy)/(2*q.r*q.r))*q.v;}if(!h&&s.cone&&sparkFlash.gain>0){const q=unpr({x:px,y:py}),c=s.cone,dx=q.x-c.x,dy=q.y-c.y,d=Math.hypot(dx,dy),front=(dx*c.fx+dy*c.fy)/Math.max(.01,d),edge=Math.cos(80*Math.PI/180);if(d>.2&&d<sparkFlash.range&&front>edge){f=sparkFlash.gain*smooth((front-edge)/.16)*smooth((d-.2)/.35)*(1-smooth((d-(sparkFlash.range-.5))/.5));l+=f;coneBoost+=f;}}if(h)l=Math.max(.3,Math.min(.8,l));const v=Math.max(.25,1-((px-W/2)/(700*W/1008))**2*.32-((py-360)/600)**2*.2),warm=Math.min(1,n*lampProfile.warmth+f),base=l*v*(h?1:1.25);data[k]*=base*(1+warm*.19);data[k+1]*=base*(1-warm*.1);data[k+2]*=base*(1-warm*.32);}
  const heroBackdropCells=galleryFrame?0:applyHeroBackdrop(data,ma,COLS,ROWS);
  const lightingMs=performance.now()-t,glyphAt=performance.now();out.fillStyle='#000';out.fillRect(0,0,W,864);ascii.paint(data,COLS,ROWS);if(!galleryFrame)fireHintLayer.composite(out);
- out.save();out.beginPath();out.rect(0,0,W,H);out.clip();out.textAlign='center';out.textBaseline='middle';out.font=`${11*view.zoom}px monospace`;for(const p of s.particles){out.globalAlpha=Math.min(1,p.life*2.2);out.fillStyle=p.life>.55?'#fff0c0':p.life>.28?'#ffb04a':'#d9622c';out.fillText(p.glyph,...pr(p.x,p.y,p.z));}out.restore();if(!galleryFrame)ui.hud(s.lamp);renderCount++;
+ out.save();out.beginPath();out.rect(0,0,W,H);out.clip();out.textAlign='center';out.textBaseline='middle';out.font=`${11*view.zoom}px monospace`;for(const p of s.particles){out.globalAlpha=Math.min(1,p.life*2.2);out.fillStyle=p.life>.55?'#fff0c0':p.life>.28?'#ffb04a':'#d9622c';out.fillText(p.glyph,...pr(p.x,p.y,p.z));}out.restore();if(!galleryFrame){
+  ui.hud(s.lamp);
+  drawDashHud(out,dashHud,s,world.dashReady(),DASH.cooldown);
+  if(ritualArt?.hint){out.save();part(out,ritualArt.hint,drawState,false);out.restore();}
+ }
+ renderCount++;
  return{geometryMs,lightingMs,glyphMs:performance.now()-glyphAt,cpuMs:performance.now()-start,lampLight:{...lampProfile,radiusPixels:radius},coneBoost,sparkFlashGain:sparkFlash.gain,fireHintParts:parts.filter(p=>p.fireHint).length,actionHint:parts.find(p=>p.actionLabel)?.text??null,heroBackdropCells,dashVisibility:dashEffect.visibility,dashFlare:dashEffect.flare,executionCamera:{...view},executionParticles:galleryFrame?0:effects.particles.length,gallery:galleryFrame?{objects:galleryFrame.stats.objects,visibleObjects:galleryFrame.stats.visibleObjects,floorParts:galleryFrame.floorParts.length,objectParts:galleryFrame.parts.length,lights:galleryFrame.lights.length,heroParts:hero.parts.length,heroClip:hero.clip??null}:undefined};
 }
 function renderGallery(){if(!galleryScene||mode!=='gallery')throw Error('Gallery preview is not open');const walking=galleryPlayer?.snapshot();if(walking)galleryCamera={x:walking.cameraX,y:walking.cameraY};const frame=galleryScene.getFrame(galleryCamera,galleryRenderRange(W,H)),s=walking??{...world.snapshot(),cameraX:galleryCamera.x,cameraY:galleryCamera.y,time:galleryTime,lamp:100,particles:[],cone:null,dash:null};galleryTimings=render(s,frame);$('status').textContent=galleryPlayer?'OBJECT GALLERY / WALK TEST / COLLISIONS ON':'OBJECT GALLERY / RENDER PREVIEW';return galleryTimings;}
@@ -95,6 +114,13 @@ function resume(){targeting.clear();if(mode==='gallery')closeGallery();mode='gam
 function home(){targeting.clear();if(mode==='gallery')closeGallery();resetWorld();mode='menu';selected=0;menuPage=false;keys.clear();commands.length=0;}
 function pause(){if(mode!=='game')return;combatDoor.cancel('pause');targeting.clear();mode='pause';selected=0;keys.clear();commands.length=0;simLast=null;acc=0;}
 const point=e=>{const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*864/r.height};};
+const ritualInputAllowed=()=>interactionInputAllowed({mode:interactionContext(),actor:world.current,frozen,hidden:document.hidden,queued:commands.length>0});
+window.addEventListener('keydown',event=>{
+ if(event.code!=='KeyF'||event.repeat||event.defaultPrevented||mode!=='game'||event.target?.isContentEditable||event.target?.closest?.('input,select,textarea,button,[contenteditable]'))return;
+ if(!ritualInputAllowed()||targeting.current()||!ritualBonfire.press())return;
+ event.preventDefault();
+ event.stopImmediatePropagation();
+},true);
 window.addEventListener('keydown',e=>{if(e.target?.isContentEditable||e.target?.closest?.('input,select,textarea,button,[contenteditable]'))return;if(mode==='gallery'){if(e.code==='Escape'){closeGallery();e.preventDefault();}else if(galleryPlayer&&['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)){galleryPlayer.cancelApproach('manual');keys.add(e.code);e.preventDefault();}return;}if(mode!=='game'){if(e.code==='Escape'&&menuPage){menuPage=false;e.preventDefault();return;}if(e.code==='Escape'&&mode==='pause'){resume();e.preventDefault();return;}if(e.code==='ArrowDown'||e.code==='ArrowUp'){selected=(selected+(e.code==='ArrowDown'?1:items().length-1))%items().length;e.preventDefault();}if(e.code==='Enter'&&!e.repeat){if(menuPage)menuPage=false;else items()[selected][1]();e.preventDefault();}return;}if(e.code==='Escape'){pause();e.preventDefault();return;}if(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)){keys.add(e.code);e.preventDefault();}if((e.code==='ShiftLeft'||e.code==='ShiftRight')&&!e.repeat&&!frozen&&!world.current.dash){if(commands.length<8)commands.push({kind:'dash',direction:movementInput(keys)});e.preventDefault();return;}if(e.code==='KeyE'&&!e.repeat&&!frozen&&!world.current.dash){commands.push({kind:'sweep',aim:unpr(aimPoint)});e.preventDefault();}});
 window.addEventListener('keyup',e=>keys.delete(e.code));window.addEventListener('blur',()=>{keys.clear();combatDoor.cancel('blur');});cv.addEventListener('pointermove',e=>{aimPoint=point(e);if(mode!=='game'&&mode!=='gallery'&&!menuPage){const i=Math.round((aimPoint.y-414)/49);if(i>=0&&i<items().length&&aimPoint.x>220&&aimPoint.x<788)selected=i;}});cv.addEventListener('pointerleave',()=>aimPoint=null);cv.addEventListener('pointerdown',e=>{cv.focus();if(mode==='gallery')return;const p=point(e);if(mode!=='game'){if(e.button!==0)return;if(menuPage){menuPage=false;return;}const i=Math.round((p.y-414)/49);if(i>=0&&i<items().length&&p.x>220&&p.x<788)items()[i][1]();return;}if(frozen||world.current.dash||p.y>=720)return;e.preventDefault();const kind=e.button===0?'light':e.button===2?'heavy':e.button===1?'sweep':null;if(kind&&commands.length<8)commands.push({kind,aim:unpr(p)});});cv.addEventListener('contextmenu',e=>e.preventDefault());cv.addEventListener('auxclick',e=>e.preventDefault());document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();simLast=null;});
 $('menuButton').onclick=()=>mode==='gallery'?closeGallery():mode==='pause'?resume():pause();$('restart').onclick=start;$('freeze').onclick=()=>{if(mode!=='game')return;frozen=!frozen;combatDoor.cancel('freeze');keys.clear();commands.length=0;simLast=null;acc=0;$('freeze').textContent=frozen?'RESUME':'FREEZE FRAME';cv.focus();};$('perfToggle').onclick=()=>$('perf').hidden=!$('perf').hidden;$('settingsClose').onclick=()=>$('settings').hidden=true;
