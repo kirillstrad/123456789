@@ -49,7 +49,7 @@ const effects=new ExecutionEffects(),executionOptions=installExecutionOptions(),
 let fireLighting=findCombatLights(doorScene);
 let ritualBonfire=createRitualBonfire(world,doorScene.map);
 const dashHud={ready:false,at:-Infinity};
-const enemyHealth=createEnemyHealthRuntime();
+const enemyHealth=createEnemyHealthRuntime({diagnosticsTarget:window});
 let mode='menu',selected=0,menuPage=false,time=0,last=0,drawAt=0,simLast=null,acc=0,paused=false,frozen=false,endTime=0,aimPoint=null,camera={x:8,y:12},view={zoom:1,dx:0,dy:0},renderCount=0,fireAt=-1,coneBoost=0;
 let manualAdvance=false;
 let selectedLevelId='test-chamber';
