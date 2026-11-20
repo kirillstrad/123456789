@@ -1,3 +1,4 @@
+import {applyAttackFootwork} from './attack-footwork.js';
 import type {HeroModule,Rig} from '../core/types.js';
 import type {CombatSnapshot} from '../combat/types.js';
 import {loadedLocomotion} from './weight-transitions.js';
@@ -22,6 +23,7 @@ export function advanceWorldFootContacts(s:CombatSnapshot,dt:number,module:HeroM
   return walking(s)?advanceWalkingContacts(previous,rig,f,dt,s.walkDistance):advanceIdleContacts(previous,rig,f,dt);
 }
 export function applyWorldFootContacts(s:CombatSnapshot,rig:Rig,module:HeroModule):Rig {
+  if(s.action?.animation4C)return applyAttackFootwork(s,rig,module,contactFrame(s));
   if(!footContactsEnabled(s)||!s.footContacts)return rig;
   const ik=(module as HeroModule&{ik?:LegIK}).ik;
   if(typeof ik!=='function')throw Error('Original hero IK is required for foot contacts.');

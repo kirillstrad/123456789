@@ -16,27 +16,32 @@ test('expanded environment covers the room, retains boundary walls and emits no 
   assert.deepEqual(lights,[]);
 });
 test('4C LLL and LLH reject queue spam and fourth strike',()=>{
-  for(const third of ['light','heavy']){
-    const w=new CombatWorld({circles:[],rects:[]});w.current.enemy.x=15;
-    assert.equal(w.attack({kind:'light',aim:null}),true);
-    for(let i=0;i<12;i++)w.step(1/60);
-    assert.equal(w.attack({kind:'heavy',aim:null}),false);
-    assert.equal(w.attack({kind:'light',aim:null}),true);
-    assert.equal(w.attack({kind:'light',aim:null}),false);
-    assert.equal(w.attack({kind:'heavy',aim:null}),false);
-    for(let i=0;i<60;i++)w.step(1/60);
-    assert.ok(w.actions.current);assert.equal(w.actions.current.stage,1);
-    assert.equal(w.actions.current.kind,'light');
-    assert.equal(w.attack({kind:third,aim:null}),true);
-    assert.equal(w.attack({kind:third,aim:null}),false);
-    for(let i=0;i<70;i++)w.step(1/60);
-    assert.ok(w.actions.current);assert.equal(w.actions.current.stage,2);
-    assert.equal(w.actions.current.kind,third);
-    assert.equal(w.attack({kind:'light',aim:null}),false);
-    assert.equal(w.attack({kind:'heavy',aim:null}),false);
-    for(let i=0;i<90;i++)w.step(1/60);
-    assert.equal(w.actions.current,null);assert.equal(w.actions.queued,null);
-    assert.equal(w.actions.started,3);
+ const advanceStage=(w,stage)=>{
+  const a=w.actions.current;assert.ok(a);
+  const budget=Math.ceil(a.duration*60)+2;
+  for(let i=0;i<budget&&w.actions.current?.stage===stage;i++)w.step(1/60);
+ };
+ for(const third of ['light','heavy']){
+  const w=new CombatWorld({circles:[],rects:[]});w.current.enemy.x=15;
+  assert.equal(w.attack({kind:'light',aim:null}),true);
+  for(let stage=0;stage<2;stage++){
+   const a=w.actions.current;assert.ok(a);assert.equal(a.stage,stage);
+   for(let i=0;i<Math.ceil(a.duration*.3*60);i++)w.step(1/60);
+   const next=stage===0?'light':third;
+   assert.equal(w.attack({kind:next,aim:null}),true);
+   assert.equal(w.attack({kind:'light',aim:null}),false);
+   assert.equal(w.attack({kind:'heavy',aim:null}),false);
+   advanceStage(w,stage);
   }
+  assert.ok(w.actions.current);assert.equal(w.actions.current.stage,2);
+  assert.equal(w.actions.current.kind,third);
+  const last=w.actions.current;
+  for(let i=0;i<Math.ceil(last.duration*.3*60);i++)w.step(1/60);
+  assert.equal(w.attack({kind:'light',aim:null}),false);
+  assert.equal(w.attack({kind:'heavy',aim:null}),false);
+  advanceStage(w,2);
+  assert.equal(w.actions.current,null);assert.equal(w.actions.queued,null);
+  assert.equal(w.actions.started,3);
+ }
 });
 test('portable HTML has no external dependencies',()=>{const s=fs.readFileSync('PLAY.html','utf8');assert.equal(/<script[^>]*src=/.test(s),false);assert.equal(/<link[^>]*href=/.test(s),false);});
