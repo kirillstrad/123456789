@@ -10,8 +10,8 @@ export function presentFireMesh(mesh,modelId,status){
  const kind=fireProfileKind(modelId),profile=fireLightingProfile(kind,{emitters:mesh.lights.length}),gain=({candle:1.5,candelabra:1.5,lamp:1.2,brazier:1.1})[kind]??1,flames=[];
  for(const source of mesh.flameParts){
   const center=source.v.reduce((s,v)=>s.map((n,i)=>n+v[i]/source.v.length),[0,0,0]),anchor=points.reduce((best,p)=>Math.hypot(...p.map((v,i)=>v-center[i]))<Math.hypot(...best.map((v,i)=>v-center[i]))?p:best,points[0]);
-  const part={...source,v:source.v.map(v=>v.map((n,i)=>anchor[i]+(n-anchor[i])*profile.flameScale)),c:[255,166,78],...(source.kind===2?{r:source.r*profile.flameScale}:{})};part.d=depth(part);flames.push(part);
-  if(part.kind===2)flames.push({...part,c:[255,245,220],r:part.r*.52,d:part.d+.0001});
+  const part={...source,v:source.v.map(v=>v.map((n,i)=>anchor[i]+(n-anchor[i])*profile.flameScale)),c:[243,161,59],...(source.kind===2?{r:source.r*profile.flameScale}:{})};part.d=depth(part);flames.push(part);
+  if(part.kind===2)flames.push({...part,c:[255,208,120],r:part.r*.52,d:part.d+.0001});
  }
  return{parts:[...mesh.bodyParts,...flames],lights:mesh.lights.map(l=>({...l,r:profile.radius,power:profile.power*gain}))};
 }

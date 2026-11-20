@@ -18,10 +18,4 @@ export function createEnemyHealthModel({linger=2,defaultMaxHp=70}={}){
  }
  return Object.freeze({update,reset});
 }
-export function paintEnemyHealth(ctx,view,{width,height=720}={}){
- if(!ctx||!Number.isFinite(width)||width<160||height<100)return;
- ctx.save();try{ctx.beginPath();ctx.rect(0,0,width,height);ctx.clip();ctx.textAlign='center';ctx.textBaseline='middle';
-  function bar(e,y,boss){if(!e)return;const w=Math.min(width-32,boss?620:340),x=(width-w)/2,h=boss?15:10;ctx.fillStyle='#111014';ctx.fillRect(x-5,y-5,w+10,h+10);ctx.strokeStyle='#665b4c';ctx.lineWidth=2;ctx.strokeRect(x-4,y-4,w+8,h+8);ctx.fillStyle='#2b1519';ctx.fillRect(x,y,w,h);ctx.fillStyle='#8e2533';ctx.fillRect(x,y,w*Math.max(0,Math.min(1,e.fraction)),h);ctx.fillStyle='#b9a58a';ctx.fillRect(x-8,y-2,5,h+4);ctx.fillRect(x+w+3,y-2,5,h+4);ctx.font=boss?'16px monospace':'13px monospace';ctx.fillStyle='#e2c79f';ctx.fillText(String(e.name).toUpperCase(),width/2,y-18);ctx.font='12px monospace';ctx.fillStyle='#e8dac5';ctx.fillText(String(Number(e.hp.toFixed(1)))+' / '+String(Number(e.maxHp.toFixed(1))),width/2,y+h+17);}
-  bar(view?.boss,48,true);bar(view?.target,view?.boss?120:43,false);
- }finally{ctx.restore();}
-}
+export {paintAsciiEnemyHealth as paintEnemyHealth} from './enemy-health-ascii.js';

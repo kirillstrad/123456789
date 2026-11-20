@@ -11,7 +11,7 @@ try{
   await fresh();const points=(await state()).candidates;let found=false;
   for(const p of points){const q=await page.evaluate(p=>{const c=document.getElementById('game'),r=c.getBoundingClientRect();return{x:r.left+p[0]*r.width/c.width,y:r.top+p[1]*r.height/c.height};},p);await page.mouse.move(q.x,q.y);await page.evaluate(()=>window.__ASH_ITERATION_2__.render());if((await state()).target){found=true;break;}}
   assert.ok(found,'visible enemy must be selectable without setting target state');const s=await state(),enemy=await page.evaluate(()=>window.__ASH_ITERATION_2__.state().enemy);assert.equal(s.target.id,enemy.id);assert.equal(s.target.hp,enemy.hp);assert.equal(s.hoverId,enemy.id);
-  const pixel=await page.evaluate(()=>{const c=document.getElementById('game'),w=Math.min(c.width-32,340),x=Math.floor((c.width-w)/2+w*.2);return [...c.getContext('2d').getImageData(x,47,1,1).data];});assert.deepEqual(pixel.slice(0,3),[142,37,51]);await page.screenshot({path:dir+'/hover.png'});
+  const painted=await page.evaluate(()=>{const c=document.getElementById('game'),d=c.getContext('2d').getImageData(0,0,c.width,85).data;let n=0;for(let i=0;i<d.length;i+=4)if(d[i]===182&&d[i+1]===92&&d[i+2]===70)n++;return n;});assert.ok(painted>0,'ASCII health fill glyphs must be painted');await page.screenshot({path:dir+'/hover.png'});
  });
  await run('real attack updates HP and the last-hit panel expires',async()=>{
   const accepted=await page.evaluate(()=>{const a=window.__ASH_ITERATION_2__,e=a.state().enemy;const ok=a.attack('light',e.x,e.y);a.advance(1.5);a.render();return ok;});assert.ok(accepted);const enemy=await page.evaluate(()=>window.__ASH_ITERATION_2__.state().enemy);assert.ok(enemy.hp<70&&enemy.hp>0);assert.equal((await state()).target?.hp,enemy.hp);

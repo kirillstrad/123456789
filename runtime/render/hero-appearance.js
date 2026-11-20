@@ -19,7 +19,7 @@ export function createHeroAppearance(rig) {
                 return c;
             const center = v.reduce((s, p) => [s[0] + p[0] / v.length, s[1] + p[1] / v.length, s[2] + p[2] / v.length], [0, 0, 0]), hand = rig.arms.some(a => distance(center, a.end) < .075), forearm = rig.arms.some(a => segmentDistance(center, a.joint, a.end) < .065), gain = hand ? 1.18 : forearm ? 1.1 : 1, bias = hand ? [5, 3, 2] : forearm ? [3, 2, 1] : [0, 0, 0], warm = c.map((n, i) => n * gain + bias[i]), luma = warm[0] * .2126 + warm[1] * .7152 + warm[2] * .0722;
             const lift = hand ? 1 : forearm ? .55 : center[2] > 1.3 ? .8 : 0, shade = .65 + .35 * Math.max(0, Math.min(1, luma / 120));
-            return [139, 129, 117].map((n, i) => Math.round((n + ([200, 185, 158][i] - n) * lift) * shade));
+            return [148, 139, 126].map((n, i) => Math.round((n + ([222, 208, 178][i] - n) * lift) * shade));
         },
         accent(v, c, kind) {
             if (kind !== 1 || v.length < 2)

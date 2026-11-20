@@ -1,3 +1,5 @@
+// VISUAL_EMBER_ASCII_V1
+import {shadeAmberCell} from '../render/amber-cell.js';
 import {arrowParts} from '../render/marrow-archer.js';
 import {gameLevel,GAME_LEVELS,applyLevelSpawn} from '../levels/registry.js';
 import {enemiesOf} from '../combat/enemy-roster.js';
@@ -30,7 +32,7 @@ import {CombatWorld} from '../game/combat-world.js';
 import {combatHero} from '../animation/combat-hero.js';
 import {OBSTACLES} from '../combat/geometry.js';
 import {createCombatDoorScene} from '../game/combat-door-scene.js';
-import {createCombatDoorEnvironment} from '../render/combat-door-environment.js';
+import {createCombatDoorEnvironment,fireWarmthOf} from '../render/combat-door-environment.js';
 import {createCombatDoorController} from '../interaction/combat-door-controller.js';
 import {executionEnemyParts as enemyParts} from '../render/execution-enemy.js';
 import {ASCII} from '../render/ascii.js';
@@ -109,11 +111,11 @@ function render(s=world.snapshot(),galleryFrame=null){
  sg.fillStyle='#020306';sg.fillRect(0,0,W,H);mg.fillStyle='#000';mg.fillRect(0,0,W,H);if(galleryDraw)for(const p of galleryDraw.floor)part(sg,p,drawState,false);
  let marked=false;for(const p of parts){if(p.fireHint)continue;part(sg,p,drawState,false);if(p.hero)marked=true;if(marked)part(mg,p,drawState,true);}
  if(!galleryFrame)fireHintLayer.render(parts,(ctx,p)=>part(ctx,p,drawState,false));else fireHintLayer.clear();
- const data=ascii.read(scene,COLS,ROWS),ma=maskReader.read(mask,COLS,ROWS),geometryMs=performance.now()-start,lights=(galleryFrame?galleryFrame.lights:[...env.lights,...(ritualArt?.lights??[])]).map(l=>({p:pr(l.x,l.y,l.z),r:l.r*view.zoom,v:l.power})),sparkFlash=sparkFlashProfile(s.cone);
+ const data=ascii.read(scene,COLS,ROWS),ma=maskReader.read(mask,COLS,ROWS),geometryMs=performance.now()-start,lights=(galleryFrame?galleryFrame.lights:[...env.lights,...(ritualArt?.lights??[]).map(l=>({...l,fireWarmth:1}))]).map(l=>({p:pr(l.x,l.y,l.z),r:l.r*view.zoom,v:l.power,fireWarmth:fireWarmthOf(l)})),sparkFlash=sparkFlashProfile(s.cone);
  for(const p of (sparkFlash.gain>0?s.particles.filter(p=>p.glow&&p.life>.08).slice(0,12):[]))lights.push({p:pr(p.x,p.y,p.z),r:sparkFlash.particleRadius*view.zoom,v:sparkFlash.particlePower*Math.min(1,p.life*2)});
  for(const q of visual.lights)lights.push({p:pr(...q.position),r:q.radius*view.zoom,v:q.power});
  const dashEffect=s.dash?dashVisual(s.dash):{visibility:1,flare:0};if(dashEffect.flare>0)lights.push({p:pr(s.x,s.y,.7),r:115*view.zoom,v:dashEffect.flare*.8});const t=performance.now();coneBoost=0;
- for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){const k=(y*COLS+x)*4,px=(x+.5)*W/COLS,py=(y+.5)*H/ROWS,h=ma[k]>127,n=power>0?Math.exp(-((px-lamp[0])**2+(py-lamp[1])**2)/(2*radius**2)):0;let l=.018+(h?.065:.12)+n*.82*1.6*power*(1+Math.sin(s.time*2.2)*.035),f=0;for(const q of lights){const dx=px-q.p[0],dy=py-q.p[1];if(Math.abs(dx)>q.r*3||Math.abs(dy)>q.r*3)continue;l+=Math.exp(-(dx*dx+dy*dy)/(2*q.r*q.r))*q.v;}if(!h&&s.cone&&sparkFlash.gain>0){const q=unpr({x:px,y:py}),c=s.cone,dx=q.x-c.x,dy=q.y-c.y,d=Math.hypot(dx,dy),front=(dx*c.fx+dy*c.fy)/Math.max(.01,d),edge=Math.cos(80*Math.PI/180);if(d>.2&&d<sparkFlash.range&&front>edge){f=sparkFlash.gain*smooth((front-edge)/.16)*smooth((d-.2)/.35)*(1-smooth((d-(sparkFlash.range-.5))/.5));l+=f;coneBoost+=f;}}if(h)l=Math.max(.3,Math.min(.8,l));const v=Math.max(.25,1-((px-W/2)/(700*W/1008))**2*.32-((py-360)/600)**2*.2),warm=Math.min(1,n*lampProfile.warmth+f),base=l*v*(h?1:1.25);data[k]*=base*(1+warm*.19);data[k+1]*=base*(1-warm*.1);data[k+2]*=base*(1-warm*.32);}
+ for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){const k=(y*COLS+x)*4,px=(x+.5)*W/COLS,py=(y+.5)*H/ROWS,h=ma[k]>127,n=power>0?Math.exp(-((px-lamp[0])**2+(py-lamp[1])**2)/(2*radius**2)):0;let l=.018+(h?.065:.12)+n*.82*1.6*power*(1+Math.sin(s.time*2.2)*.035),f=0,fireGlow=0;for(const q of lights){const dx=px-q.p[0],dy=py-q.p[1];if(Math.abs(dx)>q.r*3||Math.abs(dy)>q.r*3)continue;const glow=Math.exp(-(dx*dx+dy*dy)/(2*q.r*q.r))*q.v;l+=glow;fireGlow+=glow*(q.fireWarmth??0);}if(!h&&s.cone&&sparkFlash.gain>0){const q=unpr({x:px,y:py}),c=s.cone,dx=q.x-c.x,dy=q.y-c.y,d=Math.hypot(dx,dy),front=(dx*c.fx+dy*c.fy)/Math.max(.01,d),edge=Math.cos(80*Math.PI/180);if(d>.2&&d<sparkFlash.range&&front>edge){f=sparkFlash.gain*smooth((front-edge)/.16)*smooth((d-.2)/.35)*(1-smooth((d-(sparkFlash.range-.5))/.5));l+=f;coneBoost+=f;}}if(h)l=Math.max(.38,Math.min(.82,l));const v=Math.max(.25,1-((px-W/2)/(700*W/1008))**2*.32-((py-360)/600)**2*.2),warm=Math.min(1,n*lampProfile.warmth+f+Math.min(1,fireGlow)),base=l*v*(h?1:1.25);shadeAmberCell(data,k,base,warm,h);}
  if(!galleryFrame)enemyHealth.update({parts,groups:enemyGroups,project:pr,zoom:view.zoom,viewport:{width:W,height:H},cells:{data,cols:COLS,rows:ROWS},pointer:aimPoint?[aimPoint.x,aimPoint.y]:null,state:world.current,events:world.events,enabled:mode==='game'&&!manifest?.blocking()&&!document.hidden&&s.phase==='playing'});
   const heroBackdropCells = galleryFrame
    ? 0

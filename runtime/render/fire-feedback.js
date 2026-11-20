@@ -4,7 +4,7 @@ const depth=(v,kind)=>v.reduce((s,p)=>s+p[0]+p[1]+p[2]*.006,0)/v.length+(kind===
 export function sparkFlashProfile(cone){const age=cone&&Number.isFinite(cone.maxLife)&&Number.isFinite(cone.life)?Math.max(0,cone.maxLife-cone.life):Infinity,fade=Math.max(0,1-age/FIRE_RULES.visibleConeDuration);return{fade,gain:FIRE_RULES.visibleConeGain*fade*fade,range:2,particleRadius:8,particlePower:.012*fade};}
 export function createFireHintParts({sources=[],hover=null,time=0,project,lamp={point:null,radius:0,power:0},reducedMotion=false}={}){
  const parts=[];if(!Number.isFinite(time))time=0;
- const add=(id,kind,v,extra={})=>parts.push({kind,v,c:[205,232,255],alpha:.65,w:1.5,hero:false,d:depth(v,kind),fireHint:true,interactionVapor:true,sourceId:id,...extra});
+ const add=(id,kind,v,extra={})=>parts.push({kind,v,c:[243,161,59],alpha:.65,w:1.5,hero:false,d:depth(v,kind),fireHint:true,interactionVapor:true,sourceId:id,...extra});
  for(const source of sources){if(source.enabled===false||source.visible===false||!finitePoint(source.contactPoint))continue;const [x,y,z]=source.contactPoint,q=typeof project==='function'?project(x,y,z):null,illumination=q&&lamp.point&&lamp.radius>0?Math.exp(-((q[0]-lamp.point[0])**2+(q[1]-lamp.point[1])**2)/(2*lamp.radius**2))*lamp.power:0,style=unlitFireHint({status:source.status,illumination});if(!style)continue;
   let hash=0;for(const c of source.id)hash=(hash*31+c.charCodeAt(0))>>>0;const seed=(hash%997)/997,phase=((time*.5+seed)%1+1)%1,sway=reducedMotion?0:Math.sin(time*1.7+seed*6)*.025,lift=.12+(reducedMotion?0:Math.sin(time*2+seed*6)*.035);
   add(source.id,3,[[x+sway,y,z+lift]],{text:'*',size:10,alpha:style.alpha,effectKind:'fire-wisp'});

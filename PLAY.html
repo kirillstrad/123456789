@@ -1468,6 +1468,8 @@ function installIronCursor(canvas, { read = () => ({}) } = {}) {
 "app/main.js":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+// VISUAL_EMBER_ASCII_V1
+const amber_cell_js_1 = require("../render/amber-cell.js");
 const marrow_archer_js_1 = require("../render/marrow-archer.js");
 const registry_js_1 = require("../levels/registry.js");
 const enemy_roster_js_1 = require("../combat/enemy-roster.js");
@@ -1645,7 +1647,7 @@ function render(s = world.snapshot(), galleryFrame = null) {
         fireHintLayer.render(parts, (ctx, p) => part(ctx, p, drawState, false));
     else
         fireHintLayer.clear();
-    const data = ascii.read(scene, COLS, ROWS), ma = maskReader.read(mask, COLS, ROWS), geometryMs = performance.now() - start, lights = (galleryFrame ? galleryFrame.lights : [...env.lights, ...(ritualArt?.lights ?? [])]).map(l => ({ p: pr(l.x, l.y, l.z), r: l.r * view.zoom, v: l.power })), sparkFlash = (0, fire_feedback_js_1.sparkFlashProfile)(s.cone);
+    const data = ascii.read(scene, COLS, ROWS), ma = maskReader.read(mask, COLS, ROWS), geometryMs = performance.now() - start, lights = (galleryFrame ? galleryFrame.lights : [...env.lights, ...(ritualArt?.lights ?? []).map(l => ({ ...l, fireWarmth: 1 }))]).map(l => ({ p: pr(l.x, l.y, l.z), r: l.r * view.zoom, v: l.power, fireWarmth: (0, combat_door_environment_js_1.fireWarmthOf)(l) })), sparkFlash = (0, fire_feedback_js_1.sparkFlashProfile)(s.cone);
     for (const p of (sparkFlash.gain > 0 ? s.particles.filter(p => p.glow && p.life > .08).slice(0, 12) : []))
         lights.push({ p: pr(p.x, p.y, p.z), r: sparkFlash.particleRadius * view.zoom, v: sparkFlash.particlePower * Math.min(1, p.life * 2) });
     for (const q of visual.lights)
@@ -1658,12 +1660,14 @@ function render(s = world.snapshot(), galleryFrame = null) {
     for (let y = 0; y < ROWS; y++)
         for (let x = 0; x < COLS; x++) {
             const k = (y * COLS + x) * 4, px = (x + .5) * W / COLS, py = (y + .5) * H / ROWS, h = ma[k] > 127, n = power > 0 ? Math.exp(-((px - lamp[0]) ** 2 + (py - lamp[1]) ** 2) / (2 * radius ** 2)) : 0;
-            let l = .018 + (h ? .065 : .12) + n * .82 * 1.6 * power * (1 + Math.sin(s.time * 2.2) * .035), f = 0;
+            let l = .018 + (h ? .065 : .12) + n * .82 * 1.6 * power * (1 + Math.sin(s.time * 2.2) * .035), f = 0, fireGlow = 0;
             for (const q of lights) {
                 const dx = px - q.p[0], dy = py - q.p[1];
                 if (Math.abs(dx) > q.r * 3 || Math.abs(dy) > q.r * 3)
                     continue;
-                l += Math.exp(-(dx * dx + dy * dy) / (2 * q.r * q.r)) * q.v;
+                const glow = Math.exp(-(dx * dx + dy * dy) / (2 * q.r * q.r)) * q.v;
+                l += glow;
+                fireGlow += glow * (q.fireWarmth ?? 0);
             }
             if (!h && s.cone && sparkFlash.gain > 0) {
                 const q = unpr({ x: px, y: py }), c = s.cone, dx = q.x - c.x, dy = q.y - c.y, d = Math.hypot(dx, dy), front = (dx * c.fx + dy * c.fy) / Math.max(.01, d), edge = Math.cos(80 * Math.PI / 180);
@@ -1674,11 +1678,9 @@ function render(s = world.snapshot(), galleryFrame = null) {
                 }
             }
             if (h)
-                l = Math.max(.3, Math.min(.8, l));
-            const v = Math.max(.25, 1 - ((px - W / 2) / (700 * W / 1008)) ** 2 * .32 - ((py - 360) / 600) ** 2 * .2), warm = Math.min(1, n * lampProfile.warmth + f), base = l * v * (h ? 1 : 1.25);
-            data[k] *= base * (1 + warm * .19);
-            data[k + 1] *= base * (1 - warm * .1);
-            data[k + 2] *= base * (1 - warm * .32);
+                l = Math.max(.38, Math.min(.82, l));
+            const v = Math.max(.25, 1 - ((px - W / 2) / (700 * W / 1008)) ** 2 * .32 - ((py - 360) / 600) ** 2 * .2), warm = Math.min(1, n * lampProfile.warmth + f + Math.min(1, fireGlow)), base = l * v * (h ? 1 : 1.25);
+            (0, amber_cell_js_1.shadeAmberCell)(data, k, base, warm, h);
         }
     if (!galleryFrame)
         enemyHealth.update({ parts, groups: enemyGroups, project: pr, zoom: view.zoom, viewport: { width: W, height: H }, cells: { data, cols: COLS, rows: ROWS }, pointer: aimPoint ? [aimPoint.x, aimPoint.y] : null, state: world.current, events: world.events, enabled: mode === 'game' && !manifest?.blocking() && !document.hidden && s.phase === 'playing' });
@@ -10013,6 +10015,22 @@ function createWorldReference(initial) {
 }
 
 },
+"render/amber-cell.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.shadeAmberCell = shadeAmberCell;
+function shadeAmberCell(data, k, base, warmth, hero = false) {
+    if (!Number.isFinite(base) || base < 0)
+        base = 0;
+    if (!Number.isFinite(warmth))
+        warmth = 0;
+    const t = Math.max(0, Math.min(1, warmth)) * (hero ? .65 : 1), r = data[k] * base * (1 + .08 * t), g = data[k + 1] * base * (1 - .28 * t), b = data[k + 2] * base * (1 - .68 * t), peak = Math.max(r, g, b), cap = hero ? 238 : 245, gain = peak > cap ? cap / peak : 1;
+    data[k] = r * gain;
+    data[k + 1] = g * gain;
+    data[k + 2] = b * gain;
+}
+
+},
 "render/ascii.js":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -10134,9 +10152,16 @@ function boneboundParts(e) {
 "render/combat-door-environment.js":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.fireWarmthOf = fireWarmthOf;
 exports.createCombatDoorEnvironment = createCombatDoorEnvironment;
 const environment_js_1 = require("./environment.js");
 const combat_light_context_js_1 = require("../game/combat-light-context.js");
+const warmFireLights = new WeakSet();
+function markFireLights(lights) { for (const light of lights)
+    if (light && typeof light === 'object')
+        warmFireLights.add(light); return lights; }
+function fireWarmthOf(light) { if (Number.isFinite(light?.fireWarmth))
+    return Math.max(0, Math.min(1, light.fireWarmth)); return light && typeof light === 'object' && warmFireLights.has(light) ? 1 : 0; }
 function feedback(d) {
     if (d.status !== 'opening' || d.elapsed > 1.15)
         return { parts: [], lights: [] };
@@ -10160,7 +10185,7 @@ function feedback(d) {
     }
     return { parts, lights: t < .22 ? [{ x, y, z: 1.1, r: 28, power: .4 * (1 - t / .22) }] : [] };
 }
-function createCombatDoorEnvironment(door, environmentFactory = environment_js_1.createEnvironment) { const env = environmentFactory(), baseParts = env.parts.map(p => p.v.every(q => q[2] === 0) ? { ...p, d: p.d - 10000 } : p), lighting = (0, combat_light_context_js_1.enableCombatLights)(door), effects = () => door.snapshot().doors.map(feedback); return Object.freeze({ step(dt) { env.step?.(dt); }, get parts() { return [...baseParts, ...(door.interior?.parts ?? []), ...(env.dynamicParts?.() ?? []), ...door.parts, ...lighting.getFrame().parts, ...effects().flatMap(e => e.parts)]; }, get lights() { return [...(env.lights ?? []), ...lighting.getFrame().lights, ...effects().flatMap(e => e.lights)]; }, get targets() { return [...door.targets, ...lighting.getFrame().targets.filter(t => t.activation === 'lantern')]; } }); }
+function createCombatDoorEnvironment(door, environmentFactory = environment_js_1.createEnvironment) { const env = environmentFactory(), baseParts = env.parts.map(p => p.v.every(q => q[2] === 0) ? { ...p, d: p.d - 10000 } : p), lighting = (0, combat_light_context_js_1.enableCombatLights)(door), effects = () => door.snapshot().doors.map(feedback); return Object.freeze({ step(dt) { env.step?.(dt); }, get parts() { return [...baseParts, ...(door.interior?.parts ?? []), ...(env.dynamicParts?.() ?? []), ...door.parts, ...lighting.getFrame().parts, ...effects().flatMap(e => e.parts)]; }, get lights() { return [...(env.lights ?? []), ...markFireLights(lighting.getFrame().lights), ...effects().flatMap(e => e.lights)]; }, get targets() { return [...door.targets, ...lighting.getFrame().targets.filter(t => t.activation === 'lantern')]; } }); }
 
 },
 "render/enemy.js":function(require,module,exports){
@@ -10423,7 +10448,7 @@ function createFireHintParts({ sources = [], hover = null, time = 0, project, la
     const parts = [];
     if (!Number.isFinite(time))
         time = 0;
-    const add = (id, kind, v, extra = {}) => parts.push({ kind, v, c: [205, 232, 255], alpha: .65, w: 1.5, hero: false, d: depth(v, kind), fireHint: true, interactionVapor: true, sourceId: id, ...extra });
+    const add = (id, kind, v, extra = {}) => parts.push({ kind, v, c: [243, 161, 59], alpha: .65, w: 1.5, hero: false, d: depth(v, kind), fireHint: true, interactionVapor: true, sourceId: id, ...extra });
     for (const source of sources) {
         if (source.enabled === false || source.visible === false || !finitePoint(source.contactPoint))
             continue;
@@ -10500,11 +10525,11 @@ function presentFireMesh(mesh, modelId, status) {
     const kind = fireProfileKind(modelId), profile = (0, fire_rules_js_1.fireLightingProfile)(kind, { emitters: mesh.lights.length }), gain = ({ candle: 1.5, candelabra: 1.5, lamp: 1.2, brazier: 1.1 })[kind] ?? 1, flames = [];
     for (const source of mesh.flameParts) {
         const center = source.v.reduce((s, v) => s.map((n, i) => n + v[i] / source.v.length), [0, 0, 0]), anchor = points.reduce((best, p) => Math.hypot(...p.map((v, i) => v - center[i])) < Math.hypot(...best.map((v, i) => v - center[i])) ? p : best, points[0]);
-        const part = { ...source, v: source.v.map(v => v.map((n, i) => anchor[i] + (n - anchor[i]) * profile.flameScale)), c: [255, 166, 78], ...(source.kind === 2 ? { r: source.r * profile.flameScale } : {}) };
+        const part = { ...source, v: source.v.map(v => v.map((n, i) => anchor[i] + (n - anchor[i]) * profile.flameScale)), c: [243, 161, 59], ...(source.kind === 2 ? { r: source.r * profile.flameScale } : {}) };
         part.d = depth(part);
         flames.push(part);
         if (part.kind === 2)
-            flames.push({ ...part, c: [255, 245, 220], r: part.r * .52, d: part.d + .0001 });
+            flames.push({ ...part, c: [255, 208, 120], r: part.r * .52, d: part.d + .0001 });
     }
     return { parts: [...mesh.bodyParts, ...flames], lights: mesh.lights.map(l => ({ ...l, r: profile.radius, power: profile.power * gain })) };
 }
@@ -10536,7 +10561,7 @@ function createHeroAppearance(rig) {
                 return c;
             const center = v.reduce((s, p) => [s[0] + p[0] / v.length, s[1] + p[1] / v.length, s[2] + p[2] / v.length], [0, 0, 0]), hand = rig.arms.some(a => distance(center, a.end) < .075), forearm = rig.arms.some(a => segmentDistance(center, a.joint, a.end) < .065), gain = hand ? 1.18 : forearm ? 1.1 : 1, bias = hand ? [5, 3, 2] : forearm ? [3, 2, 1] : [0, 0, 0], warm = c.map((n, i) => n * gain + bias[i]), luma = warm[0] * .2126 + warm[1] * .7152 + warm[2] * .0722;
             const lift = hand ? 1 : forearm ? .55 : center[2] > 1.3 ? .8 : 0, shade = .65 + .35 * Math.max(0, Math.min(1, luma / 120));
-            return [139, 129, 117].map((n, i) => Math.round((n + ([200, 185, 158][i] - n) * lift) * shade));
+            return [148, 139, 126].map((n, i) => Math.round((n + ([222, 208, 178][i] - n) * lift) * shade));
         },
         accent(v, c, kind) {
             if (kind !== 1 || v.length < 2)
@@ -10570,7 +10595,7 @@ function createHeroAppearance(rig) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.applyHeroBackdrop = applyHeroBackdrop;
 const neighbors = [[-1, 0, .6], [1, 0, .6], [0, -1, .6], [0, 1, .6], [-1, -1, .25], [1, -1, .25], [-1, 1, .25], [1, 1, .25], [-2, 0, .12], [2, 0, .12], [0, -2, .12], [0, 2, .12]];
-function applyHeroBackdrop(data, mask, cols, rows, strength = .13) {
+function applyHeroBackdrop(data, mask, cols, rows, strength = .15) {
     if (!Number.isInteger(cols) || !Number.isInteger(rows) || cols < 1 || rows < 1 || data.length !== cols * rows * 4 || mask.length !== data.length || !Number.isFinite(strength) || strength < 0 || strength > .2)
         throw Error('Invalid hero backdrop input');
     if (strength === 0)
@@ -11023,11 +11048,62 @@ function drawDashHud(out, hud, s, ready, cooldown) {
 }
 
 },
+"ui/enemy-health-ascii.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.enemyHealthRows = enemyHealthRows;
+exports.paintAsciiEnemyHealth = paintAsciiEnemyHealth;
+const ascii = s => String(s).replace(/[^\x20-\x7e]/g, '?');
+function enemyHealthRows(e, cols = 42) {
+    if (!e || ![e.hp, e.maxHp].every(Number.isFinite) || e.hp <= 0 || e.maxHp <= 0)
+        return [];
+    cols = Math.max(18, Math.min(90, Math.floor(cols)));
+    const inner = cols - 2, slots = cols - 6, hp = Math.min(e.hp, e.maxHp), count = Math.max(1, Math.min(slots, Math.floor(hp / e.maxHp * slots)));
+    const center = s => { s = ascii(s).slice(0, inner); const left = Math.floor((inner - s.length) / 2); return ' '.repeat(left) + s + ' '.repeat(inner - s.length - left); };
+    const name = '[ ' + ascii(e.name ?? 'UNDEAD').toUpperCase().slice(0, cols - 10) + ' ]', left = Math.floor((inner - name.length) / 2), numbers = String(Number(hp.toFixed(1))) + ' / ' + String(Number(e.maxHp.toFixed(1)));
+    return ['+' + '-'.repeat(left) + name + '-'.repeat(inner - name.length - left) + '+', '| [' + '#'.repeat(count) + ':'.repeat(slots - count) + '] |', '|' + center(numbers) + '|', '+' + '='.repeat(inner) + '+'];
+}
+function paintAsciiEnemyHealth(ctx, view, { width, height = 720 } = {}) {
+    if (!ctx || !Number.isFinite(width) || !Number.isFinite(height) || width < 160 || height < 100)
+        return;
+    ctx.save();
+    try {
+        ctx.beginPath();
+        ctx.rect(0, 0, width, height);
+        ctx.clip();
+        ctx.globalAlpha = 1;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.font = 'bold 12px monospace';
+        const cell = ctx.measureText('M').width;
+        if (!Number.isFinite(cell) || cell <= 0)
+            return;
+        function plate(e, y, boss) { const cols = Math.min(boss ? 76 : 42, Math.floor((width - 20) / cell)), rows = enemyHealthRows(e, cols); if (!rows.length)
+            return; const x = Math.round((width - cols * cell) / 2); for (let r = 0; r < rows.length; r++)
+            for (let c = 0; c < rows[r].length; c++) {
+                const ch = rows[r][c];
+                if (ch === ' ')
+                    continue;
+                const X = x + c * cell, Y = y + r * 14;
+                ctx.fillStyle = '#09080c';
+                ctx.fillText(ch, X + 1, Y + 2);
+                ctx.fillStyle = r === 1 && ch === '#' ? '#b65c46' : ch === ':' ? '#51434a' : r === 0 || r === 3 ? '#b3a38b' : '#dccbb0';
+                ctx.fillText(ch, X, Y);
+            } }
+        plate(view?.boss, 12, true);
+        plate(view?.target, view?.boss ? 86 : 12, false);
+    }
+    finally {
+        ctx.restore();
+    }
+}
+
+},
 "ui/enemy-health.js":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.paintEnemyHealth = void 0;
 exports.createEnemyHealthModel = createEnemyHealthModel;
-exports.paintEnemyHealth = paintEnemyHealth;
 function createEnemyHealthModel({ linger = 2, defaultMaxHp = 70 } = {}) {
     let scope, clock = -Infinity, selected = null, until = -Infinity;
     const seen = new Set();
@@ -11086,25 +11162,8 @@ function createEnemyHealthModel({ linger = 2, defaultMaxHp = 70 } = {}) {
     }
     return Object.freeze({ update, reset });
 }
-function paintEnemyHealth(ctx, view, { width, height = 720 } = {}) {
-    if (!ctx || !Number.isFinite(width) || width < 160 || height < 100)
-        return;
-    ctx.save();
-    try {
-        ctx.beginPath();
-        ctx.rect(0, 0, width, height);
-        ctx.clip();
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        function bar(e, y, boss) { if (!e)
-            return; const w = Math.min(width - 32, boss ? 620 : 340), x = (width - w) / 2, h = boss ? 15 : 10; ctx.fillStyle = '#111014'; ctx.fillRect(x - 5, y - 5, w + 10, h + 10); ctx.strokeStyle = '#665b4c'; ctx.lineWidth = 2; ctx.strokeRect(x - 4, y - 4, w + 8, h + 8); ctx.fillStyle = '#2b1519'; ctx.fillRect(x, y, w, h); ctx.fillStyle = '#8e2533'; ctx.fillRect(x, y, w * Math.max(0, Math.min(1, e.fraction)), h); ctx.fillStyle = '#b9a58a'; ctx.fillRect(x - 8, y - 2, 5, h + 4); ctx.fillRect(x + w + 3, y - 2, 5, h + 4); ctx.font = boss ? '16px monospace' : '13px monospace'; ctx.fillStyle = '#e2c79f'; ctx.fillText(String(e.name).toUpperCase(), width / 2, y - 18); ctx.font = '12px monospace'; ctx.fillStyle = '#e8dac5'; ctx.fillText(String(Number(e.hp.toFixed(1))) + ' / ' + String(Number(e.maxHp.toFixed(1))), width / 2, y + h + 17); }
-        bar(view?.boss, 48, true);
-        bar(view?.target, view?.boss ? 120 : 43, false);
-    }
-    finally {
-        ctx.restore();
-    }
-}
+var enemy_health_ascii_js_1 = require("./enemy-health-ascii.js");
+Object.defineProperty(exports, "paintEnemyHealth", { enumerable: true, get: function () { return enemy_health_ascii_js_1.paintAsciiEnemyHealth; } });
 
 },
 "ui/manifest-layout.js":function(require,module,exports){
