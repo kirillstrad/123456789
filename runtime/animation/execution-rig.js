@@ -1,0 +1,60 @@
+import { EXECUTION } from '../combat/execution.js';
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], mul = (a, t) => [a[0] * t, a[1] * t, a[2] * t], dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], norm = (a) => mul(a, 1 / Math.max(1e-9, Math.hypot(...a)));
+const mix = (a, b, t) => add(mul(a, 1 - t), mul(b, t));
+function ramp(t, a, b) { const u = clamp((t - a) / (b - a)); return u * u * u * (u * (u * 6 - 15) + 10); }
+function solve(base, target, a, b, pole) { const raw = sub(target, base), n = Math.hypot(...raw) > 1e-8 ? norm(raw) : [0, 0, -1], d = clamp(Math.hypot(...raw), Math.abs(a - b) + .001, a + b - .001), end = add(base, mul(n, d)), offset = sub(pole, mul(n, dot(pole, n))), bend = norm(Math.hypot(...offset) > .001 ? offset : [1, 0, 0]), x = (a * a - b * b + d * d) / (2 * d), h = Math.sqrt(Math.max(0, a * a - x * x)); return { base, joint: add(add(base, mul(n, x)), mul(bend, h)), end, a, b }; }
+export function executionRig(s, module) {
+    const e = s.execution;
+    if (!e)
+        throw Error('Execution state required');
+    const t = e.elapsed, heading = Math.atan2(e.fy, e.fx), distance = Math.hypot(e.targetX - e.heroX, e.targetY - e.heroY), back = ramp(t, EXECUTION.pull, EXECUTION.duration), pin = ramp(t, 0, EXECUTION.pin) * (1 - back);
+    const pose = module.sample('breath', 0, t);
+    pose.id = 'execution';
+    pose.gait = null;
+    pose.breath *= .25;
+    pose.lean += pin * .23;
+    pose.twist = -pin * .10;
+    pose.victim = false;
+    pose.burn = ramp(t, EXECUTION.offer, EXECUTION.extract);
+    const rest = module.rig(module.sample('breath', 0, 0)), pinTip = [0, distance, -.12], pinGrip = [0, distance - .35, Math.sqrt(1.72 * 1.72 - .35 * .35) - .12];
+    let hand;
+    if (t < EXECUTION.down)
+        hand = mix(rest.grip, [.26, .02, 1.28], ramp(t, 0, EXECUTION.down));
+    else if (t < EXECUTION.pin)
+        hand = mix([.26, .02, 1.28], pinGrip, ramp(t, EXECUTION.down, EXECUTION.pin));
+    else if (t < EXECUTION.release)
+        hand = mix(pinGrip, [.3, .14, .9], ramp(t, EXECUTION.pin, EXECUTION.release));
+    else if (t < EXECUTION.extract)
+        hand = [.3, .14, .9];
+    else if (t < EXECUTION.regrip)
+        hand = mix([.3, .14, .9], pinGrip, ramp(t, EXECUTION.extract, EXECUTION.regrip));
+    else if (t < EXECUTION.pull)
+        hand = mix(pinGrip, [.24, .35, 1.75], ramp(t, EXECUTION.regrip, EXECUTION.pull));
+    else
+        hand = mix([.24, .35, 1.75], rest.grip, back);
+    const near = [-.12, Math.max(.35, distance - .25), .63], offer = ramp(t, EXECUTION.release, EXECUTION.offer) * (1 - ramp(t, EXECUTION.extract, EXECUTION.regrip));
+    pose.right = hand;
+    pose.left = mix(pose.left, near, offer);
+    const rig = module.rig(pose);
+    rig.arms[1] = solve(rig.arms[1].base, hand, rig.arms[1].a, rig.arms[1].b, [.58, -.08, 1.13]);
+    rig.arms[0] = solve(rig.arms[0].base, pose.left, rig.arms[0].a, rig.arms[0].b, [-.55, -.13, 1.13]);
+    rig.lamp = rig.arms[0].end;
+    if (t >= EXECUTION.pin && t < EXECUTION.regrip) {
+        rig.grip = [...pinGrip];
+        rig.tip = [...pinTip];
+        rig.n = norm(sub(pinTip, pinGrip));
+    }
+    else {
+        rig.grip = rig.arms[1].end;
+        const toward = norm(sub(pinTip, pinGrip));
+        rig.n = t < EXECUTION.pin ? norm(mix(rest.n, toward, ramp(t, 0, EXECUTION.pin))) : norm(mix(toward, rest.n, back));
+        rig.tip = add(rig.grip, mul(rig.n, 1.72));
+        if (t >= EXECUTION.pull && rig.tip[2] < .025) {
+            const z = clamp((.025 - rig.grip[2]) / 1.72, -1, 1), az = Math.atan2(rig.n[1], rig.n[0]), flat = Math.sqrt(1 - z * z);
+            rig.n = [Math.cos(az) * flat, Math.sin(az) * flat, z];
+            rig.tip = add(rig.grip, mul(rig.n, 1.72));
+        }
+    }
+    return { pose, rig, heading, pinGrip, pinTip };
+}

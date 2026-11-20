@@ -1,5 +1,5 @@
 export const OBSTACLES = Object.freeze({ circles: [{ x: 5, y: 5, r: .57 }, { x: 11, y: 5, r: .57 }, { x: 5, y: 12.8, r: .57 }, { x: 11, y: 12.8, r: .57 }, { x: 3.2, y: 8, r: .85 }, { x: 12.7, y: 9.2, r: .85 }, { x: 3, y: 14.5, r: .65 }, { x: 13.3, y: 5.7, r: .65 }], rects: [{ minX: 7.15, maxX: 8.85, minY: 2.52, maxY: 3.08 }] });
-export function solid(x, y, map = OBSTACLES, radius = .24) { return x < 1.7 || y < 1.7 || x > 16 || y > 16 || map.circles.some(o => Math.hypot(x - o.x, y - o.y) < o.r + radius) || map.rects.some(o => x > o.minX - radius && x < o.maxX + radius && y > o.minY - radius && y < o.maxY + radius); }
+export function solid(x, y, map = OBSTACLES, radius = .24) { const b = map.bounds ?? { minX: 1.7, maxX: 16, minY: 1.7, maxY: 16 }; return x < b.minX || y < b.minY || x > b.maxX || y > b.maxY || map.circles.some(o => Math.hypot(x - o.x, y - o.y) < o.r + radius) || map.rects.some(o => x > o.minX - radius && x < o.maxX + radius && y > o.minY - radius && y < o.maxY + radius); }
 function segmentRect(a, b, o) { let lo = 0, hi = 1; for (const [k, min, max] of [['x', o.minX, o.maxX], ['y', o.minY, o.maxY]]) {
     const d = b[k] - a[k];
     if (Math.abs(d) < 1e-10) {

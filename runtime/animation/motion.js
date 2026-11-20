@@ -1,5 +1,6 @@
+import { createInertia, advanceInertia, interpolateInertia } from './inertia.js';
 export const MOTION = Object.freeze({ maxSpeed: 1.65, acceleration: 9, deceleration: 14, turnRate: 9, strikeTurnRate: 16, blendRate: 14 });
-export function createMotion(fx = 0, fy = -1) { return { vx: 0, vy: 0, heading: Math.atan2(fy, fx), weight: 0, speed: 0 }; }
+export function createMotion(fx = 0, fy = -1) { return { vx: 0, vy: 0, heading: Math.atan2(fy, fx), weight: 0, speed: 0, ...createInertia() }; }
 export function angleDelta(from, to) { return Math.atan2(Math.sin(to - from), Math.cos(to - from)); }
 export function turnToward(from, to, maxDelta) { const d = angleDelta(from, to); return from + Math.max(-maxDelta, Math.min(maxDelta, d)); }
 export function velocity(m, input, dt) { if (!Number.isFinite(dt) || dt <= 0)
@@ -7,15 +8,16 @@ export function velocity(m, input, dt) { if (!Number.isFinite(dt) || dt <= 0)
     m.vx = 0;
     m.vy = 0;
 } return { x: m.vx, y: m.vy }; }
-export function finishMotion(m, dt, fx, fy, walking, striking, dead = false) { m.speed = walking ? Math.hypot(m.vx, m.vy) : 0; if (!walking) {
+export function finishMotion(m, dt, fx, fy, walking, striking, dead = false) { if (!Number.isFinite(dt) || dt <= 0)
+    return; const priorSpeed = m.speed, priorHeading = m.heading; m.speed = walking ? Math.hypot(m.vx, m.vy) : 0; if (!walking) {
     m.vx = 0;
     m.vy = 0;
 } const target = Math.min(1, m.speed / MOTION.maxSpeed); m.weight += (target - m.weight) * (1 - Math.exp(-MOTION.blendRate * dt)); if (target === 0 && m.weight < .001)
     m.weight = 0; if (!dead && Math.hypot(fx, fy) > .001)
-    m.heading = turnToward(m.heading, Math.atan2(fy, fx), (striking ? MOTION.strikeTurnRate : MOTION.turnRate) * dt); }
+    m.heading = turnToward(m.heading, Math.atan2(fy, fx), (striking ? MOTION.strikeTurnRate : MOTION.turnRate) * dt); advanceInertia(m, dt, { forward: (m.speed - priorSpeed) / Math.max(1e-9, MOTION.acceleration * dt), side: angleDelta(priorHeading, m.heading) / Math.max(1e-9, MOTION.turnRate * dt), enabled: !striking && !dead }, dead); }
 export function interpolateMotion(a, b, t) { if (!b)
     return undefined; if (!a)
-    return { ...b }; const mix = (x, y) => x + (y - x) * t; return { vx: mix(a.vx, b.vx), vy: mix(a.vy, b.vy), speed: mix(a.speed, b.speed), weight: mix(a.weight, b.weight), heading: a.heading + angleDelta(a.heading, b.heading) * t }; }
+    return { ...b, ...interpolateInertia(undefined, b, t) }; const mix = (x, y) => x + (y - x) * t; return { vx: mix(a.vx, b.vx), vy: mix(a.vy, b.vy), speed: mix(a.speed, b.speed), weight: mix(a.weight, b.weight), heading: a.heading + angleDelta(a.heading, b.heading) * t, ...interpolateInertia(a, b, t) }; }
 const mix3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], mul = (a, n) => [a[0] * n, a[1] * n, a[2] * n], dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 function leg(base, target, a, b, pole) { const d = sub(target, base), distance = Math.hypot(...d), n = distance > .000001 ? mul(d, 1 / distance) : [0, 0, -1], reach = Math.max(Math.abs(a - b) + .001, Math.min(a + b - .001, distance)), end = add(base, mul(n, reach)); let bend = sub(sub(pole, base), mul(n, dot(sub(pole, base), n))); if (Math.hypot(...bend) < .001) {

@@ -22,11 +22,12 @@ export function pickFrameTarget({parts,targets,point,project,zoom=1,viewport}){
  }
  return null;
 }
-export function installFrameTargeting(canvas,{canRequest=()=>false,resolve=()=>null,context=()=>''}={}){
+export function installFrameTargeting(canvas,{canRequest=()=>false,resolve=()=>null,context=()=>'',enemyTarget=null}={}){
  let pointer=null,selected=null,lastFrame=null,held=false,disposed=false;const pending=createInteractionIntent(),original=canvas.style.cursor,doc=canvas.ownerDocument,win=doc?.defaultView;
  const cursor=installIronCursor(canvas,{read(){
   const api=win?.__ASH_ITERATION_2__,mode=context(),s=api?.state?.(),gallery=mode.startsWith('gallery')?win?.__ASH_GALLERY__:null,session=gallery?.interaction?.();let enemy=false;
   if(mode==='game'&&s?.phase==='playing'&&s.enemy?.hp>0&&lastFrame?.project&&pointer){const p=canvasTargetPointer(pointer,canvas),q=lastFrame.project(s.enemy.x,s.enemy.y,.9),z=lastFrame.zoom??1;enemy=!!p&&((p[0]-q[0])/(20*z))**2+((p[1]-q[1])/(38*z))**2<=1;}
+  if(typeof enemyTarget==='function')enemy=mode==='game'&&enemyTarget()!==null;
   return{mode,target:selected,allowed:canRequest(),busy:!!s?.interaction||!!pending.current()||!!session,enemy,progress:session?.progress??s?.interactionAnimation?.progress??0};
  }});
  const leave=()=>{pointer=null;selected=null;canvas.style.cursor=original;},clear=()=>{leave();lastFrame=null;held=false;pending.clear();},move=e=>{pointer={clientX:e.clientX,clientY:e.clientY};},visibility=()=>{if(doc.hidden)clear();};

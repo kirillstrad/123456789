@@ -6,15 +6,22 @@ export class SparkSystem {
     contact = false;
     contactTime = -1;
     seed = 314159;
+    walkUnits = 0;
     random() { this.seed = (Math.imul(this.seed, 1664525) + 1013904223) >>> 0; return this.seed / 4294967296; }
-    clear() { this.particles = []; this.cone = null; this.contact = false; this.last = null; this.contactTime = -1; }
+    clear() { this.particles = []; this.cone = null; this.contact = false; this.last = null; this.contactTime = -1; this.walkUnits = 0; }
     spawn(q, count, force, facing = null) { for (let i = 0; i < count; i++) {
         const a = facing ? Math.atan2(facing.y, facing.x) + (this.random() - .5) * SPARKS.arcDegrees * Math.PI / 180 : this.random() * Math.PI * 2, v = (.45 + this.random()) * force, life = (facing ? .6 : .3) + this.random() * (facing ? .95 : .5);
         this.particles.push({ x: q[0], y: q[1], z: q[2], vx: Math.cos(a) * v, vy: Math.sin(a) * v, vz: .3 + this.random() * force, life, maxLife: life, glow: !!facing, glyph: '*+x.:'[i % 5] });
     } if (this.particles.length > SPARKS.maxParticles)
         this.particles.splice(0, this.particles.length - SPARKS.maxParticles); }
-    stone(q, time, facing, sweep = false) { const touch = q[2] <= .085, dist = this.last ? Math.hypot(q[0] - this.last.x, q[1] - this.last.y) : 0; if (touch && (!this.contact || dist > .055) && time - this.contactTime > .035) {
-        this.spawn(q, sweep ? 12 : this.contact ? 3 : 7, sweep ? 2.3 : 1, sweep ? facing : null);
+    stone(q, time, facing, sweep = false, walking = false) { const touch = q[2] <= .085, dist = this.last ? Math.hypot(q[0] - this.last.x, q[1] - this.last.y) : 0; if (touch && (!this.contact || dist > .055) && time - this.contactTime > .035) {
+        let count = sweep ? 12 : this.contact ? 3 : 7;
+        if (walking && !sweep) {
+            this.walkUnits += count * 3;
+            count = Math.floor(this.walkUnits / 5);
+            this.walkUnits %= 5;
+        }
+        this.spawn(q, count, sweep ? 2.3 : 1, sweep ? facing : null);
         this.last = { x: q[0], y: q[1] };
         this.contactTime = time;
     } if (!touch)

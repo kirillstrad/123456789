@@ -1,5 +1,5 @@
 const neighbors=[[-1,0,.6],[1,0,.6],[0,-1,.6],[0,1,.6],[-1,-1,.25],[1,-1,.25],[-1,1,.25],[1,1,.25],[-2,0,.12],[2,0,.12],[0,-2,.12],[0,2,.12]];
-export function applyHeroBackdrop(data,mask,cols,rows,strength=.13){
+export function applyHeroBackdrop(data,mask,cols,rows,strength=.15){
  if(!Number.isInteger(cols)||!Number.isInteger(rows)||cols<1||rows<1||data.length!==cols*rows*4||mask.length!==data.length||!Number.isFinite(strength)||strength<0||strength>.2)throw Error('Invalid hero backdrop input');
  if(strength===0)return 0;let minX=cols,maxX=-1,minY=rows,maxY=-1,affected=0;
  for(let y=0;y<rows;y++)for(let x=0;x<cols;x++)if(mask[(y*cols+x)*4]>127){minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);}

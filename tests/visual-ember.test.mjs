@@ -1,0 +1,11 @@
+import {graphicHudContext} from './helpers/graphic-hud-context.mjs';
+import test from 'node:test';import assert from 'node:assert/strict';
+import {shadeAmberCell} from '../src/render/amber-cell.js';import {enemyHealthRows,paintAsciiEnemyHealth} from '../src/ui/enemy-health-ascii.js';
+const e={name:'Ossuary Guard',hp:54,maxHp:80};
+test('ASCII plates have consistent printable widths and exact normal HP',()=>{const rows=enemyHealthRows(e,42);assert.equal(rows.length,4);assert.ok(rows.every(s=>s.length===42&&/^[\x20-\x7e]+$/.test(s)));assert.ok(rows[0].includes('OSSUARY GUARD'));assert.ok(rows[2].includes('54 / 80'));});
+test('ASCII fill is bounded, nonempty for living targets and absent for dead targets',()=>{const rows=enemyHealthRows({...e,hp:.1},24);assert.equal([...rows[1]].filter(c=>c==='#').length,1);assert.deepEqual(enemyHealthRows({...e,hp:0}),[]);assert.deepEqual(enemyHealthRows({...e,maxHp:NaN}),[]);assert.ok(enemyHealthRows({...e,hp:999})[2].includes('80 / 80'));});
+test('small and boss plates keep row dimensions and safe names',()=>{for(const n of [18,24,42,76,90]){const rows=enemyHealthRows({...e,name:'BAD\nTITLE'},n);assert.ok(rows.every(s=>s.length===n&&!s.includes('\n')));}});
+test('enemy painter uses a rendered channel and restores context (V6)',()=>{const {ctx,calls}=graphicHudContext();paintAsciiEnemyHealth(ctx,{target:e,boss:{...e,name:'Corpse Golem'}},{width:1008,height:864});assert.equal(calls[0][0],'save');assert.equal(calls.at(-1)[0],'restore');assert.ok(calls.some(c=>c[0]==='gradient'));assert.ok(calls.some(c=>c[0]==='rect'));});
+test('hot neutral source becomes pale gold without white clipping',()=>{const d=new Uint8ClampedArray([255,255,255,173]);shadeAmberCell(d,0,5,1);assert.equal(d[0],245);assert.ok(d[0]>d[1]&&d[1]>d[2]);assert.ok(d[2]>160&&d[2]<d[1]);assert.equal(d[3],173);});
+test('unlit neutral cells stay unchanged and black remains black',()=>{for(const rgb of [[80,80,80,255],[0,0,0,255]]){const d=new Uint8ClampedArray(rgb);shadeAmberCell(d,0,1,0);assert.deepEqual([...d],rgb);}});
+test('hero keeps selective pale contrast while receiving warm light',()=>{const d=new Uint8ClampedArray([200,185,158,255]);shadeAmberCell(d,0,2,1,true);assert.ok(d[0]<=238&&d[0]>d[1]&&d[1]>d[2]);assert.equal(d[3],255);});

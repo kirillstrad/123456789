@@ -1,5 +1,6 @@
 import type {CombatSnapshot,Obstacles,Point} from './types.js';
 import {solid} from './geometry.js';
+import {aliveEnemies,enemyRadius} from './enemy-roster.js';
 export const DASH=Object.freeze({dissolve:.16,travel:.42,reform:.22,total:.8,distance:2.4,cooldown:1.2,spacing:.025,landingClearance:.66});
 export interface DashState{id:number;elapsed:number;fx:number;fy:number;startX:number;startY:number;distance:number;blocked:boolean}
 const clamp=(x:number)=>Math.max(0,Math.min(1,x));
@@ -10,7 +11,7 @@ export function planDash(s:CombatSnapshot,map:Obstacles,direction:Point,id:numbe
   const n=Math.hypot(direction.x,direction.y);if(!Number.isFinite(n)||n<.001)return null;
   const fx=direction.x/n,fy=direction.y/n,count=Math.ceil(DASH.distance/DASH.spacing);let distance=0;
   for(let i=1;i<=count;i++){const v=DASH.distance*i/count;if(solid(s.x+fx*v,s.y+fy*v,map))break;distance=v;}
-  while(distance>0&&s.enemy.hp>0&&Math.hypot(s.x+fx*distance-s.enemy.x,s.y+fy*distance-s.enemy.y)<DASH.landingClearance)distance=Math.max(0,distance-DASH.spacing);
+  while(distance>0&&aliveEnemies(s).some(e=>Math.hypot(s.x+fx*distance-e.x,s.y+fy*distance-e.y)<Math.max(DASH.landingClearance,enemyRadius(e)+.24)))distance=Math.max(0,distance-DASH.spacing);
   if(distance<DASH.spacing)return null;
   return {id,elapsed:0,fx,fy,startX:s.x,startY:s.y,distance,blocked:false};
 }

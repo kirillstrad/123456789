@@ -1,4 +1,4 @@
-export const LAMP_LIGHTING=Object.freeze({maxLife:100,criticalAt:1,normalAt:15,emberPowerScale:.055,emberRadiusScale:.4});
+export const LAMP_LIGHTING=Object.freeze({maxLife:100,criticalAt:1,normalAt:15,emberPowerScale:.055,emberRadiusScale:.58});
 export function lampLighting(life,phase='playing'){
  const charge=Number.isFinite(life)?Math.max(0,Math.min(LAMP_LIGHTING.maxLife,life)):0;
  if(phase==='dead'||charge<=0)return{power:0,radiusScale:0,warmth:0,mode:'out'};

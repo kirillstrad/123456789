@@ -44,21 +44,26 @@ test('3c nearest-two light cap survives repeated selection; heavy remains multi-
  assert.deepEqual(selectStrikeTargets(origin,facing,'light',targets,empty,new Set(first.map(t=>t.id))),[]);
  assert.equal(selectStrikeTargets(origin,facing,'heavy',targets,empty).length,3);
 });
-test('3c queued combo prevents dash interruption and leaves no hidden attack after dash',()=>{
+test('3c valid dash cancels queued combo and leaves no hidden attack after dash',()=>{
  const w=make();assert(w.attack({kind:'light',aim:null}));
- const first=w.actions.current; ticks(w,Math.ceil(first.duration*.4/dt));
- assert(w.attack({kind:'light',aim:null}));assert.equal(w.dash({x:1,y:0}),false);
- assert.equal(w.actions.current.id,first.id);assert(w.actions.queued);
- const budget=Math.ceil((COMBAT.lightDurations[0]+COMBAT.lightDurations[1]+.2)/dt);
- for(let i=0;i<budget&&w.actions.current;i++)w.step(dt);
- assert.equal(w.actions.current,null);assert.equal(w.actions.queued,null);
- assert(w.dash({x:1,y:0}));
+ const first=w.actions.current;ticks(w,Math.ceil(first.duration*.4/dt));
+ assert(w.attack({kind:'light',aim:null}));assert(w.actions.queued);
+ assert.equal(w.dash({x:1,y:0}),true);
+ assert.equal(w.actions.current,null);assert.equal(w.actions.queued,null);assert.equal(w.current.action,null);
  assert.equal(w.attack({kind:'light',aim:null}),false);assert.equal(w.attack({kind:'heavy',aim:null}),false);
  assert.equal(comboEdgeStyle(frame(w)),null);
  ticks(w,Math.ceil(DASH.total/dt)+2);assert.equal(w.current.dash,null);
  assert.equal(w.current.action,null);assert.equal(w.current.combatEntry,null);assert.equal(w.actions.queued,null);
  const started=w.actions.started;
  assert(w.attack({kind:'heavy',aim:null}));assert.equal(w.actions.started,started+1);assert.equal(w.current.action.stage,0);
+});
+test('3c rejected dash preserves current attack and queued continuation',()=>{
+ const w=make();assert(w.attack({kind:'light',aim:null}));
+ ticks(w,Math.ceil(w.actions.current.duration*.4/dt));assert(w.attack({kind:'light',aim:null}));
+ const id=w.actions.current.id,queued=w.actions.queued;
+ assert.equal(w.dash({x:0,y:0}),false);assert.equal(w.actions.current.id,id);assert.equal(w.actions.queued,queued);
+ w.current.dashCooldown=1;
+ assert.equal(w.dash({x:1,y:0}),false);assert.equal(w.actions.current.id,id);assert.equal(w.actions.queued,queued);
 });
 test('3c thin wall blocks dash and does not leak buffered attacks',()=>{
  const w=make({circles:[],rects:[{minX:9,maxX:9.02,minY:7,maxY:9}]});

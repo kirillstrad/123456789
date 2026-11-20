@@ -2,12 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import {createEnemyHealthRuntime} from '../src/app/enemy-health-runtime.js';
 import {GAME_LEVELS,gameLevel,applyLevelSpawn} from '../src/levels/registry.js';
 import {createWorldReference} from '../src/levels/world-reference.js';
 import {ASHEN_ROOMS,ASHEN_DOORS,ASHEN_LIGHTS,ASHEN_PROPS,ashenWalkable,createAshenPlan} from '../src/levels/ashen-layout.js';
 
-test('only two playable levels are advertised, not unimplemented concepts',()=>{
- assert.deepEqual(GAME_LEVELS.map(l=>l.id),['test-chamber','ashen-nave']);assert(Object.isFrozen(GAME_LEVELS[0]));assert.throws(()=>gameLevel('crypt'));
+test('legacy levels and the implemented trial are advertised',()=>{
+ assert.deepEqual(GAME_LEVELS.map(l=>l.id),['golem-trial','test-chamber','ashen-nave','bonebound-trial','undead-trial','archer-trial']);assert(Object.isFrozen(GAME_LEVELS[0]));assert.throws(()=>gameLevel('crypt'));
 });
 test('test chamber spawn is unchanged and ashen spawn seeds both interpolation states',()=>{
  const state=()=>({x:99,y:98,cameraX:99,cameraY:98,enemy:{x:1,y:1},motion:{heading:1}}),w={current:state(),previous:state()};applyLevelSpawn(w,'test-chamber');assert.equal(w.current.x,99);applyLevelSpawn(w,'ashen-nave');
@@ -72,8 +73,9 @@ function appHarness(){
  const src=fs.readFileSync('src/app/main.js','utf8');
  const rebuild=src.match(/^function rebuildSelectedLevel\(\)\{[\s\S]*?^\}/m)?.[0];
  const funcs=['start','resetWorld','launchLevel'].map(name=>src.split('\n').find(l=>l.startsWith('function '+name+'('))).join('\n');assert(rebuild);
- const ctx=vm.createContext({createWorldReference,applyLevelSpawn,gameLevel});
- vm.runInContext(`let serial=0,builds=0,cancels=0,mode='menu',selectedLevelId='test-chamber',selected=0,menuPage=false,paused=false,frozen=false,endTime=0,simLast=1,acc=1,drawAt=0,aimPoint={x:1,y:1},camera={},view={},fireLighting=null;
+ let healthResets=0;const hp=createEnemyHealthRuntime(),enemyHealth={...hp,reset(){healthResets++;hp.reset();}};
+ const ctx=vm.createContext({createWorldReference,applyLevelSpawn,gameLevel,enemyHealth});
+ vm.runInContext(`let serial=0,builds=0,cancels=0,mode='menu',selectedLevelId='test-chamber',golemCheckpoint=null,selected=0,menuPage=false,paused=false,frozen=false,endTime=0,simLast=1,acc=1,drawAt=0,aimPoint={x:1,y:1},camera={},view={},fireLighting=null;
  const keys=new Set(['KeyW']),commands=[{kind:'dash'}],report={frames:[1]},dashHud={ready:true,at:1},targeting={clear(){}},manifest={dismiss(){},reset(){}},effects={reset(){}},fireHintLayer={clear(){}},cv={focus(){}},$=()=>({}),OBSTACLES={};
  class CombatWorld{constructor(map){this.map=map;this.serial=++serial;this.reset();}reset(){this.current={x:8,y:12,enemy:{x:10,y:8},motion:{}};this.previous={x:8,y:12,enemy:{x:10,y:8},motion:{}};}step(){}snapshot(){return this.current;}}
  const makeScene=()=>({map:{},reset(){}});let doorScene=makeScene(),env={},ritualBonfire={reset(){}},relicWorld={reset(){}},combatDoor={cancel(){cancels++;}};
@@ -83,7 +85,7 @@ function appHarness(){
  const window={},closeGallery=()=>{mode='menu';};
  ${rebuild}\n${funcs}
  globalThis.p={launch:launchLevel,restart:start,serial:heldInput,state:()=>({selectedLevelId,builds,serial:world.serial,enemyX:world.current.enemy.x,keys:keys.size,commands:commands.length,mode})};`,ctx);
- return ctx.p;
+ return Object.assign(ctx.p,{healthResets:()=>healthResets});
 }
 test('launch restart and switching rebuild fresh worlds while captured input follows the new owner',()=>{
  const p=appHarness(),initial=p.serial();p.launch('ashen-nave');const a=p.state();assert.equal(a.selectedLevelId,'ashen-nave');assert.equal(a.enemyX,34);assert.equal(a.keys,0);assert.equal(a.commands,0);assert.notEqual(p.serial(),initial);
@@ -98,4 +100,17 @@ test('captured world methods forward to the new owner after replacement',()=>{
 });
 test('door corridors leave four tiles of authored floor for frames and sweep clearance',()=>{
  const main=ASHEN_ROOMS.find(r=>r.id==='main-passage'),back=ASHEN_ROOMS.find(r=>r.id==='return-passage');assert.equal(main.h,4);assert.equal(back.w,4);
+});
+
+// HP_HARNESS_V1
+test('HP state resets on launch and restart without weakening world assertions',()=>{const p=appHarness();let n=p.healthResets();p.launch('test-chamber');assert.ok(p.healthResets()>n);n=p.healthResets();p.restart();assert.ok(p.healthResets()>n);n=p.healthResets();assert.throws(()=>p.launch('missing'));assert.equal(p.healthResets(),n);});
+
+// GOLEM_53_LEVEL_DISPATCH_REGRESSION
+test('golem trial dispatches its own encounter initializer exactly once',()=>{
+ let calls=0;
+ const world={startGolemTrial(){calls++;}};
+ applyLevelSpawn(world,'golem-trial');
+ assert.equal(calls,1);
+ assert.equal(gameLevel('golem-trial').title,'GOLEM TRIAL');
+ assert.equal(new Set(GAME_LEVELS.map(l=>l.id)).size,GAME_LEVELS.length);
 });

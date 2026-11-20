@@ -1,0 +1,92 @@
+name: Enemy HP integration
+on:
+  push:
+    branches: [bestiary-patch-1]
+    paths:
+      - '.github/workflows/enemy-health-integration.yml'
+      - 'src/ui/enemy-health.js'
+      - 'src/app/enemy-health-runtime.js'
+      - 'tools/connect-enemy-health.mjs'
+      - 'tools/refine-enemy-health.mjs'
+      - 'tools/repair-enemy-health-harnesses.mjs'
+      - 'tools/run-hp-regressions.mjs'
+      - 'tools/enemy-health-browser-check.mjs'
+      - 'tests/enemy-health-connected.test.mjs'
+      - 'tests/enemy-health-hardening.test.mjs'
+permissions:
+  contents: write
+concurrency:
+  group: enemy-health-integration-bestiary-patch-1
+  cancel-in-progress: false
+jobs:
+  connect:
+    if: github.repository == 'kirillstrad/123456789' && github.ref == 'refs/heads/bestiary-patch-1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: bestiary-patch-1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - id: dependencies
+        run: npm ci
+      - run: node tools/connect-enemy-health.mjs && node tools/refine-enemy-health.mjs && node tools/repair-enemy-health-harnesses.mjs
+      - id: build
+        run: npm run build
+      - id: unit
+        run: node --test tests/enemy-health-connected.test.mjs tests/enemy-health-hardening.test.mjs tests/levels-v1.test.mjs tests/gallery-door-app-lifecycle.test.mjs
+      - id: integration
+        name: Commit validated integration and fixture dependencies
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/app/main.js src/app/frame-targeting.js patches/bestiary-patch-1.apply.mjs tests/levels-v1.test.mjs tests/gallery-door-app-lifecycle.test.mjs
+          if ! git diff --cached --quiet; then
+            git commit -m 'Fix enemy HP dependency in isolated app test harnesses'
+            git push origin HEAD:bestiary-patch-1
+          fi
+      - id: browser_setup
+        continue-on-error: true
+        run: npx playwright install --with-deps chromium
+      - id: browser
+        if: steps.browser_setup.outcome == 'success'
+        continue-on-error: true
+        run: node tools/enemy-health-browser-check.mjs
+      - id: regression
+        continue-on-error: true
+        run: node tools/run-hp-regressions.mjs
+      - name: Persist verification status and regression failures
+        if: always()
+        env:
+          BUILD: ${{ steps.build.outcome }}
+          UNIT: ${{ steps.unit.outcome }}
+          INTEGRATION: ${{ steps.integration.outcome }}
+          BROWSER: ${{ steps.browser.outcome }}
+          REGRESSION: ${{ steps.regression.outcome }}
+        run: |
+          node --input-type=module -e "import fs from 'node:fs';import{execFileSync}from'node:child_process';const checks=Object.fromEntries(['BUILD','UNIT','INTEGRATION','BROWSER','REGRESSION'].map(k=>[k.toLowerCase(),process.env[k]||'not-run']));const passed=Object.values(checks).every(v=>v==='success');fs.mkdirSync('docs',{recursive:true});fs.writeFileSync('docs/enemy-health-verification.json',JSON.stringify({status:passed?'automated-checks-passed':'incomplete-or-failed',checks,testedSourceCommit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),workflowRun:process.env.GITHUB_RUN_ID,humanVisualAcceptance:false},null,2));"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/enemy-health-verification.json
+          if test -f docs/enemy-health-regression-failures.json; then git add docs/enemy-health-regression-failures.json; fi
+          if ! git diff --cached --quiet; then
+            git commit -m 'Record enemy HP verification and regression failure details'
+            git push origin HEAD:bestiary-patch-1
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: enemy-health-build-and-evidence
+          path: |
+            PLAY.html
+            docs/typecheck.json
+            docs/enemy-health-verification.json
+            docs/enemy-health-regression-failures.json
+            docs/enemy-health-regression.log
+            docs/enemy-health-browser/
+      - name: Fail job if verification did not pass
+        if: always()
+        run: node --input-type=module -e "import fs from 'node:fs';const p='docs/enemy-health-verification.json';if(!fs.existsSync(p)||JSON.parse(fs.readFileSync(p,'utf8')).status!=='automated-checks-passed')process.exit(1);"

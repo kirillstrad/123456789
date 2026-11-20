@@ -1,6 +1,6 @@
 import {interactionInputAllowed} from './intent.js';
 import {interactionFrame} from '../animation/interaction.js';
-export const IGNITION_POLICY=Object.freeze({lampCost:6,reserve:1,low:15,positionTolerance:.15,facingCos:Math.cos(Math.PI/10)});
+export const IGNITION_POLICY=Object.freeze({lampCost:0,reserve:0,low:15,positionTolerance:.15,facingCos:Math.cos(Math.PI/10)});
 function aligned(actor,target){
  if(!target?.approach||!target.facePoint||![actor?.x,actor?.y,actor?.fx,actor?.fy,target.approach.x,target.approach.y,target.facePoint.x,target.facePoint.y].every(Number.isFinite))return false;
  if(Math.hypot(actor.x-target.approach.x,actor.y-target.approach.y)>IGNITION_POLICY.positionTolerance)return false;
@@ -11,9 +11,8 @@ export function ignitionStartGate({actor,target,allowed=false}={}){
  if(allowed!==true)return{ok:false,reason:'inactive',warning:null};
  if(!interactionInputAllowed({mode:'game',actor}))return{ok:false,reason:'actor-busy-or-dead',warning:null};
  if(!target||target.kind!=='ignite'||target.availability!=='ready'||target.enabled===false||target.visible===false||target.removed)return{ok:false,reason:'target-unavailable',warning:null};
- if(actor.lamp<IGNITION_POLICY.lampCost+IGNITION_POLICY.reserve)return{ok:false,reason:'insufficient-lamp',warning:null};
  if(!aligned(actor,target))return{ok:false,reason:'not-aligned',warning:null};
- return{ok:true,reason:null,warning:actor.lamp-IGNITION_POLICY.lampCost<=IGNITION_POLICY.low?'IGNITION ENTERS LOW LAMP':null};
+ return{ok:true,reason:null,warning:null};
 }
 // Call step from the simulation owner after its world tick. No wall-clock timer.
 // allowed must explicitly supply the app's active/frozen/hidden start gate.
@@ -37,14 +36,9 @@ export function createLightIgnitionController({world,scene,allowed=()=>false}={}
   if(!current.paid&&!current.failed&&(!scene.canIgnite(current.targetId,current.token)||!aligned(s,current.target))){cancel('target-or-position-changed');return null;}
   current.elapsed=Math.min(3.2,current.elapsed+dt);const frame=interactionFrame('ignite',current.elapsed);
   if(frame.effectDue&&!current.paid&&!current.failed){
-   if(s.interaction.costPaid||s.lamp<IGNITION_POLICY.lampCost+IGNITION_POLICY.reserve){current.failed='insufficient-lamp';scene.cancel(current.targetId,current.token);s.note='NOT ENOUGH LAMP TO IGNITE';}
-   else{
-    // Stock spendInteractionLamp and scene.ignite are synchronous and have no
-    // reentrant callbacks. Ownership is verified before the exact payment.
-    if(!scene.canIgnite(current.targetId,current.token)){cancel('target-changed');return null;}
-    if(!world.spendInteractionLamp(current.id,IGNITION_POLICY.lampCost)){current.failed='payment-rejected';scene.cancel(current.targetId,current.token);}
-    else{if(!scene.ignite(current.targetId,current.token))throw Error('Ignition commit invariant failed');current.paid=true;s.note='THE LIGHT TAKES HOLD';}
-   }
+   if(!scene.canIgnite(current.targetId,current.token)){cancel('target-changed');return null;}
+   if(!scene.ignite(current.targetId,current.token))throw Error('Ignition commit invariant failed');
+   current.paid=true;s.note='THE LIGHT TAKES HOLD';
   }
   if(frame.complete){lastResult={ok:current.paid,reason:current.failed};world.finishInteraction(current.id);session=null;}return frame;
  }

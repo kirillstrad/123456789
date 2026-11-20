@@ -3,7 +3,7 @@ export interface ExecutionActor{x:number;y:number;fx:number;fy:number;lamp:numbe
 export interface ExecutionTarget{id:number;x:number;y:number;hp:number;maxHp:number}
 export type ExecutionPhase='approach'|'pin'|'release'|'offer'|'drain'|'regrip'|'pull'|'return'|'settle'|'done'|'cancelled';
 export type ExecutionEvent='impact'|'pierced'|'hand-released'|'lamp-offered'|'extracted'|'regripped'|'blade-pulled'|'finished'|'cancelled';
-export interface ExecutionState{targetId:number;elapsed:number;phase:ExecutionPhase;extracted:boolean;heroX:number;heroY:number;targetX:number;targetY:number;fx:number;fy:number}
+export interface ExecutionState{kind?:'corpse-golem';targetId:number;elapsed:number;phase:ExecutionPhase;extracted:boolean;heroX:number;heroY:number;targetX:number;targetY:number;fx:number;fy:number}
 export function executionTargetWeak(target:ExecutionTarget):boolean{return Number.isFinite(target.hp)&&Number.isFinite(target.maxHp)&&target.maxHp>0&&target.hp>0&&target.hp<=target.maxHp*EXECUTION.weakFraction;}
 export function canExecute(hero:ExecutionActor,target:ExecutionTarget,lineBlocked=false):boolean{
 if(hero.phase!=='playing'||!Number.isFinite(hero.lamp)||hero.lamp<=0||hero.busy||lineBlocked||!executionTargetWeak(target))return false;

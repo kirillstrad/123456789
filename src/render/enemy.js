@@ -1,4 +1,7 @@
-export function enemyParts(e){let parts=[],heroPart=false;function smooth(x){x=Math.max(0,Math.min(1,x));return x*x*(3-2*x);}
+import {boneboundParts} from './bonebound.js';
+import {meleeUndeadParts} from './melee-undead.js';
+import {marrowArcherParts} from './marrow-archer.js';
+export function enemyParts(e,state={}){if(e.archetype==='marrow-archer')return marrowArcherParts(e,state);const undead=meleeUndeadParts(e,state);if(undead)return undead;if(e.archetype==='bonebound')return boneboundParts(e,state);let parts=[],heroPart=false;function smooth(x){x=Math.max(0,Math.min(1,x));return x*x*(3-2*x);}
 function poly(v,c,s=null,w=1){parts.push({kind:0,v,c,s,w,hero:heroPart,d:v.reduce((a,q)=>a+q[0]+q[1]+(q[2]||0)*.006,0)/v.length})}
 function line(v,c,w=1){parts.push({kind:1,v,c,w,hero:heroPart,d:v.reduce((a,q)=>a+q[0]+q[1]+(q[2]||0)*.006,0)/v.length+.005})}
 function dot(x,y,z,r,c){parts.push({kind:2,v:[[x,y,z]],r,c,hero:heroPart,d:x+y+z*.006+.01})}
