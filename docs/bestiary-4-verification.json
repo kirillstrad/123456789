@@ -1,0 +1,16 @@
+{
+  "scope": "patches-1-2-3-4-and-ash-iron",
+  "status": "automated-checks-passed",
+  "checks": {
+    "migration": "success",
+    "build": "success",
+    "unit": "success",
+    "browser": "success",
+    "regression": "success",
+    "integration": "success"
+  },
+  "inputCommit": "b4aa575e96f50238bd8878f9090e5726ec6c3c25",
+  "testedSourceCommit": "942146f886b22b9a74e6cdd3c1f43ba8e881f768",
+  "workflowRun": "44759140822",
+  "humanVisualAcceptance": false
+}
