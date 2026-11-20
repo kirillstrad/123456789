@@ -229,6 +229,7 @@ const interaction_js_1 = require("./interaction.js");
 const config_js_1 = require("../combat/config.js");
 const strike_presentation_js_1 = require("./strike-presentation.js");
 const execution_rig_js_1 = require("./execution-rig.js");
+const golem_finisher_rig_js_1 = require("./golem-finisher-rig.js");
 const ash_dash_js_1 = require("../combat/ash-dash.js");
 const ash_dash_js_2 = require("../render/ash-dash.js");
 const hero_appearance_js_1 = require("../render/hero-appearance.js");
@@ -276,7 +277,7 @@ function combatHero(s, module = globalThis.IronPilgrim, secondary = { cloth: 0, 
     }
     else if ((s.motion?.weight ?? (s.moving ? 1 : 0)) > .001)
         clip = 'walk';
-    const execution = !dead && s.execution && s.execution.phase !== 'cancelled' ? (0, execution_rig_js_1.executionRig)(s, module) : null, sampled = execution ?? interaction ?? (locomotion ? (0, weight_transitions_js_1.loadedLocomotion)(s, module) : (0, weight_transitions_js_1.transitionPose)(dead ? { ...s, time: t * 2.5 } : s, module, clip, t)), strikePose = !execution && !interaction && !dead && s.action ? (s.action.animation4C ? sampled : (0, strike_presentation_js_1.blendEntry)(module, sampled, s.action.progress, s.time)) : sampled, pose = strikePose.pose, rig = execution ? execution.rig : dead ? sampled.rig : (0, combat_entry_js_1.bridgeCombatEntry)(s, (0, foot_contact_world_js_1.applyWorldFootContacts)(s, strikePose.rig, module), module), heading = execution ? execution.heading : s.motion?.heading ?? Math.atan2(s.fy, s.fx), fx = Math.cos(heading), fy = Math.sin(heading), transform = (v) => { const x = v[0] - pose.root[0], y = v[1] - pose.root[1]; return [s.x + fy * x + fx * y, s.y - fx * x + fy * y, v[2]]; }, parts = [], appearance = (0, hero_appearance_js_1.createHeroAppearance)(rig);
+    const execution = !dead && s.execution && s.execution.phase !== 'cancelled' ? (s.execution.kind === 'corpse-golem' ? (0, golem_finisher_rig_js_1.golemFinisherRig)({ ...s, execution: s.execution }, module) : (0, execution_rig_js_1.executionRig)(s, module)) : null, sampled = execution ?? interaction ?? (locomotion ? (0, weight_transitions_js_1.loadedLocomotion)(s, module) : (0, weight_transitions_js_1.transitionPose)(dead ? { ...s, time: t * 2.5 } : s, module, clip, t)), strikePose = !execution && !interaction && !dead && s.action ? (s.action.animation4C ? sampled : (0, strike_presentation_js_1.blendEntry)(module, sampled, s.action.progress, s.time)) : sampled, pose = strikePose.pose, rig = execution ? execution.rig : dead ? sampled.rig : (0, combat_entry_js_1.bridgeCombatEntry)(s, (0, foot_contact_world_js_1.applyWorldFootContacts)(s, strikePose.rig, module), module), heading = execution ? (s.golemAligning ? (s.motion?.heading ?? Math.atan2(s.fy, s.fx)) : execution.heading) : s.motion?.heading ?? Math.atan2(s.fy, s.fx), fx = Math.cos(heading), fy = Math.sin(heading), transform = (v) => { const x = v[0] - pose.root[0], y = v[1] - pose.root[1]; return [s.x + fy * x + fx * y, s.y - fx * x + fy * y, v[2]]; }, parts = [], appearance = (0, hero_appearance_js_1.createHeroAppearance)(rig);
     const append = (fragment, c, w) => {
         if (!fragment)
             return;
@@ -1211,7 +1212,7 @@ function createEnemyHealthRuntime({ defaultMaxHp = 70, diagnosticsTarget = null 
             const picked = index.pick(pointer);
             hover = visibleIds.has(picked) ? picked : null;
             const boss = state.bossEncounter;
-            view = model.update({ time: state.time, worldKey: state, enemies: roster(state), visibleIds, hoverId: hover, hits: events, bossId: boss?.bossId ?? null, inBossRoom: boss?.active === true && boss?.inRoom === true, enabled: true });
+            view = model.update({ time: state.time, worldKey: state, enemies: roster(state).filter(e => e.archetype !== 'corpse-golem'), visibleIds, hoverId: hover, hits: events, bossId: boss?.bossId ?? null, inBossRoom: boss?.active === true && boss?.inRoom === true, enabled: true });
             candidates = diagnosticsTarget ? index.records.filter(r => Number.isSafeInteger(r.id)).slice(0, 256).map(r => [r.v.reduce((n, p) => n + p[0], 0) / r.v.length, r.v.reduce((n, p) => n + p[1], 0) / r.v.length]) : [];
             stats = { records: index.records.length, buckets: index.bucketCount, updateMs: performance.now() - begin };
             return view;
@@ -1522,6 +1523,9 @@ function installIronCursor(canvas, { read = () => ({}) } = {}) {
 "app/main.js":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+// GOLEM_TRIAL_APP_V1
+const golem_trial_state_js_1 = require("../game/golem-trial-state.js");
+const golem_trial_hud_js_1 = require("../ui/golem-trial-hud.js");
 // VISUAL_EMBER_ASCII_V1
 const amber_cell_js_1 = require("../render/amber-cell.js");
 const marrow_archer_js_1 = require("../render/marrow-archer.js");
@@ -1582,6 +1586,7 @@ const enemyHealth = (0, enemy_health_runtime_js_1.createEnemyHealthRuntime)({ di
 let mode = 'menu', selected = 0, menuPage = false, time = 0, last = 0, drawAt = 0, simLast = null, acc = 0, paused = false, frozen = false, endTime = 0, aimPoint = null, camera = { x: 8, y: 12 }, view = { zoom: 1, dx: 0, dy: 0 }, renderCount = 0, fireAt = -1, coneBoost = 0;
 let manualAdvance = false;
 let selectedLevelId = 'test-chamber';
+let golemCheckpoint = null;
 let manifest = null;
 let relicWorld = typeof relic_world_js_1.createRelicWorld === 'function' ? (0, relic_world_js_1.createRelicWorld)({
     map: doorScene.map,
@@ -1613,7 +1618,10 @@ function advanceWorld(seconds) {
     }
     return true;
 }
-function resetWorld() { targeting.clear(); relicWorld?.reset(); manifest?.reset(); enemyHealth.reset(); combatDoor.cancel('reset'); doorScene.reset(); world.reset(); (0, registry_js_1.applyLevelSpawn)(world, selectedLevelId); ritualBonfire.reset(); dashHud.ready = false; dashHud.at = -Infinity; effects.reset(); fireHintLayer.clear(); view = { zoom: 1, dx: 0, dy: 0 }; }
+function resetWorld() { targeting.clear(); relicWorld?.reset(); manifest?.reset(); enemyHealth.reset(); combatDoor.cancel('reset'); doorScene.reset(); world.reset(); (0, registry_js_1.applyLevelSpawn)(world, selectedLevelId); if (selectedLevelId === 'golem-trial' && golemCheckpoint) {
+    (0, golem_trial_state_js_1.restoreGolemLoadout)(world.current, golemCheckpoint);
+    world.previous = world.snapshot();
+} ritualBonfire.reset(); dashHud.ready = false; dashHud.at = -Infinity; effects.reset(); fireHintLayer.clear(); view = { zoom: 1, dx: 0, dy: 0 }; }
 const fire = canvas(192, 165), fg = fire.getContext('2d', { willReadFrequently: true }), fireASCII = new ascii_js_1.ASCII(out);
 const basePr = (x, y, z, cx = camera.x, cy = camera.y) => [504 + ((x - cx) - (y - cy)) * 65 * .76, 430 + ((x - cx) + (y - cy)) * 65 * .43 - z * 65 * .87];
 const pr = (x, y, z, cx = camera.x, cy = camera.y) => (0, viewport_js_1.screenPoint)((0, execution_effects_js_1.projectExecution)(basePr(x, y, z, cx, cy), view), W);
@@ -1652,8 +1660,8 @@ function render(s = world.snapshot(), galleryFrame = null) {
         manifest?.advance(performance.now());
         manifest?.update(s);
     }
-    const rite = galleryFrame ? null : ritualBonfire.frame();
-    const ritualArt = galleryFrame ? null : ritualBonfire.art(s, ritualInputAllowed() && !targeting.current());
+    const rite = galleryFrame || selectedLevelId === 'golem-trial' ? null : ritualBonfire.frame();
+    const ritualArt = galleryFrame || selectedLevelId === 'golem-trial' ? null : ritualBonfire.art(s, ritualInputAllowed() && !targeting.current());
     if (!galleryFrame) {
         s = combatDoor.decorate(s);
         s = { ...s, interactionAnimation: rite ?? s.interactionAnimation, comboEdgeActive: s.phase === 'playing' && world.actions.canContinue() };
@@ -1667,7 +1675,7 @@ function render(s = world.snapshot(), galleryFrame = null) {
     view = { zoom: v.zoom, dx: (504 - focus[0]) * (v.zoom - 1) + v.weight * (504 - focus[0]) * .3 + v.shakeX, dy: (430 - focus[1]) * (v.zoom - 1) + v.weight * (430 - focus[1]) * .3 + v.shakeY };
     const enemyGroups = galleryFrame ? [] : enemyHealth.geometry(s, execution_enemy_js_1.executionEnemyParts);
     const drawState = { ...s, visualZoom: view.zoom }, galleryDraw = galleryFrame ? (0, render_frame_js_1.galleryRenderLayers)(galleryFrame) : null, parts = galleryDraw ? [...galleryDraw.objects, ...hero.parts].sort((a, b) => a.d - b.d) : [...env.parts, ...enemyGroups.flatMap(g => g.parts), ...(0, marrow_archer_js_1.arrowParts)(s.arrows ?? []), ...hero.parts, ...visual.parts, ...(ritualArt?.parts ?? [])].sort((a, b) => a.d - b.d);
-    if (!galleryFrame && relicWorld) {
+    if (!galleryFrame && relicWorld && selectedLevelId !== 'golem-trial') {
         parts.push(...relicWorld.parts(s));
         parts.sort((a, b) => a.d - b.d);
     }
@@ -1770,6 +1778,8 @@ function render(s = world.snapshot(), galleryFrame = null) {
     out.restore();
     if (!galleryFrame && mode === 'game' && !manifest?.blocking())
         enemyHealth.paint(out, { width: W, height: H });
+    if (!galleryFrame && selectedLevelId === 'golem-trial')
+        (0, golem_trial_hud_js_1.paintGolemTrialHud)(out, s, { width: W, enabled: mode === 'game' && !manifest?.blocking() && !document.hidden, available: world.executionAvailable() });
     if (!galleryFrame)
         manifest?.text(out, COLS, frameRows, frameHeight);
     renderCount++;
@@ -1810,7 +1820,7 @@ function rebuildSelectedLevel() {
     enemyHealth.reset();
     fireLighting = (0, combat_light_context_js_1.findCombatLights)(doorScene);
     ritualBonfire = (0, ritual_bonfire_js_1.createRitualBonfire)(world, doorScene.map);
-    relicWorld = (0, relic_world_js_1.createRelicWorld)({ map: doorScene.map, openDialogue: value => window.__ASH_MANIFEST__?.openDialogue(value), openReading: value => window.__ASH_MANIFEST__?.openReading(value), setObjective: value => window.__ASH_MANIFEST__?.setObjective(value) });
+    relicWorld = selectedLevelId === 'golem-trial' ? null : (0, relic_world_js_1.createRelicWorld)({ map: doorScene.map, openDialogue: value => window.__ASH_MANIFEST__?.openDialogue(value), openReading: value => window.__ASH_MANIFEST__?.openReading(value), setObjective: value => window.__ASH_MANIFEST__?.setObjective(value) });
     combatDoor = (0, combat_door_controller_js_1.createCombatDoorController)({ world, scene: doorScene, targeting, active: () => mode === 'game' && (!frozen || manualAdvance) });
     keys.clear();
     commands.length = 0;
@@ -1819,11 +1829,13 @@ function rebuildSelectedLevel() {
     acc = 0;
     drawAt = 0;
 }
-function launchLevel(id) { (0, registry_js_1.gameLevel)(id); const previous = selectedLevelId; selectedLevelId = id; try {
+function launchLevel(id) { (0, registry_js_1.gameLevel)(id); const previous = selectedLevelId, oldCheckpoint = golemCheckpoint; if (id === 'golem-trial' && previous !== 'golem-trial')
+    golemCheckpoint = (0, golem_trial_state_js_1.captureGolemLoadout)(world.current); selectedLevelId = id; try {
     start();
 }
 catch (error) {
     selectedLevelId = previous;
+    golemCheckpoint = oldCheckpoint;
     throw error;
 } return { id: selectedLevelId }; }
 window.__ASH_LEVELS__ = Object.freeze({ list: () => registry_js_1.GAME_LEVELS.map(l => ({ ...l })), current: () => ({ ...(0, registry_js_1.gameLevel)(selectedLevelId) }), start: launchLevel, menu: () => window.__ASH_THRONE__?.levels?.() });
@@ -1857,7 +1869,7 @@ function home() { targeting.clear(); if (mode === 'gallery')
 function pause() { if (mode !== 'game')
     return; enemyHealth.reset(); manifest?.dismiss(); combatDoor.cancel('pause'); targeting.clear(); mode = 'pause'; selected = 0; keys.clear(); commands.length = 0; simLast = null; acc = 0; }
 const point = e => { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * 864 / r.height }; };
-const ritualInputAllowed = () => !manifest?.blocking() && (0, intent_js_1.interactionInputAllowed)({ mode: interactionContext(), actor: world.current, frozen, hidden: document.hidden, queued: commands.length > 0 });
+const ritualInputAllowed = () => selectedLevelId !== 'golem-trial' && !manifest?.blocking() && (0, intent_js_1.interactionInputAllowed)({ mode: interactionContext(), actor: world.current, frozen, hidden: document.hidden, queued: commands.length > 0 });
 window.addEventListener('keydown', event => {
     if (event.code !== 'KeyF' || event.repeat || event.defaultPrevented || mode !== 'game' || event.target?.isContentEditable || event.target?.closest?.('input,select,textarea,button,[contenteditable]'))
         return;
@@ -1954,6 +1966,11 @@ $('restart').onclick = start;
 $('bestiaryTrial').onclick = startBoneboundTrial;
 $('undeadTrial').onclick = () => launchLevel('undead-trial');
 $('archerTrial').onclick = () => launchLevel('archer-trial');
+const golemButton = document.createElement('button');
+golemButton.id = 'golemTrial';
+golemButton.textContent = 'GOLEM TRIAL';
+golemButton.onclick = () => launchLevel('golem-trial');
+$('archerTrial').after(golemButton);
 $('freeze').onclick = () => { if (mode !== 'game')
     return; frozen = !frozen; combatDoor.cancel('freeze'); keys.clear(); commands.length = 0; simLast = null; acc = 0; $('freeze').textContent = frozen ? 'RESUME' : 'FREEZE FRAME'; cv.focus(); };
 $('perfToggle').onclick = () => $('perf').hidden = !$('perf').hidden;
@@ -2330,10 +2347,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.BESTIARY = void 0;
 exports.enemyDefinition = enemyDefinition;
 exports.makeBestiaryEnemy = makeBestiaryEnemy;
+const corpse_golem_js_1 = require("./corpse-golem.js");
 const marrow_archer_js_1 = require("./marrow-archer.js");
 const config_js_1 = require("./config.js");
 const melee_undead_js_1 = require("./melee-undead.js");
-const profiles = { ...melee_undead_js_1.MELEE_UNDEAD, 'marrow-archer': marrow_archer_js_1.MARROW_ARCHER,
+const profiles = { ...melee_undead_js_1.MELEE_UNDEAD, 'marrow-archer': marrow_archer_js_1.MARROW_ARCHER, 'corpse-golem': corpse_golem_js_1.CORPSE_GOLEM,
     'test-warden': { id: 'test-warden', name: 'Test Warden', category: 'human', maxHp: config_js_1.COMBAT.enemyLife, damage: config_js_1.COMBAT.enemyDamage, radius: .35, speed: config_js_1.COMBAT.enemySpeed, windup: config_js_1.COMBAT.enemyWindup, recover: config_js_1.COMBAT.enemyRecover, reach: config_js_1.COMBAT.enemyReach, cooldown: config_js_1.COMBAT.enemyCooldown, stagger: config_js_1.COMBAT.staggerDuration },
     bonebound: { id: 'bonebound', name: 'Bonebound', category: 'undead', maxHp: 36, damage: 8, radius: .32, speed: .8, windup: .72, recover: .8, reach: 1.15, cooldown: 1.35, stagger: .45 }
 };
@@ -4804,6 +4822,9 @@ function enableCombatLights(door) {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CombatWorld = void 0;
+// GOLEM_TRIAL_CONNECTED_V1
+const golem_trial_state_js_1 = require("./golem-trial-state.js");
+const corpse_golem_js_1 = require("../combat/corpse-golem.js");
 // MARROW_ARCHER_CONNECTED_V1
 const marrow_archer_js_1 = require("../combat/marrow-archer.js");
 const lamp_life_js_1 = require("../combat/lamp-life.js");
@@ -4822,6 +4843,8 @@ const enemy_js_1 = require("../combat/enemy.js");
 const geometry_js_1 = require("../combat/geometry.js");
 function initial() { const enemy = (0, enemy_js_1.makeEnemy)(); return { x: 8, y: 12, fx: 0, fy: -1, time: 0, walkDistance: 0, moving: false, motion: (0, motion_js_1.createMotion)(), footContacts: null, combatEntry: null, dash: null, dashCooldown: 0, execution: null, interaction: null, lamp: lamp_life_js_1.LAMP_LIFE.max, cameraX: 8, cameraY: 12, phase: 'playing', action: null, sweepProgress: null, enemy, enemies: [enemy], particles: [], cone: null, hitReaction: 0, deathTime: 0, note: 'Approach the warden. LMB light / RMB heavy / E sparks.' }; }
 class CombatWorld {
+    golemTrial = null;
+    golemStaging = null;
     current = initial();
     previous = initial();
     actions = new action_machine_js_1.ActionMachine();
@@ -4836,7 +4859,7 @@ class CombatWorld {
     map;
     tipProvider;
     constructor(map = geometry_js_1.OBSTACLES, tipProvider = null) { this.map = map; this.tipProvider = tipProvider; }
-    reset() { this.arrowSystem.reset(); this.arrowVictoryPending = false; this.current = initial(); this.previous = initial(); this.actions.clear(); this.sparks.clear(); this.events = []; this.sweepElapsed = null; this.sweepFired = false; this.dashSerial = 0; }
+    reset() { this.golemTrial?.reset(); this.golemTrial = null; this.golemStaging = null; this.arrowSystem.reset(); this.arrowVictoryPending = false; this.current = initial(); this.previous = initial(); this.actions.clear(); this.sparks.clear(); this.events = []; this.sweepElapsed = null; this.sweepFired = false; this.dashSerial = 0; }
     record(event) {
         this.events.push({ ...event, time: this.current.time });
         if (this.events.length > 400)
@@ -4855,6 +4878,8 @@ class CombatWorld {
     hooks() {
         return { position: () => this.current, facing: () => ({ x: this.current.fx, y: this.current.fy }), lunge: (dx, dy) => { this.move(dx, dy); }, hit: a => {
                 const s = this.current;
+                if (this.golemTrial && !this.golemTrial.canFight())
+                    return;
                 let struck = false;
                 for (const e of (0, mechanics_4c_js_1.selectStrikeTargets)(s, { x: a.fx, y: a.fy }, a.kind, (0, enemy_roster_js_1.enemiesOf)(s), this.map, a.hitIds)) {
                     struck = true;
@@ -4868,7 +4893,7 @@ class CombatWorld {
                     if (e.hp <= 0)
                         this.record({ type: 'enemy-dead', targetId: e.id });
                 }
-                if (struck && !(0, enemy_roster_js_1.aliveEnemies)(s).length) {
+                if (struck && !(0, enemy_roster_js_1.aliveEnemies)(s).length && !this.golemTrial) {
                     this.arrowVictoryPending = this.arrowSystem.snapshot().length > 0;
                     if (!this.arrowVictoryPending) {
                         s.phase = 'won';
@@ -4906,6 +4931,102 @@ class CombatWorld {
         this.current = { ...s, enemies: roster, enemy: roster[0], phase: 'playing', arrows: [], particles: [], cone: null };
         this.previous = this.snapshot();
     }
+    startGolemTrial() {
+        const s = this.current;
+        s.x = 8;
+        s.y = 17;
+        s.cameraX = 8;
+        s.cameraY = 17;
+        s.fx = 0;
+        s.fy = -1;
+        s.motion = (0, motion_js_1.createMotion)(0, -1);
+        this.setEncounter([(0, bestiary_js_1.makeBestiaryEnemy)('corpse-golem', 1, 8, 7)]);
+        this.golemTrial = (0, golem_trial_state_js_1.createGolemTrialController)(this.map, 1);
+        this.golemStaging = null;
+        this.current.note = 'Enter the arena. The gate will close behind you.';
+        this.golemTrial.step(0, this.current);
+        this.previous = this.snapshot();
+    }
+    golemFinishTarget() {
+        const s = this.current;
+        if (!this.golemTrial?.canFight())
+            return null;
+        const hero = { ...s, busy: !!s.interaction || !!s.execution || !!s.dash || !!this.actions.current || this.sweepElapsed !== null || s.hitReaction > 0 };
+        return (0, enemy_roster_js_1.aliveEnemies)(s).find(e => (0, corpse_golem_js_1.golemExecutionWeak)(e) && (0, corpse_golem_js_1.canFinishGolem)(hero, e, (0, geometry_js_1.blocked)(s, e, this.map)) && !!(0, golem_trial_state_js_1.stageGolem)(s, e, this.map, geometry_js_1.solid, enemy_roster_js_1.actorCanOccupy)) ?? null;
+    }
+    executeGolem() {
+        const s = this.current, boss = this.golemFinishTarget();
+        if (!boss)
+            return false;
+        const goal = (0, golem_trial_state_js_1.stageGolem)(s, boss, this.map, geometry_js_1.solid, enemy_roster_js_1.actorCanOccupy);
+        if (!goal)
+            return false;
+        const entry = (0, corpse_golem_js_1.beginGolemExecution)({ ...s, ...goal, busy: false }, boss, (0, geometry_js_1.blocked)(goal, boss, this.map));
+        if (!entry)
+            return false;
+        this.golemStaging = { x: s.x, y: s.y, heading: s.motion?.heading ?? Math.atan2(s.fy, s.fx), elapsed: 0 };
+        s.execution = entry;
+        s.golemAligning = true;
+        boss.mode = 'stagger';
+        boss.timer = 0;
+        this.actions.clear();
+        s.moving = false;
+        s.footContacts = null;
+        s.combatEntry = null;
+        this.record({ type: 'execution-start', targetId: boss.id });
+        this.sync();
+        return true;
+    }
+    stepGolemExecution(dt) {
+        const s = this.current, entry = s.execution;
+        if (!entry)
+            return;
+        const boss = (0, enemy_roster_js_1.enemiesOf)(s).find(e => e.id === entry.targetId);
+        if (!boss)
+            throw Error('Golem execution target lost');
+        const staging = this.golemStaging;
+        if (staging) {
+            staging.elapsed = Math.min(.35, staging.elapsed + dt);
+            const u = staging.elapsed / .35, w = u * u * (3 - 2 * u);
+            s.x = staging.x + (entry.heroX - staging.x) * w;
+            s.y = staging.y + (entry.heroY - staging.y) * w;
+            const angle = Math.atan2(entry.fy, entry.fx), turn = Math.atan2(Math.sin(angle - staging.heading), Math.cos(angle - staging.heading)), h = staging.heading + turn * w;
+            s.fx = Math.cos(h);
+            s.fy = Math.sin(h);
+            s.motion = (0, motion_js_1.createMotion)(s.fx, s.fy);
+            if (staging.elapsed >= .35) {
+                this.golemStaging = null;
+                s.golemAligning = false;
+            }
+            this.sync();
+            return;
+        }
+        const result = (0, corpse_golem_js_1.advanceGolemExecution)(entry, dt, s.lamp > 0);
+        s.execution = result.state;
+        s.fx = entry.fx;
+        s.fy = entry.fy;
+        s.motion = (0, motion_js_1.createMotion)(s.fx, s.fy);
+        for (const event of result.events) {
+            this.record({ type: 'execution-event', targetId: boss.id, executionEvent: event });
+            if (event === 'extracted' && !entry.extracted) {
+                boss.hp = 0;
+                boss.mode = 'dead';
+                boss.charred = true;
+                boss.timer = 0;
+                boss.deathElapsed = .9;
+                this.record({ type: 'enemy-dead', targetId: boss.id });
+            }
+            if (event === 'finished') {
+                s.execution = null;
+                this.golemStaging = null;
+                this.record({ type: 'execution-end', targetId: boss.id });
+                this.golemTrial?.step(0, s);
+            }
+        }
+        s.cameraX += (s.x - s.cameraX) * Math.min(1, dt * 6);
+        s.cameraY += (s.y - s.cameraY) * Math.min(1, dt * 6);
+        this.sync();
+    }
     startBoneboundTrial() {
         const chosen = [];
         for (const [x, y] of [[8.7, 8.1], [7, 8], [10.1, 7.8], [7, 10], [10, 10], [8, 6.5]]) {
@@ -4923,7 +5044,11 @@ class CombatWorld {
     stepEnemies(dt, excludeId = null, landing = null) {
         const s = this.current;
         (0, enemy_roster_js_1.stepEnemyGroup)(s, dt, this.map, n => this.damage(n), (e, t, p, map, damage, allowAttack) => {
-            if (e.archetype === 'marrow-archer')
+            if (e.archetype === 'corpse-golem') {
+                if (!this.golemTrial || this.golemTrial.canFight())
+                    (0, corpse_golem_js_1.stepCorpseGolem)({ enemy: e, dt: t, player: p, map, damage, solid: geometry_js_1.solid, blocked: geometry_js_1.blocked, allowAttack });
+            }
+            else if (e.archetype === 'marrow-archer')
                 (0, marrow_archer_js_1.stepMarrowArcher)({ enemy: e, dt: t, player: p, map, enemies: (0, enemy_roster_js_1.enemiesOf)(s), allowAttack, solid: geometry_js_1.solid, shoot: (owner, direction) => this.arrowSystem.spawn(owner, direction) });
             else
                 (0, enemy_js_1.enemyStep)(e, t, p, map, damage, allowAttack);
@@ -4994,10 +5119,17 @@ class CombatWorld {
         this.sync();
         return true;
     }
-    executionTargetReady() { const s = this.current; return s.phase === 'playing' && !s.interaction && !s.execution && (0, enemy_roster_js_1.enemiesOf)(s).some(e => (0, execution_js_1.executionTargetWeak)({ ...e, maxHp: (0, enemy_roster_js_1.enemyMaxHp)(e) })); }
-    executionTarget() { const s = this.current; return (0, enemy_roster_js_1.aliveEnemies)(s).filter(e => (0, execution_js_1.canExecute)({ ...s, busy: !!s.interaction || !!s.execution || !!s.dash || !!this.actions.current || this.sweepElapsed !== null || s.hitReaction > 0 }, { ...e, maxHp: (0, enemy_roster_js_1.enemyMaxHp)(e) }, (0, geometry_js_1.blocked)(s, e, this.map))).sort((a, b) => Math.hypot(a.x - s.x, a.y - s.y) - Math.hypot(b.x - s.x, b.y - s.y) || a.id - b.id)[0] ?? null; }
-    executionAvailable() { return this.executionTarget() !== null; }
+    executionTargetReady() {
+        if (this.golemTrial)
+            return this.golemFinishTarget() !== null;
+        const s = this.current;
+        return s.phase === 'playing' && !s.interaction && !s.execution && (0, enemy_roster_js_1.enemiesOf)(s).some(e => (0, execution_js_1.executionTargetWeak)({ ...e, maxHp: (0, enemy_roster_js_1.enemyMaxHp)(e) }));
+    }
+    executionTarget() { const s = this.current; return (0, enemy_roster_js_1.aliveEnemies)(s).filter(e => e.archetype !== 'corpse-golem' && (0, execution_js_1.canExecute)({ ...s, busy: !!s.interaction || !!s.execution || !!s.dash || !!this.actions.current || this.sweepElapsed !== null || s.hitReaction > 0 }, { ...e, maxHp: (0, enemy_roster_js_1.enemyMaxHp)(e) }, (0, geometry_js_1.blocked)(s, e, this.map))).sort((a, b) => Math.hypot(a.x - s.x, a.y - s.y) - Math.hypot(b.x - s.x, b.y - s.y) || a.id - b.id)[0] ?? null; }
+    executionAvailable() { return this.golemFinishTarget() !== null || this.executionTarget() !== null; }
     execute() {
+        if (this.golemTrial)
+            return this.executeGolem();
         const s = this.current, target = this.executionTarget();
         if (!target)
             return false;
@@ -5019,6 +5151,10 @@ class CombatWorld {
         return true;
     }
     stepExecution(dt) {
+        if (this.current.execution?.kind === 'corpse-golem') {
+            this.stepGolemExecution(dt);
+            return;
+        }
         const s = this.current, entry = s.execution;
         if (!entry)
             return;
@@ -5122,6 +5258,8 @@ class CombatWorld {
     }
     damage(n) {
         const s = this.current;
+        if (this.golemTrial && (!this.golemTrial.canFight() || s.execution?.kind === 'corpse-golem'))
+            return;
         if (s.phase !== 'playing' || !Number.isFinite(n) || n <= 0 || (0, ash_dash_js_1.dashInvulnerable)(s.dash))
             return;
         const reaction = !this.actions.current && this.sweepElapsed === null && !s.dash && !s.execution && !s.interaction, feet = reaction ? (0, combat_entry_js_1.captureCombatFeet)(s) : null;
@@ -5182,6 +5320,7 @@ class CombatWorld {
         if (!s.dash)
             s.dashCooldown = Math.max(0, (s.dashCooldown ?? 0) - dt);
         s.time += dt;
+        this.golemTrial?.step(dt, s);
         s.hitReaction = Math.max(0, s.hitReaction - dt);
         s.moving = false;
         this.sparks.step(dt);
@@ -5345,6 +5484,97 @@ function createGolemArena(map, bossId) {
         },
     });
 }
+
+},
+"game/golem-trial-state.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.GOLEM_DEATH = exports.GOLEM_PREPARE = void 0;
+exports.createGolemTrialController = createGolemTrialController;
+exports.stageGolem = stageGolem;
+exports.captureGolemLoadout = captureGolemLoadout;
+exports.restoreGolemLoadout = restoreGolemLoadout;
+exports.GOLEM_PREPARE = 1, exports.GOLEM_DEATH = .9;
+function createGolemTrialController(map, bossId) {
+    if (!Array.isArray(map?.rects) || Object.isFrozen(map.rects))
+        throw Error('Golem requires a mutable collision map');
+    const rects = map.rects, gate = { minX: 6.8, maxX: 9.2, minY: 14.5, maxY: 14.75, golemGate: true };
+    let status = 'waiting', elapsed = 0;
+    function lock(on) { if (map.rects !== rects)
+        throw Error('Golem map ownership changed'); const i = rects.indexOf(gate); if (on && i < 0)
+        rects.push(gate); if (!on && i >= 0)
+        rects.splice(i, 1); }
+    const inRoom = s => s.x >= 2.65 && s.x <= 13.35 && s.y >= 2.65 && s.y <= 14.25;
+    const snapshot = s => ({ bossId, status, inRoom: inRoom(s), active: ['preparing', 'fighting', 'finishing', 'dying'].includes(status), locked: !['waiting', 'won'].includes(status) });
+    return { canFight: () => status === 'fighting', reset() { status = 'waiting'; elapsed = 0; lock(false); }, snapshot,
+        step(dt, s) {
+            if (!Number.isFinite(dt) || dt < 0)
+                throw Error('Invalid golem tick');
+            const boss = (s.enemies ?? [s.enemy]).find(e => e.id === bossId);
+            if (!boss)
+                throw Error('Golem trial lost its boss');
+            if (s.phase === 'dead' || s.lamp <= 0) {
+                status = 'failed';
+                lock(true);
+                s.bossEncounter = snapshot(s);
+                return;
+            }
+            if (status === 'waiting' && inRoom(s)) {
+                status = 'preparing';
+                elapsed = 0;
+                lock(true);
+                s.note = 'The gate closes. Prepare.';
+            }
+            else if (status === 'preparing') {
+                elapsed += dt;
+                if (elapsed >= exports.GOLEM_PREPARE - 1e-9) {
+                    status = 'fighting';
+                    s.note = 'CORPSE GOLEM';
+                }
+            }
+            if (s.execution?.kind === 'corpse-golem')
+                status = 'finishing';
+            else if (boss.hp <= 0 && status !== 'won') {
+                status = 'dying';
+                boss.deathElapsed = boss.charred ? exports.GOLEM_DEATH : (boss.deathElapsed ?? 0) + dt;
+                if (boss.deathElapsed >= exports.GOLEM_DEATH - 1e-9) {
+                    status = 'won';
+                    lock(false);
+                    s.note = 'CORPSE GOLEM DEFEATED';
+                }
+            }
+            if (status !== 'waiting' && status !== 'won') {
+                s.x = Math.max(2.65, Math.min(13.35, s.x));
+                s.y = Math.max(2.65, Math.min(14.25, s.y));
+            }
+            s.bossEncounter = snapshot(s);
+        }
+    };
+}
+function stageGolem(s, boss, map, solid, occupy) {
+    const dx = boss.x - s.x, dy = boss.y - s.y, d = Math.hypot(dx, dy);
+    if (!Number.isFinite(d) || d < 1e-8)
+        return null;
+    const goal = { x: boss.x - dx / d * 1.3, y: boss.y - dy / d * 1.3 }, n = Math.max(1, Math.ceil(Math.hypot(goal.x - s.x, goal.y - s.y) / .02));
+    for (let i = 0; i <= n; i++) {
+        const x = s.x + (goal.x - s.x) * i / n, y = s.y + (goal.y - s.y) * i / n;
+        if (solid(x, y, map, .24) || !occupy(s, x, y))
+            return null;
+    }
+    return goal;
+}
+const transient = new Set('x y fx fy time walkDistance moving motion footContacts combatEntry dash dashCooldown execution interaction cameraX cameraY phase action sweepProgress enemy enemies particles cone arrows hitReaction deathTime note bossEncounter'.split(' '));
+function captureGolemLoadout(s) {
+    if (!Number.isFinite(s?.lamp) || s.lamp <= 0 || s.phase === 'dead')
+        throw Error('Enter GOLEM TRIAL with a living hero');
+    const result = {};
+    for (const [k, v] of Object.entries(s))
+        if (!transient.has(k))
+            result[k] = structuredClone(v);
+    return result;
+}
+function restoreGolemLoadout(s, checkpoint) { for (const [k, v] of Object.entries(checkpoint))
+    s[k] = structuredClone(v); }
 
 },
 "game/interaction-room-layout.js":function(require,module,exports){
@@ -10225,6 +10455,41 @@ function buildAshenWallDress(plan, walkable) {
 }
 
 },
+"levels/golem-trial.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.createGolemTrialScene = createGolemTrialScene;
+const golem_arena_js_1 = require("../game/golem-arena.js");
+function createGolemTrialScene() {
+    const map = (0, golem_arena_js_1.golemArenaMap)();
+    const part = (kind, v, c, w = 1) => ({ kind, v, c, w, hero: false, d: v.reduce((n, p) => n + p[0] + p[1] + p[2] * .006, 0) / v.length });
+    function art() {
+        const parts = [part(0, [[2.4, 2.4, 0], [13.6, 2.4, 0], [13.6, 19.6, 0], [2.4, 19.6, 0]], [51, 48, 44])];
+        for (let y = 3; y < 20; y++)
+            parts.push(part(1, [[2.4, y, .006], [13.6, y, .006]], [67, 61, 52]));
+        for (let x = 3; x < 14; x++)
+            parts.push(part(1, [[x, 2.4, .006], [x, 19.6, .006]], [61, 57, 51]));
+        for (const r of map.rects) {
+            if (r.golemGate) {
+                for (let x = 6.85; x < 9.2; x += .18)
+                    parts.push(part(1, [[x, 14.625, .04], [x, 14.625, 2.8]], [116, 105, 88], 4));
+                for (const z of [.5, 1.5, 2.6])
+                    parts.push(part(1, [[6.8, 14.625, z], [9.2, 14.625, z]], [106, 95, 79], 5));
+                continue;
+            }
+            const a = [r.minX, r.minY, 0], b = [r.maxX, r.minY, 0], c = [r.maxX, r.maxY, 0], d = [r.minX, r.maxY, 0], up = p => [p[0], p[1], 2.65];
+            for (const [p, q] of [[a, b], [b, c], [c, d], [d, a]])
+                parts.push(part(0, [p, q, up(q), up(p)], [73, 67, 58]));
+            parts.push(part(0, [up(a), up(b), up(c), up(d)], [106, 96, 80]));
+        }
+        return parts;
+    }
+    const doorScene = { map, targets: [], parts: [], lightDefinitions: [], interior: null, setActors() { }, getTarget: () => null, getBounds: () => ({ ...golem_arena_js_1.GOLEM_BOUNDS }), getColliders: () => [], revision: () => map.golemRevision ?? 0, step() { }, reset() { }, highlight() { }, snapshot: () => ({ doors: [], golem: true }) };
+    const env = { targets: [], lights: [{ x: 5, y: 5, z: 2, r: 100, power: .3, fireWarmth: 1 }, { x: 11, y: 11, z: 2, r: 100, power: .3, fireWarmth: 1 }], get parts() { return art(); }, step() { } };
+    return { doorScene, env };
+}
+
+},
 "levels/registry.js":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -10232,6 +10497,7 @@ exports.GAME_LEVELS = void 0;
 exports.gameLevel = gameLevel;
 exports.applyLevelSpawn = applyLevelSpawn;
 const entries = [
+    { id: 'golem-trial', title: 'GOLEM TRIAL', description: 'Corpse Golem integration test. Current hero loadout.', status: 'prototype' },
     { id: 'test-chamber', title: 'TEST CHAMBER', description: 'Combat, lighting and interior test room.', status: 'ready' },
     { id: 'ashen-nave', title: 'THE ASHEN NAVE', description: 'Explore the nave, its chapel and burial wing. Defeat the warden.', status: 'prototype' },
     { id: 'bonebound-trial', title: 'BONEBOUND TRIAL', description: 'Three undead. Development combat encounter.', status: 'prototype' },
@@ -10243,6 +10509,10 @@ function gameLevel(id) { const level = exports.GAME_LEVELS.find(l => l.id === id
     throw Error('Unknown game level: ' + id); return level; }
 function applyLevelSpawn(world, id) {
     gameLevel(id);
+    if (id === 'golem-trial') {
+        world.startGolemTrial();
+        return;
+    }
     if (id === 'archer-trial') {
         world.startArcherTrial();
         return;
@@ -10273,11 +10543,14 @@ function applyLevelSpawn(world, id) {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.buildLevelScene = buildLevelScene;
+const golem_trial_js_1 = require("./golem-trial.js");
 const registry_js_1 = require("./registry.js");
 const ashen_layout_js_1 = require("./ashen-layout.js");
 const ashen_environment_js_1 = require("./ashen-environment.js");
 function buildLevelScene(id, { baseObstacles, createDoorScene, createDoorEnvironment }) {
     (0, registry_js_1.gameLevel)(id);
+    if (id === 'golem-trial')
+        return (0, golem_trial_js_1.createGolemTrialScene)();
     if (id === 'test-chamber' || id === 'bonebound-trial' || id === 'undead-trial' || id === 'archer-trial') {
         const doorScene = createDoorScene(baseObstacles);
         return { doorScene, env: createDoorEnvironment(doorScene) };
@@ -10707,6 +10980,8 @@ class ExecutionEffects {
             if (this.seen.size > 2048)
                 this.seen.delete(this.seen.values().next().value);
             const bound = (0, enemy_roster_js_1.enemiesOf)(s).find(e => e.id === event.targetId);
+            if (bound?.archetype === 'corpse-golem')
+                continue;
             if (event.type === 'execution-start') {
                 this.target = s.execution?.targetId === event.targetId ? { x: s.execution.targetX, y: s.execution.targetY } : bound ? { x: bound.x, y: bound.y } : null;
                 this.emit = 0;
@@ -10733,7 +11008,7 @@ class ExecutionEffects {
             }
         }
         const e = s.execution;
-        if (e && s.phase === 'playing' && e.phase !== 'cancelled' && e.elapsed >= execution_js_1.EXECUTION.offer && e.elapsed < execution_js_1.EXECUTION.extract) {
+        if (e && e.kind !== 'corpse-golem' && s.phase === 'playing' && e.phase !== 'cancelled' && e.elapsed >= execution_js_1.EXECUTION.offer && e.elapsed < execution_js_1.EXECUTION.extract) {
             this.emit += dt;
             while (this.emit >= .05) {
                 this.emit -= .05;
@@ -10768,13 +11043,17 @@ class ExecutionEffects {
         }
         const e = s.execution;
         let camera = { zoom: 1, weight: 0, focusX: s.x, focusY: s.y, focusZ: .6, shakeX: 0, shakeY: 0 };
-        if (e) {
+        if (e && e.kind !== 'corpse-golem') {
             const v = (0, execution_js_1.executionPresentation)(e), fade = s.phase === 'dead' ? 1 - clamp(s.deathTime / .6) : 1, weight = clamp((v.cameraZoom - 1) / .17) * fade;
             camera = { zoom: options.camera === false ? 1 : 1 + (v.cameraZoom - 1) * fade, weight: options.camera === false ? 0 : weight, focusX: (s.x + e.targetX) / 2, focusY: (s.y + e.targetY) / 2, focusZ: .6, shakeX: options.shake === false ? 0 : v.cameraShake * fade, shakeY: options.shake === false ? 0 : v.cameraShake * .55 * fade };
             if (s.phase === 'playing' && e.elapsed >= execution_js_1.EXECUTION.offer && e.elapsed < execution_js_1.EXECUTION.extract) {
                 const power = .38 * Math.sin(clamp((e.elapsed - execution_js_1.EXECUTION.offer) / (execution_js_1.EXECUTION.extract - execution_js_1.EXECUTION.offer)) * Math.PI);
                 lights.push({ position: [e.targetX, e.targetY, .3], radius: 105, power });
             }
+        }
+        if (e?.kind === 'corpse-golem' && e.elapsed >= 3.25 && e.elapsed < 5.2) {
+            const u = Math.max(0, Math.min(1, (e.elapsed - 3.25) / 1.55)), fade = 1 - Math.max(0, (e.elapsed - 4.8) / .4);
+            lights.push({ position: [e.targetX - e.fx * .42, e.targetY - e.fy * .42, 1.25], radius: 115, power: (.25 + .8 * Math.sin(u * Math.PI / 2)) * fade });
         }
         return { parts, lights, camera };
     }
@@ -10786,10 +11065,13 @@ exports.ExecutionEffects = ExecutionEffects;
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.executionEnemyParts = executionEnemyParts;
+const corpse_golem_js_1 = require("./corpse-golem.js");
 const enemy_js_1 = require("./enemy.js");
 const enemy_roster_js_1 = require("../combat/enemy-roster.js");
 const execution_js_1 = require("../combat/execution.js");
 function executionEnemyParts(enemy, s) {
+    if (enemy.archetype === 'corpse-golem')
+        return (0, corpse_golem_js_1.corpseGolemParts)(enemy, s);
     const e = s.execution?.targetId === enemy.id ? s.execution : null;
     if (e) {
         const visual = (0, execution_js_1.executionPresentation)(e), u = visual.pin, fx = e.fx, fy = e.fy, t = e.elapsed, struggle = t >= execution_js_1.EXECUTION.pin && !e.extracted ? (1 - visual.char * .94) : 0, original = (0, enemy_js_1.enemyParts)({ ...enemy, hp: Math.max(1, enemy.hp), mode: 'wait', walkDistance: 0 });
@@ -11543,6 +11825,38 @@ function createEnemyHealthModel({ linger = 2, defaultMaxHp = 70 } = {}) {
 }
 var enemy_health_ascii_js_1 = require("./enemy-health-ascii.js");
 Object.defineProperty(exports, "paintEnemyHealth", { enumerable: true, get: function () { return enemy_health_ascii_js_1.paintAsciiEnemyHealth; } });
+
+},
+"ui/golem-trial-hud.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.paintGolemTrialHud = paintGolemTrialHud;
+function paintGolemTrialHud(ctx, s, { width, enabled, available }) {
+    const a = s.bossEncounter;
+    if (!enabled || !a?.inRoom || !a.active || s.phase === 'dead')
+        return;
+    const boss = (s.enemies ?? [s.enemy]).find(e => e.id === a.bossId);
+    if (!boss)
+        return;
+    const hp = Math.max(0, boss.hp), max = boss.maxHp ?? 600, n = Math.max(16, Math.min(70, Math.floor(width / 12) - 6)), filled = Math.round(n * Math.max(0, Math.min(1, hp / max)));
+    ctx.save();
+    ctx.font = '14px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(0,0,0,.85)';
+    ctx.fillRect(width * .08, 12, width * .84, 82);
+    ctx.fillStyle = '#e5bf82';
+    ctx.fillText('CORPSE GOLEM', width / 2, 30);
+    ctx.fillStyle = '#c99c5b';
+    ctx.fillText('[' + '#'.repeat(filled) + '-'.repeat(n - filled) + ']', width / 2, 52);
+    ctx.fillStyle = '#e5d5b9';
+    ctx.fillText(`${hp} / ${max}`, width / 2, 74);
+    if (available && !s.execution) {
+        ctx.fillStyle = '#ffcb77';
+        ctx.fillText('R — Последний уголь', width / 2, 116);
+    }
+    ctx.restore();
+}
 
 },
 "ui/manifest-layout.js":function(require,module,exports){

@@ -1,7 +1,9 @@
+import {corpseGolemParts} from './corpse-golem.js';
 import {enemyParts} from './enemy.js';
 import {enemyMaxHp} from '../combat/enemy-roster.js';
 import {EXECUTION,executionTargetWeak,executionPresentation} from '../combat/execution.js';
 export function executionEnemyParts(enemy,s){
+if(enemy.archetype==='corpse-golem')return corpseGolemParts(enemy,s);
 const e=s.execution?.targetId===enemy.id?s.execution:null;
 if(e){const visual=executionPresentation(e),u=visual.pin,fx=e.fx,fy=e.fy,t=e.elapsed,struggle=t>=EXECUTION.pin&&!e.extracted?(1-visual.char*.94):0,original=enemyParts({...enemy,hp:Math.max(1,enemy.hp),mode:'wait',walkDistance:0});return original.map(p=>{const v=p.v.map(([x,y,z])=>{const side=x-enemy.x,forward=(y-enemy.y)*(1-u)+(z-.65)*.75*u,weight=Math.min(1,Math.abs(z-.65)*1.8),shake=Math.sin(t*16+z*9)*.055*struggle*weight;return[enemy.x+fx*forward-fy*(side+shake),enemy.y+fy*forward+fx*(side+shake),Math.max(.025,z*(1-u)+(.12+Math.abs(y-enemy.y)*.08)*u+Math.abs(Math.sin(t*19+z))*struggle*weight*.025)];});const char=enemy.charred?1:visual.char,c=Array.isArray(p.c)?p.c:typeof p.c==='string'&&/^#[0-9a-f]{6}$/i.test(p.c)?[1,3,5].map(i=>parseInt(p.c.slice(i,i+2),16)):[90,70,70];return{...p,v,c:c.map(n=>n*(1-char)+24*char),d:v.reduce((a,q)=>a+q[0]+q[1]+q[2]*.006,0)/v.length+(p.kind===1?.005:0)};});}
 let parts=enemyParts(enemy);if(enemy.charred)return parts.map(p=>({...p,c:'#282521'}));
