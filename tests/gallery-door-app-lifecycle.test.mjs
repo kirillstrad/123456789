@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import {createEnemyHealthRuntime} from '../src/app/enemy-health-runtime.js';
 
 const app=fs.readFileSync('src/app/main.js','utf8');
 const names=['renderGallery','openGallery','closeGallery','gallerySetCamera','walkGallery'];
@@ -24,7 +25,8 @@ assert.ok(angle);
 // Actual app transition functions + actual interaction/door code in a fresh VM.
 // Scene assembly/geometry, actor/approach, combat cancellation, input, DOM and renderer are test doubles.
 function harness(){
- const context=vm.createContext({structuredClone,window:{},document:{hidden:false,activeElement:null}});
+ let healthResets=0;const hp=createEnemyHealthRuntime(),enemyHealth={...hp,reset(){healthResets++;hp.reset();}};
+ const context=vm.createContext({structuredClone,enemyHealth,window:{},document:{hidden:false,activeElement:null}});
  const seed=`
  const manifest={dismiss(){}};
  let mode='game',camera={x:3,y:4},view={zoom:1.2,dx:5,dy:6};
@@ -63,7 +65,7 @@ function harness(){
   fail:value=>failRender=value,failCombat:value=>failCombatCancel=value,
   state:()=>({mode,camera,view,keys:keys.size,commands:commands.length,aimPoint,simLast,acc,drawAt})};
  `,context);
- return{api:context.window.__ASH_GALLERY__,probe:context.probe};
+ return{api:context.window.__ASH_GALLERY__,probe:context.probe,healthResets:()=>healthResets};
 }
 const tick=(owner,count)=>{for(let i=0;i<count;i++)owner.step(1/60);};
 function launch(h){assert.ok(h.probe.request());const owner=h.probe.owner();owner.step(1/60);assert.ok(owner.interaction());return owner;}
@@ -83,3 +85,6 @@ test('initial preview render failure uses the actual openGallery cleanup path',(
 test('repeated close/reopen cycles do not let old owners publish into any scene',()=>{const h=harness(),old=[];for(let i=0;i<20;i++){h.api.walk();const owner=launch(h);tick(owner,130);const scene=h.probe.scene();h.api.close();old.push({owner,scene,count:scene.record.publications});for(const entry of old){tick(entry.owner,5);assert.equal(entry.scene.record.publications,entry.count);}}assert.equal(h.probe.made().length,20);assert.equal(h.probe.owner(),null);});
 test('entering gallery cancels combat ownership before scene creation and repeated open is a no-op',()=>{const h=harness();h.api.open();const log=Array.from(h.probe.log());assert.deepEqual(log.slice(0,2),['combat-cancel:gallery-open','scene-create']);h.api.open();h.api.walk();assert.equal(Array.from(h.probe.log()).filter(e=>e==='combat-cancel:gallery-open').length,1);});
 test('combat cancellation failure propagates before any gallery scene is created',()=>{const h=harness();h.probe.failCombat(true);assert.throws(()=>h.api.open(),/scripted combat cancellation failure/);assert.equal(h.probe.state().mode,'game');assert.equal(h.probe.scene(),null);assert.equal(h.probe.owner(),null);assert.equal(h.probe.made().length,0);h.probe.failCombat(false);assert.doesNotThrow(()=>h.api.walk());});
+
+// HP_HARNESS_V1
+test('gallery entry resets HP once and repeated open stays idempotent',()=>{const h=harness(),before=h.healthResets();h.api.open();assert.equal(h.healthResets(),before+1);h.api.open();assert.equal(h.healthResets(),before+1);});
