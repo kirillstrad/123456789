@@ -4,12 +4,12 @@
     "migration": "success",
     "build": "success",
     "unit": "success",
-    "browser": "success",
-    "regression": "failure",
+    "browser": "failure",
+    "regression": "success",
     "integration": "skipped"
   },
-  "inputCommit": "a168ae5ea7096ff74224cd5ea4f13f2d77deab65",
+  "inputCommit": "63e08dd13a2975710ed1b415ff49aef18e7167a6",
   "testedSourceCommit": null,
-  "workflowRun": "44744699189",
+  "workflowRun": "44745828730",
   "humanVisualAcceptance": false
 }

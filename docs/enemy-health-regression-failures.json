@@ -1,16 +1,7 @@
 {
-  "exitCode": 1,
+  "exitCode": 0,
   "signal": null,
   "error": null,
-  "totalFailures": 2,
-  "failures": [
-    {
-      "test": "not ok 101 - combat entry: queued LL and LH preserve entry until a fresh next strike",
-      "context": "  ---\n  duration_ms: 4.140968\n  type: 'test'\n  location: '/home/runner/work/123456789/123456789/tests/combat-entry.test.mjs:43:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly equal:\n    \n    false !== true\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: true\n  actual: false\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (file:///home/runner/work/123456789/123456789/tests/combat-entry.test.mjs:49:10)\n    Test.runInAsyncScope (node:async_hooks:214:14)\n    Test.run (node:internal/test_runner/test:1047:25)"
-    },
-    {
-      "test": "not ok 102 - combat entry: movement cancel clears bridge and locomotion support returns",
-      "context": "  ---\n  duration_ms: 13.848744\n  type: 'test'\n  location: '/home/runner/work/123456789/123456789/tests/combat-entry.test.mjs:62:1'\n  failureType: 'testCodeFailure'\n  error: \"Cannot read properties of null (reading 'every')\"\n  code: 'ERR_TEST_FAILURE'\n  name: 'TypeError'\n  stack: |-\n    TestContext.<anonymous> (file:///home/runner/work/123456789/123456789/tests/combat-entry.test.mjs:66:48)\n    Test.runInAsyncScope (node:async_hooks:214:14)\n    Test.run (node:internal/test_runner/test:1047:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:744:18)\n    Test.postRun (node:internal/test_runner/test:1173:19)\n    Test.run (node:internal/test_runner/test:1101:12)\n    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)\n  ...\n# Subtest: combat entry: death, victory and reset never keep old entry feet\nok 103 - combat entry: death, victory and reset never keep old entry feet"
-    }
-  ]
+  "totalFailures": 0,
+  "failures": []
 }
