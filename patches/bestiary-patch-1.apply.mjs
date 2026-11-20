@@ -88,7 +88,7 @@ edit(dash,"import {solid} from './geometry.js';","import {solid} from './geometr
 edit(dash,'s.enemy.hp>0&&Math.hypot(s.x+fx*distance-s.enemy.x,s.y+fy*distance-s.enemy.y)<DASH.landingClearance','aliveEnemies(s).some(e=>Math.hypot(s.x+fx*distance-e.x,s.y+fy*distance-e.y)<Math.max(DASH.landingClearance,enemyRadius(e)+.24))');
 const main='src/app/main.js';
 edit(main,"import {gameLevel,GAME_LEVELS,applyLevelSpawn} from '../levels/registry.js';","import {gameLevel,GAME_LEVELS,applyLevelSpawn} from '../levels/registry.js';\nimport {enemiesOf} from '../combat/enemy-roster.js';");
-edit(main,'...enemyParts(s.enemy,s),','...enemiesOf(s).flatMap(e=>enemyParts(e,s)),');
+if(read(main).includes('...enemyParts(s.enemy,s),'))edit(main,'...enemyParts(s.enemy,s),','...enemiesOf(s).flatMap(e=>enemyParts(e,s)),');
 const rendering='src/render/execution-enemy.js';
 edit(rendering,"import {COMBAT} from '../combat/config.js';","import {enemyMaxHp} from '../combat/enemy-roster.js';");
 edit(rendering,'maxHp:COMBAT.enemyLife','maxHp:enemyMaxHp(enemy)');

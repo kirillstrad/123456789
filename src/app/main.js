@@ -1,4 +1,5 @@
 import {gameLevel,GAME_LEVELS,applyLevelSpawn} from '../levels/registry.js';
+import {createEnemyHealthRuntime} from './enemy-health-runtime.js'; // ENEMY_HEALTH_CONNECTED_V2
 import {createWorldReference} from '../levels/world-reference.js';
 import {buildLevelScene} from '../levels/runtime.js';
 import {installManifest} from '../ui/relic.js';
@@ -48,6 +49,7 @@ const effects=new ExecutionEffects(),executionOptions=installExecutionOptions(),
 let fireLighting=findCombatLights(doorScene);
 let ritualBonfire=createRitualBonfire(world,doorScene.map);
 const dashHud={ready:false,at:-Infinity};
+const enemyHealth=createEnemyHealthRuntime();
 let mode='menu',selected=0,menuPage=false,time=0,last=0,drawAt=0,simLast=null,acc=0,paused=false,frozen=false,endTime=0,aimPoint=null,camera={x:8,y:12},view={zoom:1,dx:0,dy:0},renderCount=0,fireAt=-1,coneBoost=0;
 let manualAdvance=false;
 let selectedLevelId='test-chamber';
@@ -60,7 +62,7 @@ let relicWorld=typeof createRelicWorld==='function'?createRelicWorld({
 }):null;
 let galleryScene=null,galleryCamera=null,galleryReturn=null,galleryTimings=null,galleryTime=0,galleryPlayer=null;
 const interactionContext=()=>mode==='gallery'?(galleryPlayer?'gallery-walk':'gallery-preview'):mode;
-const targeting=installFrameTargeting(cv,{context:interactionContext,resolve:id=>mode==='gallery'?galleryScene?.getTarget(id):(env.targets??[]).find(t=>t.id===id),canRequest:()=>!manifest?.blocking()&&interactionInputAllowed({mode:interactionContext(),actor:mode==='gallery'?galleryPlayer?.snapshot():world.current,frozen,hidden:document.hidden,queued:commands.length>0})});
+const targeting=installFrameTargeting(cv,{enemyTarget:()=>enemyHealth.hoverId(),context:interactionContext,resolve:id=>mode==='gallery'?galleryScene?.getTarget(id):(env.targets??[]).find(t=>t.id===id),canRequest:()=>!manifest?.blocking()&&interactionInputAllowed({mode:interactionContext(),actor:mode==='gallery'?galleryPlayer?.snapshot():world.current,frozen,hidden:document.hidden,queued:commands.length>0})});
 let combatDoor=createCombatDoorController({world,scene:doorScene,targeting,active:()=>mode==='game'&&(!frozen||manualAdvance)});
 function stepWorld(dt,input){if(manifest?.blocking())return;combatDoor.step(dt,input);ritualBonfire.step();env.step?.(dt);effects.step(dt,world.current,world.events);}
 function advanceWorld(seconds){
@@ -70,7 +72,7 @@ function advanceWorld(seconds){
  try{for(let i=0;i<Math.round(seconds*60);i++)stepWorld(1/60);}finally{manualAdvance=previous;simLast=null;acc=0;}
  return true;
 }
-function resetWorld(){targeting.clear();relicWorld?.reset();manifest?.reset();combatDoor.cancel('reset');doorScene.reset();world.reset();applyLevelSpawn(world,selectedLevelId);ritualBonfire.reset();dashHud.ready=false;dashHud.at=-Infinity;effects.reset();fireHintLayer.clear();view={zoom:1,dx:0,dy:0};}
+function resetWorld(){targeting.clear();enemyHealth.reset();relicWorld?.reset();manifest?.reset();combatDoor.cancel('reset');doorScene.reset();world.reset();applyLevelSpawn(world,selectedLevelId);ritualBonfire.reset();dashHud.ready=false;dashHud.at=-Infinity;effects.reset();fireHintLayer.clear();view={zoom:1,dx:0,dy:0};}
 const fire=canvas(192,165),fg=fire.getContext('2d',{willReadFrequently:true}),fireASCII=new ASCII(out);
 const basePr=(x,y,z,cx=camera.x,cy=camera.y)=>[504+((x-cx)-(y-cy))*65*.76,430+((x-cx)+(y-cy))*65*.43-z*65*.87];
 const pr=(x,y,z,cx=camera.x,cy=camera.y)=>screenPoint(projectExecution(basePr(x,y,z,cx,cy),view),W);
@@ -92,7 +94,8 @@ function render(s=world.snapshot(),galleryFrame=null){
  const v=galleryFrame||rite?visual.camera:interactionCamera(s,visual.camera,doorPassable);
  const focus=basePr(v.focusX,v.focusY,v.focusZ,s.cameraX,s.cameraY);
  camera={x:s.cameraX,y:s.cameraY};view={zoom:v.zoom,dx:(504-focus[0])*(v.zoom-1)+v.weight*(504-focus[0])*.3+v.shakeX,dy:(430-focus[1])*(v.zoom-1)+v.weight*(430-focus[1])*.3+v.shakeY};
- const drawState={...s,visualZoom:view.zoom},galleryDraw=galleryFrame?galleryRenderLayers(galleryFrame):null,parts=galleryDraw?[...galleryDraw.objects,...hero.parts].sort((a,b)=>a.d-b.d):[...env.parts,...enemyParts(s.enemy,s),...hero.parts,...visual.parts,...(ritualArt?.parts??[])].sort((a,b)=>a.d-b.d);
+ const enemyGroups=galleryFrame?[]:enemyHealth.geometry(s,enemyParts);
+ const drawState={...s,visualZoom:view.zoom},galleryDraw=galleryFrame?galleryRenderLayers(galleryFrame):null,parts=galleryDraw?[...galleryDraw.objects,...hero.parts].sort((a,b)=>a.d-b.d):[...env.parts,...enemyGroups.flatMap(g=>g.parts),...hero.parts,...visual.parts,...(ritualArt?.parts??[])].sort((a,b)=>a.d-b.d);
  if(!galleryFrame&&relicWorld){parts.push(...relicWorld.parts(s));parts.sort((a,b)=>a.d-b.d);}
  targeting.frame({parts,targets:galleryFrame?.targets??env.targets??[],project:pr,zoom:view.zoom,active:(mode==='gallery'&&!galleryPlayer)||((mode==='game'||mode==='gallery')&&s.phase==='playing')});
  const lamp=pr(...hero.lamp),lampProfile=lampLighting(s.lamp,galleryFrame&&!galleryPlayer?'playing':s.phase),radius=146*65/94*1.2*view.zoom*lampProfile.radiusScale,power=lampProfile.power;
@@ -109,6 +112,7 @@ function render(s=world.snapshot(),galleryFrame=null){
  for(const q of visual.lights)lights.push({p:pr(...q.position),r:q.radius*view.zoom,v:q.power});
  const dashEffect=s.dash?dashVisual(s.dash):{visibility:1,flare:0};if(dashEffect.flare>0)lights.push({p:pr(s.x,s.y,.7),r:115*view.zoom,v:dashEffect.flare*.8});const t=performance.now();coneBoost=0;
  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){const k=(y*COLS+x)*4,px=(x+.5)*W/COLS,py=(y+.5)*H/ROWS,h=ma[k]>127,n=power>0?Math.exp(-((px-lamp[0])**2+(py-lamp[1])**2)/(2*radius**2)):0;let l=.018+(h?.065:.12)+n*.82*1.6*power*(1+Math.sin(s.time*2.2)*.035),f=0;for(const q of lights){const dx=px-q.p[0],dy=py-q.p[1];if(Math.abs(dx)>q.r*3||Math.abs(dy)>q.r*3)continue;l+=Math.exp(-(dx*dx+dy*dy)/(2*q.r*q.r))*q.v;}if(!h&&s.cone&&sparkFlash.gain>0){const q=unpr({x:px,y:py}),c=s.cone,dx=q.x-c.x,dy=q.y-c.y,d=Math.hypot(dx,dy),front=(dx*c.fx+dy*c.fy)/Math.max(.01,d),edge=Math.cos(80*Math.PI/180);if(d>.2&&d<sparkFlash.range&&front>edge){f=sparkFlash.gain*smooth((front-edge)/.16)*smooth((d-.2)/.35)*(1-smooth((d-(sparkFlash.range-.5))/.5));l+=f;coneBoost+=f;}}if(h)l=Math.max(.3,Math.min(.8,l));const v=Math.max(.25,1-((px-W/2)/(700*W/1008))**2*.32-((py-360)/600)**2*.2),warm=Math.min(1,n*lampProfile.warmth+f),base=l*v*(h?1:1.25);data[k]*=base*(1+warm*.19);data[k+1]*=base*(1-warm*.1);data[k+2]*=base*(1-warm*.32);}
+ if(!galleryFrame)enemyHealth.update({parts,groups:enemyGroups,project:pr,zoom:view.zoom,viewport:{width:W,height:H},cells:{data,cols:COLS,rows:ROWS},pointer:aimPoint?[aimPoint.x,aimPoint.y]:null,state:world.current,events:world.events,enabled:mode==='game'&&!manifest?.blocking()&&!document.hidden&&s.phase==='playing'});
   const heroBackdropCells = galleryFrame
    ? 0
    : applyHeroBackdrop(data, ma, COLS, ROWS);
@@ -153,13 +157,14 @@ function render(s=world.snapshot(),galleryFrame=null){
  }
 
  out.restore();
+ if(!galleryFrame&&mode==='game'&&!manifest?.blocking())enemyHealth.paint(out,{width:W,height:H});
  if(!galleryFrame)manifest?.text(out,COLS,frameRows,frameHeight);
  renderCount++;
  renderCount++;
  return{geometryMs,lightingMs,glyphMs:performance.now()-glyphAt,cpuMs:performance.now()-start,lampLight:{...lampProfile,radiusPixels:radius},coneBoost,sparkFlashGain:sparkFlash.gain,fireHintParts:parts.filter(p=>p.fireHint).length,actionHint:parts.find(p=>p.actionLabel)?.text??null,heroBackdropCells,dashVisibility:dashEffect.visibility,dashFlare:dashEffect.flare,executionCamera:{...view},executionParticles:galleryFrame?0:effects.particles.length,gallery:galleryFrame?{objects:galleryFrame.stats.objects,visibleObjects:galleryFrame.stats.visibleObjects,floorParts:galleryFrame.floorParts.length,objectParts:galleryFrame.parts.length,lights:galleryFrame.lights.length,heroParts:hero.parts.length,heroClip:hero.clip??null}:undefined};
 }
 function renderGallery(){if(!galleryScene||mode!=='gallery')throw Error('Gallery preview is not open');const walking=galleryPlayer?.snapshot();if(walking)galleryCamera={x:walking.cameraX,y:walking.cameraY};const frame=galleryScene.getFrame(galleryCamera,galleryRenderRange(W,H)),s=walking??{...world.snapshot(),cameraX:galleryCamera.x,cameraY:galleryCamera.y,time:galleryTime,lamp:100,particles:[],cone:null,dash:null};galleryTimings=render(s,frame);$('status').textContent=galleryPlayer?'OBJECT GALLERY / WALK TEST / COLLISIONS ON':'OBJECT GALLERY / RENDER PREVIEW';return galleryTimings;}
-function openGallery(){if(mode==='gallery')return galleryScene.stats();manifest?.dismiss();combatDoor.cancel('gallery-open');targeting.clear();const next=createGalleryScene();galleryReturn={mode,camera:{...camera},view:{...view}};galleryScene=next;galleryCamera=next.getSpawn();galleryTime=0;galleryTimings=null;mode='gallery';keys.clear();commands.length=0;aimPoint=null;simLast=null;acc=0;drawAt=0;cv.focus();try{renderGallery();}catch(error){closeGallery();throw error;}return next.stats();}
+function openGallery(){if(mode==='gallery')return galleryScene.stats();enemyHealth.reset();manifest?.dismiss();combatDoor.cancel('gallery-open');targeting.clear();const next=createGalleryScene();galleryReturn={mode,camera:{...camera},view:{...view}};galleryScene=next;galleryCamera=next.getSpawn();galleryTime=0;galleryTimings=null;mode='gallery';keys.clear();commands.length=0;aimPoint=null;simLast=null;acc=0;drawAt=0;cv.focus();try{renderGallery();}catch(error){closeGallery();throw error;}return next.stats();}
 function closeGallery(){if(mode!=='gallery')return;targeting.clear();galleryPlayer?.dispose?.();galleryPlayer=null;galleryScene.dispose();galleryScene=null;galleryCamera=null;galleryTimings=null;mode=galleryReturn.mode;camera=galleryReturn.camera;view=galleryReturn.view;galleryReturn=null;keys.clear();commands.length=0;aimPoint=null;simLast=null;acc=0;drawAt=0;$('status').textContent=world.current.note;cv.focus();}
 function gallerySetCamera(x,y){if(mode!=='gallery'||![x,y].every(Number.isFinite))throw Error('Invalid gallery camera');if(galleryPlayer){galleryPlayer.dispose?.();targeting.clear();}galleryPlayer=null;keys.clear();acc=0;simLast=null;const b=galleryScene.getBounds();galleryCamera={x:Math.max(b.minX,Math.min(b.maxX,x)),y:Math.max(b.minY,Math.min(b.maxY,y))};return renderGallery();}
 function walkGallery(){targeting.clear();galleryPlayer?.dispose?.();openGallery();galleryPlayer=createGalleryInteraction(createGalleryApproach(createGalleryPlayer(world.snapshot(),galleryScene.getSpawn(),galleryScene.getBounds(),{...galleryMotion,contacts:advanceWorldFootContacts,colliders:galleryScene.getColliders()}),galleryScene,targeting,{allowed:()=>mode==='gallery'&&!document.hidden&&!document.activeElement?.isContentEditable&&!document.activeElement?.closest?.('input,select,textarea,button,[contenteditable]'),manualHeld:()=>['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].some(k=>keys.has(k))}),galleryScene,targeting,{context:interactionContext});galleryCamera=galleryScene.getSpawn();keys.clear();commands.length=0;simLast=null;acc=0;drawAt=0;return renderGallery();}
@@ -168,7 +173,7 @@ function rebuildSelectedLevel(){
  const next=buildLevelScene(selectedLevelId,{baseObstacles:OBSTACLES,createDoorScene:createCombatDoorScene,createDoorEnvironment:createCombatDoorEnvironment});
  const nextWorld=new CombatWorld(next.doorScene.map,s=>combatHero(s).tip);
  manifest?.dismiss();combatDoor.cancel('level-change');targeting.clear();
- doorScene=next.doorScene;env=next.env;worldReference.replace(nextWorld);
+ doorScene=next.doorScene;env=next.env;worldReference.replace(nextWorld);enemyHealth.reset();
  fireLighting=findCombatLights(doorScene);ritualBonfire=createRitualBonfire(world,doorScene.map);
  relicWorld=createRelicWorld({map:doorScene.map,openDialogue:value=>window.__ASH_MANIFEST__?.openDialogue(value),openReading:value=>window.__ASH_MANIFEST__?.openReading(value),setObjective:value=>window.__ASH_MANIFEST__?.setObjective(value)});
  combatDoor=createCombatDoorController({world,scene:doorScene,targeting,active:()=>mode==='game'&&(!frozen||manualAdvance)});
@@ -181,7 +186,7 @@ function drawMenu(){out.fillStyle='#000';out.fillRect(0,0,W,864);if(time-fireAt>
 function start(){targeting.clear();if(mode==='gallery')closeGallery();rebuildSelectedLevel();resetWorld();mode='game';selected=0;menuPage=false;paused=false;frozen=false;endTime=0;keys.clear();commands.length=0;simLast=null;acc=0;report.frames=[];camera={x:8,y:12};$('freeze').textContent='FREEZE FRAME';cv.focus();}
 function resume(){targeting.clear();if(mode==='gallery')closeGallery();mode='game';paused=false;keys.clear();commands.length=0;simLast=null;acc=0;cv.focus();}
 function home(){targeting.clear();if(mode==='gallery')closeGallery();resetWorld();mode='menu';selected=0;menuPage=false;keys.clear();commands.length=0;}
-function pause(){if(mode!=='game')return;manifest?.dismiss();combatDoor.cancel('pause');targeting.clear();mode='pause';selected=0;keys.clear();commands.length=0;simLast=null;acc=0;}
+function pause(){if(mode!=='game')return;enemyHealth.reset();manifest?.dismiss();combatDoor.cancel('pause');targeting.clear();mode='pause';selected=0;keys.clear();commands.length=0;simLast=null;acc=0;}
 const point=e=>{const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*864/r.height};};
 const ritualInputAllowed=()=>!manifest?.blocking()&&interactionInputAllowed({mode:interactionContext(),actor:world.current,frozen,hidden:document.hidden,queued:commands.length>0});
 window.addEventListener('keydown',event=>{
