@@ -1,0 +1,15 @@
+{
+  "status": "incomplete-or-failed",
+  "checks": {
+    "migration": "success",
+    "build": "success",
+    "unit": "success",
+    "browser": "success",
+    "regression": "failure",
+    "integration": "skipped"
+  },
+  "inputCommit": "a168ae5ea7096ff74224cd5ea4f13f2d77deab65",
+  "testedSourceCommit": null,
+  "workflowRun": "44744699189",
+  "humanVisualAcceptance": false
+}

@@ -1,13 +1,15 @@
 {
-  "status": "automated-checks-passed",
+  "status": "incomplete-or-failed",
   "checks": {
+    "migration": "success",
     "build": "success",
     "unit": "success",
-    "integration": "success",
     "browser": "success",
-    "regression": "success"
+    "regression": "failure",
+    "integration": "skipped"
   },
-  "testedSourceCommit": "6931cecf398bad27e5eb21f4fac1f6606afb1820",
-  "workflowRun": "44736481453",
+  "inputCommit": "a168ae5ea7096ff74224cd5ea4f13f2d77deab65",
+  "testedSourceCommit": null,
+  "workflowRun": "44744699189",
   "humanVisualAcceptance": false
 }
