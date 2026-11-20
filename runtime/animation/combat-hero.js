@@ -3,6 +3,7 @@ import { sampleInteraction } from './interaction.js';
 import { COMBAT } from '../combat/config.js';
 import { strikeProgress, blendEntry } from './strike-presentation.js';
 import { executionRig } from './execution-rig.js';
+import { golemFinisherRig } from './golem-finisher-rig.js';
 import { dashVisual } from '../combat/ash-dash.js';
 import { ashDashParts } from '../render/ash-dash.js';
 import { createHeroAppearance, HERO_ACCENT_COLOR, HERO_GLINT_COLOR } from '../render/hero-appearance.js';
@@ -46,7 +47,7 @@ export function combatHero(s, module = globalThis.IronPilgrim, secondary = { clo
     }
     else if ((s.motion?.weight ?? (s.moving ? 1 : 0)) > .001)
         clip = 'walk';
-    const execution = !dead && s.execution && s.execution.phase !== 'cancelled' ? executionRig(s, module) : null, sampled = execution ?? interaction ?? (locomotion ? loadedLocomotion(s, module) : transitionPose(dead ? { ...s, time: t * 2.5 } : s, module, clip, t)), strikePose = !execution && !interaction && !dead && s.action ? (s.action.animation4C ? sampled : blendEntry(module, sampled, s.action.progress, s.time)) : sampled, pose = strikePose.pose, rig = execution ? execution.rig : dead ? sampled.rig : bridgeCombatEntry(s, applyWorldFootContacts(s, strikePose.rig, module), module), heading = execution ? execution.heading : s.motion?.heading ?? Math.atan2(s.fy, s.fx), fx = Math.cos(heading), fy = Math.sin(heading), transform = (v) => { const x = v[0] - pose.root[0], y = v[1] - pose.root[1]; return [s.x + fy * x + fx * y, s.y - fx * x + fy * y, v[2]]; }, parts = [], appearance = createHeroAppearance(rig);
+    const execution = !dead && s.execution && s.execution.phase !== 'cancelled' ? (s.execution.kind === 'corpse-golem' ? golemFinisherRig({ ...s, execution: s.execution }, module) : executionRig(s, module)) : null, sampled = execution ?? interaction ?? (locomotion ? loadedLocomotion(s, module) : transitionPose(dead ? { ...s, time: t * 2.5 } : s, module, clip, t)), strikePose = !execution && !interaction && !dead && s.action ? (s.action.animation4C ? sampled : blendEntry(module, sampled, s.action.progress, s.time)) : sampled, pose = strikePose.pose, rig = execution ? execution.rig : dead ? sampled.rig : bridgeCombatEntry(s, applyWorldFootContacts(s, strikePose.rig, module), module), heading = execution ? (s.golemAligning ? (s.motion?.heading ?? Math.atan2(s.fy, s.fx)) : execution.heading) : s.motion?.heading ?? Math.atan2(s.fy, s.fx), fx = Math.cos(heading), fy = Math.sin(heading), transform = (v) => { const x = v[0] - pose.root[0], y = v[1] - pose.root[1]; return [s.x + fy * x + fx * y, s.y - fx * x + fy * y, v[2]]; }, parts = [], appearance = createHeroAppearance(rig);
     const append = (fragment, c, w) => { if (!fragment)
         return; const edge = fragment.map(transform); parts.push({ kind: 1, v: edge, c, w, hero: true, d: edge.reduce((d, v) => d + v[0] + v[1] + v[2] * .006, 0) / edge.length + .006 }); };
     const push = (kind, v, c, w = 1) => { const points = v.map(transform); parts.push({ kind, v: points, c: appearance.material(v, c, kind), w, hero: true, d: points.reduce((d, v) => d + v[0] + v[1] + v[2] * .006, 0) / points.length + (kind === 1 ? .005 : 0) }); append(appearance.accent(v, c, kind), HERO_ACCENT_COLOR, 1); append(appearance.glint(v, c, kind), HERO_GLINT_COLOR, .75); };

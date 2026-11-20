@@ -229,6 +229,7 @@ const interaction_js_1 = require("./interaction.js");
 const config_js_1 = require("../combat/config.js");
 const strike_presentation_js_1 = require("./strike-presentation.js");
 const execution_rig_js_1 = require("./execution-rig.js");
+const golem_finisher_rig_js_1 = require("./golem-finisher-rig.js");
 const ash_dash_js_1 = require("../combat/ash-dash.js");
 const ash_dash_js_2 = require("../render/ash-dash.js");
 const hero_appearance_js_1 = require("../render/hero-appearance.js");
@@ -276,7 +277,7 @@ function combatHero(s, module = globalThis.IronPilgrim, secondary = { cloth: 0, 
     }
     else if ((s.motion?.weight ?? (s.moving ? 1 : 0)) > .001)
         clip = 'walk';
-    const execution = !dead && s.execution && s.execution.phase !== 'cancelled' ? (0, execution_rig_js_1.executionRig)(s, module) : null, sampled = execution ?? interaction ?? (locomotion ? (0, weight_transitions_js_1.loadedLocomotion)(s, module) : (0, weight_transitions_js_1.transitionPose)(dead ? { ...s, time: t * 2.5 } : s, module, clip, t)), strikePose = !execution && !interaction && !dead && s.action ? (s.action.animation4C ? sampled : (0, strike_presentation_js_1.blendEntry)(module, sampled, s.action.progress, s.time)) : sampled, pose = strikePose.pose, rig = execution ? execution.rig : dead ? sampled.rig : (0, combat_entry_js_1.bridgeCombatEntry)(s, (0, foot_contact_world_js_1.applyWorldFootContacts)(s, strikePose.rig, module), module), heading = execution ? execution.heading : s.motion?.heading ?? Math.atan2(s.fy, s.fx), fx = Math.cos(heading), fy = Math.sin(heading), transform = (v) => { const x = v[0] - pose.root[0], y = v[1] - pose.root[1]; return [s.x + fy * x + fx * y, s.y - fx * x + fy * y, v[2]]; }, parts = [], appearance = (0, hero_appearance_js_1.createHeroAppearance)(rig);
+    const execution = !dead && s.execution && s.execution.phase !== 'cancelled' ? (s.execution.kind === 'corpse-golem' ? (0, golem_finisher_rig_js_1.golemFinisherRig)({ ...s, execution: s.execution }, module) : (0, execution_rig_js_1.executionRig)(s, module)) : null, sampled = execution ?? interaction ?? (locomotion ? (0, weight_transitions_js_1.loadedLocomotion)(s, module) : (0, weight_transitions_js_1.transitionPose)(dead ? { ...s, time: t * 2.5 } : s, module, clip, t)), strikePose = !execution && !interaction && !dead && s.action ? (s.action.animation4C ? sampled : (0, strike_presentation_js_1.blendEntry)(module, sampled, s.action.progress, s.time)) : sampled, pose = strikePose.pose, rig = execution ? execution.rig : dead ? sampled.rig : (0, combat_entry_js_1.bridgeCombatEntry)(s, (0, foot_contact_world_js_1.applyWorldFootContacts)(s, strikePose.rig, module), module), heading = execution ? (s.golemAligning ? (s.motion?.heading ?? Math.atan2(s.fy, s.fx)) : execution.heading) : s.motion?.heading ?? Math.atan2(s.fy, s.fx), fx = Math.cos(heading), fy = Math.sin(heading), transform = (v) => { const x = v[0] - pose.root[0], y = v[1] - pose.root[1]; return [s.x + fy * x + fx * y, s.y - fx * x + fy * y, v[2]]; }, parts = [], appearance = (0, hero_appearance_js_1.createHeroAppearance)(rig);
     const append = (fragment, c, w) => {
         if (!fragment)
             return;
@@ -626,6 +627,38 @@ function golemFinisherRig(state, module) {
 }
 
 },
+"animation/golem-motion.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.updateGolemMotion = updateGolemMotion;
+exports.golemMotionPose = golemMotionPose;
+const mix = (a, b, t) => a + (b - a) * t;
+const localWorld = (e, h, x, y) => [e.x + Math.sin(h) * x + Math.cos(h) * y, e.y - Math.cos(h) * x + Math.sin(h) * y];
+function updateGolemMotion(e, dt, before) {
+    if (e?.archetype !== 'corpse-golem' || !(e.hp > 0) || e.mode === 'dead' || !Number.isFinite(dt) || dt <= 0 || ![e.x, e.y, e.fx, e.fy, before.x, before.y].every(Number.isFinite))
+        return;
+    const target = Math.atan2(e.fy, e.fx), old = e.golemMotion, heading = old ? old.heading + Math.atan2(Math.sin(target - old.heading), Math.cos(target - old.heading)) * (1 - Math.exp(-dt * 8)) : target;
+    const speed = mix(old?.speed ?? 0, Math.hypot(e.x - before.x, e.y - before.y) / dt, 1 - Math.exp(-dt * 8)), nominal = [localWorld(e, heading, -.48, .12), localWorld(e, heading, .48, .12)];
+    let feet = old ? old.feet.map(f => ({ ...f, start: [...f.start], goal: [...f.goal], p: [...f.p] })) : nominal.map(p => ({ p: [...p], start: [...p], goal: [...p], t: 1, lift: 0 })), next = old?.next ?? 0;
+    const active = feet.findIndex(f => f.t < 1), dist = i => Math.hypot(feet[i].p[0] - nominal[i][0], feet[i].p[1] - nominal[i][1]);
+    if (active < 0 && e.hp > 0 && Math.max(dist(0), dist(1)) > .3) {
+        if (dist(next) < .2)
+            next = 1 - next;
+        const goal = nominal[next].map((v, i) => v + [Math.cos(heading), Math.sin(heading)][i] * Math.min(.14, speed * .25));
+        feet[next] = { ...feet[next], start: [...feet[next].p], goal, t: 0, lift: 0 };
+        next = 1 - next;
+    }
+    feet = feet.map(f => { if (f.t >= 1)
+        return { ...f, lift: 0 }; const t = Math.min(1, f.t + dt / .38), u = .5 - .5 * Math.cos(Math.PI * t); return { ...f, t, p: f.start.map((v, i) => mix(v, f.goal[i], u)), lift: Math.sin(Math.PI * t) * .10 }; });
+    e.golemMotion = { heading, speed, feet, next };
+}
+function golemMotionPose(e) {
+    const m = e.golemMotion, h = m?.heading ?? Math.atan2(e.fy, e.fx), fx = Math.cos(h), fy = Math.sin(h);
+    const feet = m ? m.feet.map(f => { const x = f.p[0] - e.x, y = f.p[1] - e.y; return [fy * x - fx * y, fx * x + fy * y, f.lift]; }) : [[-.48, .12, 0], [.48, .12, 0]];
+    return { heading: h, feet, bob: m ? Math.sin((e.walkDistance ?? 0) * 5) * .012 * Math.min(1, m.speed * 2) : 0 };
+}
+
+},
 "animation/inertia.js":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -916,6 +949,62 @@ function blendEntry(module, sampled, progress, time) {
     const vector = (a, b) => a.map((value, i) => mix(value, b[i]));
     const pose = { ...to, root: vector(from.root, to.root), right: vector(from.right, to.right), left: vector(from.left, to.left), lean: mix(from.lean, to.lean), head: mix(from.head, to.head), az: mix(from.az, to.az) };
     return { pose, rig: module.rig(pose) };
+}
+
+},
+"animation/undead-motion.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.UNDEAD_KINDS = exports.ease = void 0;
+exports.undeadProfile = undeadProfile;
+exports.updateUndeadMotion = updateUndeadMotion;
+exports.undeadPose = undeadPose;
+exports.archerReady = archerReady;
+exports.bossAccentPose = bossAccentPose;
+const melee_undead_js_1 = require("../combat/melee-undead.js");
+const marrow_archer_js_1 = require("../combat/marrow-archer.js");
+const clamp = x => Math.max(0, Math.min(1, x));
+const ease = x => { x = clamp(x); return x * x * (3 - 2 * x); };
+exports.ease = ease;
+exports.UNDEAD_KINDS = Object.freeze(['bonebound', 'ossuary-guard', 'marrow-archer', 'gravebearer', 'bloated-remnant', 'ashbound']);
+function undeadProfile(kind) { return kind === 'marrow-archer' ? marrow_archer_js_1.MARROW_ARCHER : kind === 'bonebound' ? { windup: .72, recover: .8, stagger: .45 } : melee_undead_js_1.MELEE_UNDEAD[kind]; }
+function updateUndeadMotion(e, dt, before) {
+    if (!exports.UNDEAD_KINDS.includes(e.archetype) || !(e.hp > 0) || e.mode === 'dead' || !Number.isFinite(dt) || dt <= 0 || ![e.x, e.y, e.fx, e.fy, before.x, before.y].every(Number.isFinite))
+        return;
+    const old = e.undeadMotion, t = (old?.time ?? 0) + dt, target = Math.atan2(e.fy, e.fx), heading = old ? old.heading + Math.atan2(Math.sin(target - old.heading), Math.cos(target - old.heading)) * (1 - Math.exp(-dt * 10)) : target;
+    const speed = (old?.speed ?? 0) + (Math.hypot(e.x - before.x, e.y - before.y) / dt - (old?.speed ?? 0)) * (1 - Math.exp(-dt * 9)), width = e.archetype === 'bloated-remnant' ? .3 : e.archetype === 'ossuary-guard' ? .21 : .16;
+    const world = side => [e.x + Math.sin(heading) * side, e.y - Math.cos(heading) * side], nominal = [world(-width), world(width)];
+    let feet = old ? old.feet.map(f => ({ ...f, p: [...f.p], start: [...f.start], goal: [...f.goal] })) : nominal.map(p => ({ p: [...p], start: [...p], goal: [...p], t: 1, lift: 0 })), next = old?.next ?? 0;
+    const dist = i => Math.hypot(feet[i].p[0] - nominal[i][0], feet[i].p[1] - nominal[i][1]);
+    if (!feet.some(f => f.t < 1) && Math.max(dist(0), dist(1)) > (e.archetype === 'bloated-remnant' ? .22 : .17)) {
+        if (dist(next) < .1)
+            next = 1 - next;
+        const delta = [e.x - before.x, e.y - before.y], distance = Math.hypot(...delta), lead = Math.min(.14, distance / dt * .16), goal = nominal[next].map((v, i) => v + delta[i] / Math.max(distance, 1e-8) * lead);
+        feet[next] = { ...feet[next], start: [...feet[next].p], goal, t: 0 };
+        next = 1 - next;
+    }
+    const duration = e.archetype === 'ashbound' ? .23 : e.archetype === 'bloated-remnant' ? .4 : .3;
+    feet = feet.map(f => { if (f.t >= 1)
+        return { ...f, lift: 0 }; const q = Math.min(1, f.t + dt / duration), u = .5 - .5 * Math.cos(q * Math.PI); return { ...f, t: q, p: f.start.map((v, i) => v + (f.goal[i] - v) * u), lift: Math.sin(q * Math.PI) * .065 }; });
+    const quiet = speed < .035 && ['wait', 'chase'].includes(e.mode), gestureTarget = quiet ? 1 : 0, gesture = (old?.gesture ?? 0) + (gestureTarget - (old?.gesture ?? 0)) * (1 - Math.exp(-dt * 10));
+    e.undeadMotion = { time: t, heading, speed, feet, next, gesture };
+}
+function undeadPose(e) {
+    const p = undeadProfile(e.archetype);
+    if (!p)
+        return null;
+    const m = e.undeadMotion, time = m?.time ?? 0, heading = e.archetype === 'marrow-archer' && e.archerLocked ? Math.atan2(e.fy, e.fx) : m?.heading ?? Math.atan2(e.fy, e.fx), width = e.archetype === 'bloated-remnant' ? .3 : e.archetype === 'ossuary-guard' ? .21 : .16;
+    const feet = m ? m.feet.map(f => { const dx = f.p[0] - e.x, dy = f.p[1] - e.y; return [Math.sin(heading) * dx - Math.cos(heading) * dy, Math.cos(heading) * dx + Math.sin(heading) * dy, f.lift]; }) : [[-width, 0, 0], [width, 0, 0]];
+    const u = e.mode === 'windup' ? clamp(e.timer / p.windup) : 0, recover = e.mode === 'recover' ? (0, exports.ease)(e.timer / p.recover) : 0;
+    const raise = (0, exports.ease)(u / .72), strike = (0, exports.ease)((u - .78) / .22), idle = (m?.gesture ?? 0) * Math.max(0, Math.sin((time + (e.id ?? 0) * 1.7) * .65)) ** 6;
+    return { time, heading, feet, raise, strike, recover, idle, gestureVariant: (e.id ?? 0) % 2, breath: Math.sin(time * 1.8 + (e.id ?? 0)) * .008, hit: e.mode === 'stagger' ? Math.sin(clamp(e.timer / (p.stagger ?? .45)) * Math.PI) * .07 : 0 };
+}
+function archerReady(e) { return e.archetype === 'marrow-archer' && e.hp > 0 && e.mode === 'windup' && e.archerLocked === true && !e.hitFired && Number.isFinite(e.timer) && e.timer >= marrow_archer_js_1.MARROW_ARCHER.aimLock; }
+function bossAccentPose(e, time = 0) {
+    if (e.hp <= 0)
+        return { head: 0, jaw: 0, grip: 0, shoulder: 0 };
+    const attack = e.mode === 'windup', recover = e.mode === 'recover';
+    return { head: Math.sin(time * .8 + (e.id ?? 0)) * (attack ? .004 : .018), jaw: (.5 + .5 * Math.sin(time * .7)) * .012, grip: attack ? Math.min(1, e.timer * 2) : .15 + .1 * Math.sin(time), shoulder: recover ? Math.sin(Math.min(1, e.timer) * Math.PI) * .018 : Math.sin(time * 1.3) * .006 };
 }
 
 },
@@ -1211,7 +1300,7 @@ function createEnemyHealthRuntime({ defaultMaxHp = 70, diagnosticsTarget = null 
             const picked = index.pick(pointer);
             hover = visibleIds.has(picked) ? picked : null;
             const boss = state.bossEncounter;
-            view = model.update({ time: state.time, worldKey: state, enemies: roster(state), visibleIds, hoverId: hover, hits: events, bossId: boss?.bossId ?? null, inBossRoom: boss?.active === true && boss?.inRoom === true, enabled: true });
+            view = model.update({ time: state.time, worldKey: state, enemies: roster(state).filter(e => e.archetype !== 'corpse-golem'), visibleIds, hoverId: hover, hits: events, bossId: boss?.bossId ?? null, inBossRoom: boss?.active === true && boss?.inRoom === true, enabled: true });
             candidates = diagnosticsTarget ? index.records.filter(r => Number.isSafeInteger(r.id)).slice(0, 256).map(r => [r.v.reduce((n, p) => n + p[0], 0) / r.v.length, r.v.reduce((n, p) => n + p[1], 0) / r.v.length]) : [];
             stats = { records: index.records.length, buckets: index.bucketCount, updateMs: performance.now() - begin };
             return view;
@@ -1522,6 +1611,19 @@ function installIronCursor(canvas, { read = () => ({}) } = {}) {
 "app/main.js":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+const undead_family_js_1 = require("../render/undead-family.js");
+// UNDEAD_REDESIGN_V5
+// COMBAT_CLARITY_V4
+const spectral_light_js_1 = require("../render/spectral-light.js");
+const golem_telegraph_js_1 = require("../render/golem-telegraph.js");
+const world_surface_js_1 = require("./world-surface.js");
+const hero_overlay_labels_js_1 = require("../ui/hero-overlay-labels.js");
+const engine_hud_pass_js_1 = require("../ui/engine-hud-pass.js");
+// ENGINE_HUD_V7
+// FULL_WORLD_GRAPHIC_HUD_V6
+// GOLEM_TRIAL_APP_V1
+const golem_trial_state_js_1 = require("../game/golem-trial-state.js");
+const golem_trial_hud_js_1 = require("../ui/golem-trial-hud.js");
 // VISUAL_EMBER_ASCII_V1
 const amber_cell_js_1 = require("../render/amber-cell.js");
 const marrow_archer_js_1 = require("../render/marrow-archer.js");
@@ -1567,7 +1669,7 @@ const render_frame_js_1 = require("../gallery/render-frame.js");
 const player_js_1 = require("../gallery/player.js");
 const galleryMotion = require("../animation/motion.js");
 const foot_contact_world_js_1 = require("../animation/foot-contact-world.js");
-const $ = s => document.getElementById(s), cv = $('game'), out = cv.getContext('2d', { willReadFrequently: true }), H = 720, ROWS = 140;
+const $ = s => document.getElementById(s), cv = $('game'), out = cv.getContext('2d', { willReadFrequently: true }), H = 864, ROWS = 168;
 let W = 1008, COLS = 196;
 const canvas = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }, scene = canvas(W, H), mask = canvas(W, H), sg = scene.getContext('2d', { willReadFrequently: true }), mg = mask.getContext('2d', { willReadFrequently: true });
 const ascii = new ascii_js_1.ASCII(out), maskReader = new ascii_js_1.ASCII(out), uiASCII = new ascii_js_1.ASCII(out, 1008), ui = (0, ornaments_js_1.makeUI)(out, (src, cols, rows, y, h, mono) => { out.save(); out.translate((W - 1008) / 2, 0); uiASCII.paint(src, cols, rows, y, h, mono); out.restore(); });
@@ -1579,9 +1681,11 @@ let fireLighting = (0, combat_light_context_js_1.findCombatLights)(doorScene);
 let ritualBonfire = (0, ritual_bonfire_js_1.createRitualBonfire)(world, doorScene.map);
 const dashHud = { ready: false, at: -Infinity };
 const enemyHealth = (0, enemy_health_runtime_js_1.createEnemyHealthRuntime)({ diagnosticsTarget: window });
+const engineHud = (0, engine_hud_pass_js_1.createEngineHudPass)(canvas);
 let mode = 'menu', selected = 0, menuPage = false, time = 0, last = 0, drawAt = 0, simLast = null, acc = 0, paused = false, frozen = false, endTime = 0, aimPoint = null, camera = { x: 8, y: 12 }, view = { zoom: 1, dx: 0, dy: 0 }, renderCount = 0, fireAt = -1, coneBoost = 0;
 let manualAdvance = false;
 let selectedLevelId = 'test-chamber';
+let golemCheckpoint = null;
 let manifest = null;
 let relicWorld = typeof relic_world_js_1.createRelicWorld === 'function' ? (0, relic_world_js_1.createRelicWorld)({
     map: doorScene.map,
@@ -1591,7 +1695,7 @@ let relicWorld = typeof relic_world_js_1.createRelicWorld === 'function' ? (0, r
 }) : null;
 let galleryScene = null, galleryCamera = null, galleryReturn = null, galleryTimings = null, galleryTime = 0, galleryPlayer = null;
 const interactionContext = () => mode === 'gallery' ? (galleryPlayer ? 'gallery-walk' : 'gallery-preview') : mode;
-const targeting = (0, frame_targeting_js_1.installFrameTargeting)(cv, { enemyTarget: () => enemyHealth.hoverId(), context: interactionContext, resolve: id => mode === 'gallery' ? galleryScene?.getTarget(id) : (env.targets ?? []).find(t => t.id === id), canRequest: () => !manifest?.blocking() && (0, intent_js_1.interactionInputAllowed)({ mode: interactionContext(), actor: mode === 'gallery' ? galleryPlayer?.snapshot() : world.current, frozen, hidden: document.hidden, queued: commands.length > 0 }) });
+const targeting = (0, frame_targeting_js_1.installFrameTargeting)(cv, { enemyTarget: () => enemyHealth.hoverId(), context: interactionContext, resolve: id => mode === 'gallery' ? galleryScene?.getTarget(id) : (env.targets ?? []).find(t => t.id === id), canRequest: () => !manifest?.blocking() && (0, intent_js_1.interactionInputAllowed)({ mode: interactionContext(), actor: mode === 'gallery' ? galleryPlayer?.snapshot() : world.current, frozen, hidden: document.hidden, queued: commands.length > 0 }) && (mode !== 'game' || !(0, world_surface_js_1.heroHudHit)(aimPoint, W, H)) });
 let combatDoor = (0, combat_door_controller_js_1.createCombatDoorController)({ world, scene: doorScene, targeting, active: () => mode === 'game' && (!frozen || manualAdvance) });
 function stepWorld(dt, input) { if (manifest?.blocking())
     return; combatDoor.step(dt, input); ritualBonfire.step(); env.step?.(dt); effects.step(dt, world.current, world.events); }
@@ -1613,7 +1717,10 @@ function advanceWorld(seconds) {
     }
     return true;
 }
-function resetWorld() { targeting.clear(); relicWorld?.reset(); manifest?.reset(); enemyHealth.reset(); combatDoor.cancel('reset'); doorScene.reset(); world.reset(); (0, registry_js_1.applyLevelSpawn)(world, selectedLevelId); ritualBonfire.reset(); dashHud.ready = false; dashHud.at = -Infinity; effects.reset(); fireHintLayer.clear(); view = { zoom: 1, dx: 0, dy: 0 }; }
+function resetWorld() { targeting.clear(); relicWorld?.reset(); manifest?.reset(); enemyHealth.reset(); combatDoor.cancel('reset'); doorScene.reset(); world.reset(); (0, registry_js_1.applyLevelSpawn)(world, selectedLevelId); if (selectedLevelId === 'golem-trial' && golemCheckpoint) {
+    (0, golem_trial_state_js_1.restoreGolemLoadout)(world.current, golemCheckpoint);
+    world.previous = world.snapshot();
+} ritualBonfire.reset(); dashHud.ready = false; dashHud.at = -Infinity; effects.reset(); fireHintLayer.clear(); view = { zoom: 1, dx: 0, dy: 0 }; }
 const fire = canvas(192, 165), fg = fire.getContext('2d', { willReadFrequently: true }), fireASCII = new ascii_js_1.ASCII(out);
 const basePr = (x, y, z, cx = camera.x, cy = camera.y) => [504 + ((x - cx) - (y - cy)) * 65 * .76, 430 + ((x - cx) + (y - cy)) * 65 * .43 - z * 65 * .87];
 const pr = (x, y, z, cx = camera.x, cy = camera.y) => (0, viewport_js_1.screenPoint)((0, execution_effects_js_1.projectExecution)(basePr(x, y, z, cx, cy), view), W);
@@ -1652,8 +1759,8 @@ function render(s = world.snapshot(), galleryFrame = null) {
         manifest?.advance(performance.now());
         manifest?.update(s);
     }
-    const rite = galleryFrame ? null : ritualBonfire.frame();
-    const ritualArt = galleryFrame ? null : ritualBonfire.art(s, ritualInputAllowed() && !targeting.current());
+    const rite = galleryFrame || selectedLevelId === 'golem-trial' ? null : ritualBonfire.frame();
+    const ritualArt = galleryFrame || selectedLevelId === 'golem-trial' ? null : ritualBonfire.art(s, ritualInputAllowed() && !targeting.current());
     if (!galleryFrame) {
         s = combatDoor.decorate(s);
         s = { ...s, interactionAnimation: rite ?? s.interactionAnimation, comboEdgeActive: s.phase === 'playing' && world.actions.canContinue() };
@@ -1665,18 +1772,22 @@ function render(s = world.snapshot(), galleryFrame = null) {
     const focus = basePr(v.focusX, v.focusY, v.focusZ, s.cameraX, s.cameraY);
     camera = { x: s.cameraX, y: s.cameraY };
     view = { zoom: v.zoom, dx: (504 - focus[0]) * (v.zoom - 1) + v.weight * (504 - focus[0]) * .3 + v.shakeX, dy: (430 - focus[1]) * (v.zoom - 1) + v.weight * (430 - focus[1]) * .3 + v.shakeY };
+    if (!galleryFrame)
+        s = { ...s, visualLights: env.lights }; // GOLEM_SCULPT_LIGHT_V3
     const enemyGroups = galleryFrame ? [] : enemyHealth.geometry(s, execution_enemy_js_1.executionEnemyParts);
-    const drawState = { ...s, visualZoom: view.zoom }, galleryDraw = galleryFrame ? (0, render_frame_js_1.galleryRenderLayers)(galleryFrame) : null, parts = galleryDraw ? [...galleryDraw.objects, ...hero.parts].sort((a, b) => a.d - b.d) : [...env.parts, ...enemyGroups.flatMap(g => g.parts), ...(0, marrow_archer_js_1.arrowParts)(s.arrows ?? []), ...hero.parts, ...visual.parts, ...(ritualArt?.parts ?? [])].sort((a, b) => a.d - b.d);
-    if (!galleryFrame && relicWorld) {
+    if (!galleryFrame)
+        env.setView?.(s, pr); // GOLEM_VISUAL_ROOM_V2
+    const drawState = { ...s, visualZoom: view.zoom }, galleryDraw = galleryFrame ? (0, render_frame_js_1.galleryRenderLayers)(galleryFrame) : null, parts = galleryDraw ? [...galleryDraw.objects, ...hero.parts].sort((a, b) => a.d - b.d) : [...env.parts, ...(0, golem_telegraph_js_1.golemTelegraphs)(s, doorScene.map, geometry_js_1.blocked), ...enemyGroups.flatMap(g => g.parts), ...(0, marrow_archer_js_1.arrowParts)(s.arrows ?? []), ...hero.parts, ...visual.parts, ...(ritualArt?.parts ?? [])].sort((a, b) => a.d - b.d);
+    if (!galleryFrame && relicWorld && selectedLevelId !== 'golem-trial') {
         parts.push(...relicWorld.parts(s));
         parts.sort((a, b) => a.d - b.d);
     }
     targeting.frame({ parts, targets: galleryFrame?.targets ?? env.targets ?? [], project: pr, zoom: view.zoom, active: (mode === 'gallery' && !galleryPlayer) || ((mode === 'game' || mode === 'gallery') && s.phase === 'playing') });
-    const lamp = pr(...hero.lamp), lampProfile = (0, lamp_light_js_1.lampLighting)(s.lamp, galleryFrame && !galleryPlayer ? 'playing' : s.phase), radius = 146 * 65 / 94 * 1.2 * view.zoom * lampProfile.radiusScale, power = lampProfile.power;
+    const lamp = pr(...hero.lamp), lampProfile = (0, lamp_light_js_1.lampLighting)(s.lamp, galleryFrame && !galleryPlayer ? 'playing' : s.phase), radius = 146 * 65 / 94 * 1.2 * view.zoom * lampProfile.radiusScale * 1.3, power = lampProfile.power;
     if (!galleryFrame) {
         const clean = parts.filter(p => !p.interactionVapor).map(p => p.interactionSource ?? p);
         parts.splice(0, parts.length, ...clean);
-        const canHover = aimPoint && (0, intent_js_1.interactionInputAllowed)({ mode: 'game', actor: s, frozen, hidden: document.hidden, queued: commands.length > 0 }), hover = canHover ? (0, frame_targeting_js_1.pickFrameTarget)({ parts, targets: [...doorScene.targets, ...(fireLighting?.getFrame().targets ?? [])], point: [aimPoint.x, aimPoint.y], project: pr, zoom: view.zoom, viewport: { width: W, height: H } }) : null;
+        const canHover = aimPoint && !(0, world_surface_js_1.heroHudHit)(aimPoint, W, H) && (0, intent_js_1.interactionInputAllowed)({ mode: 'game', actor: s, frozen, hidden: document.hidden, queued: commands.length > 0 }), hover = canHover ? (0, frame_targeting_js_1.pickFrameTarget)({ parts, targets: [...doorScene.targets, ...(fireLighting?.getFrame().targets ?? [])], point: [aimPoint.x, aimPoint.y], project: pr, zoom: view.zoom, viewport: { width: W, height: H } }) : null;
         parts.push(...(0, fire_feedback_js_1.createFireHintParts)({ sources: fireLighting?.getSources() ?? [], hover, time: s.time, project: pr, lamp: { point: lamp, radius, power }, reducedMotion: !!window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches }));
         parts.sort((a, b) => a.d - b.d);
     }
@@ -1701,7 +1812,7 @@ function render(s = world.snapshot(), galleryFrame = null) {
         fireHintLayer.render(parts, (ctx, p) => part(ctx, p, drawState, false));
     else
         fireHintLayer.clear();
-    const data = ascii.read(scene, COLS, ROWS), ma = maskReader.read(mask, COLS, ROWS), geometryMs = performance.now() - start, lights = (galleryFrame ? galleryFrame.lights : [...env.lights, ...(ritualArt?.lights ?? []).map(l => ({ ...l, fireWarmth: 1 }))]).map(l => ({ p: pr(l.x, l.y, l.z), r: l.r * view.zoom, v: l.power, fireWarmth: (0, combat_door_environment_js_1.fireWarmthOf)(l) })), sparkFlash = (0, fire_feedback_js_1.sparkFlashProfile)(s.cone);
+    const data = ascii.read(scene, COLS, ROWS), ma = maskReader.read(mask, COLS, ROWS), geometryMs = performance.now() - start, lights = (galleryFrame ? galleryFrame.lights : [...env.lights, ...(0, undead_family_js_1.undeadReadyLights)(s), ...(ritualArt?.lights ?? []).map(l => ({ ...l, fireWarmth: 1 }))]).map(l => ({ p: pr(l.x, l.y, l.groundZ ?? l.z), r: l.r * view.zoom, v: l.power, fireWarmth: (0, combat_door_environment_js_1.fireWarmthOf)(l), tint: (0, spectral_light_js_1.lightTint)(l) })), sparkFlash = (0, fire_feedback_js_1.sparkFlashProfile)(s.cone);
     for (const p of (sparkFlash.gain > 0 ? s.particles.filter(p => p.glow && p.life > .08).slice(0, 12) : []))
         lights.push({ p: pr(p.x, p.y, p.z), r: sparkFlash.particleRadius * view.zoom, v: sparkFlash.particlePower * Math.min(1, p.life * 2) });
     for (const q of visual.lights)
@@ -1715,6 +1826,7 @@ function render(s = world.snapshot(), galleryFrame = null) {
         for (let x = 0; x < COLS; x++) {
             const k = (y * COLS + x) * 4, px = (x + .5) * W / COLS, py = (y + .5) * H / ROWS, h = ma[k] > 127, n = power > 0 ? Math.exp(-((px - lamp[0]) ** 2 + (py - lamp[1]) ** 2) / (2 * radius ** 2)) : 0;
             let l = .018 + (h ? .065 : .12) + n * .82 * 1.6 * power * (1 + Math.sin(s.time * 2.2) * .035), f = 0, fireGlow = 0;
+            const spectral = [n * power, n * power * .95, n * power * .82, n * power];
             for (const q of lights) {
                 const dx = px - q.p[0], dy = py - q.p[1];
                 if (Math.abs(dx) > q.r * 3 || Math.abs(dy) > q.r * 3)
@@ -1722,6 +1834,10 @@ function render(s = world.snapshot(), galleryFrame = null) {
                 const glow = Math.exp(-(dx * dx + dy * dy) / (2 * q.r * q.r)) * q.v;
                 l += glow;
                 fireGlow += glow * (q.fireWarmth ?? 0);
+                const tint = q.tint ?? [1, 1, 1];
+                for (let j = 0; j < 3; j++)
+                    spectral[j] += glow * tint[j];
+                spectral[3] += glow;
             }
             if (!h && s.cone && sparkFlash.gain > 0) {
                 const q = unpr({ x: px, y: py }), c = s.cone, dx = q.x - c.x, dy = q.y - c.y, d = Math.hypot(dx, dy), front = (dx * c.fx + dy * c.fy) / Math.max(.01, d), edge = Math.cos(80 * Math.PI / 180);
@@ -1733,11 +1849,11 @@ function render(s = world.snapshot(), galleryFrame = null) {
             }
             if (h)
                 l = Math.max(.38, Math.min(.82, l));
-            const v = Math.max(.25, 1 - ((px - W / 2) / (700 * W / 1008)) ** 2 * .32 - ((py - 360) / 600) ** 2 * .2), warm = Math.min(1, n * lampProfile.warmth + f + Math.min(1, fireGlow)), base = l * v * (h ? 1 : 1.25);
-            (0, amber_cell_js_1.shadeAmberCell)(data, k, base, warm, h);
+            const v = Math.max(.25, 1 - ((px - W / 2) / (700 * W / 1008)) ** 2 * .32 - ((py - H / 2) / (H * .84)) ** 2 * .2), warm = Math.min(1, n * lampProfile.warmth + f + Math.min(1, fireGlow)), base = l * v * (h ? 1 : 1.25);
+            (0, spectral_light_js_1.shadeColoredCell)(data, k, base, warm, h, spectral);
         }
     if (!galleryFrame)
-        enemyHealth.update({ parts, groups: enemyGroups, project: pr, zoom: view.zoom, viewport: { width: W, height: H }, cells: { data, cols: COLS, rows: ROWS }, pointer: aimPoint ? [aimPoint.x, aimPoint.y] : null, state: world.current, events: world.events, enabled: mode === 'game' && !manifest?.blocking() && !document.hidden && s.phase === 'playing' });
+        enemyHealth.update({ parts, groups: enemyGroups, project: pr, zoom: view.zoom, viewport: { width: W, height: H }, cells: { data, cols: COLS, rows: ROWS }, pointer: aimPoint && !(0, world_surface_js_1.heroHudHit)(aimPoint, W, H) ? [aimPoint.x, aimPoint.y] : null, state: world.current, events: world.events, enabled: mode === 'game' && !manifest?.blocking() && !document.hidden && s.phase === 'playing' });
     const heroBackdropCells = galleryFrame
         ? 0
         : (0, hero_backdrop_js_1.applyHeroBackdrop)(data, ma, COLS, ROWS);
@@ -1746,13 +1862,23 @@ function render(s = world.snapshot(), galleryFrame = null) {
     const frame = galleryFrame
         ? data
         : (0, combat_hud_js_1.composeCombatHud)(data, COLS, ROWS, frameRows, dashHud, s, world.dashReady(), ash_dash_js_1.DASH.cooldown);
+    if (!galleryFrame) {
+        const hudTarget = engineHud.begin(W, frameHeight);
+        if (mode === 'game' && !manifest?.blocking() && !document.hidden) {
+            (0, hero_overlay_labels_js_1.paintHeroOverlayLabels)(hudTarget, s, { width: W, height: H, ready: world.dashReady() });
+            enemyHealth.paint(hudTarget, { width: W, height: H });
+            if (selectedLevelId === 'golem-trial')
+                (0, golem_trial_hud_js_1.paintGolemTrialHud)(hudTarget, s, { width: W, enabled: true, available: world.executionAvailable() });
+        }
+        engineHud.compose(frame, COLS, frameRows);
+    }
     if (!galleryFrame)
         manifest?.paint(frame, COLS, frameRows);
     const lightingMs = performance.now() - t;
     const glyphAt = performance.now();
     out.fillStyle = '#000';
     out.fillRect(0, 0, W, frameHeight);
-    ascii.paint(frame, COLS, galleryFrame ? ROWS : frameRows, 0, galleryFrame ? H : frameHeight);
+    ascii.paint(frame, COLS, galleryFrame ? ROWS : frameRows, 0, galleryFrame ? H : frameHeight, false, galleryFrame ? null : engineHud.annotations());
     if (!galleryFrame)
         fireHintLayer.composite(out);
     out.save();
@@ -1768,8 +1894,9 @@ function render(s = world.snapshot(), galleryFrame = null) {
         out.fillText(p.glyph, ...pr(p.x, p.y, p.z));
     }
     out.restore();
-    if (!galleryFrame && mode === 'game' && !manifest?.blocking())
-        enemyHealth.paint(out, { width: W, height: H });
+    void 0; // Hero labels are part of engineHud, not a post-frame overlay.
+    void 0; // Target panels are part of engineHud before ASCII output.
+    void 0; // Boss panel is part of engineHud before ASCII output.
     if (!galleryFrame)
         manifest?.text(out, COLS, frameRows, frameHeight);
     renderCount++;
@@ -1810,7 +1937,7 @@ function rebuildSelectedLevel() {
     enemyHealth.reset();
     fireLighting = (0, combat_light_context_js_1.findCombatLights)(doorScene);
     ritualBonfire = (0, ritual_bonfire_js_1.createRitualBonfire)(world, doorScene.map);
-    relicWorld = (0, relic_world_js_1.createRelicWorld)({ map: doorScene.map, openDialogue: value => window.__ASH_MANIFEST__?.openDialogue(value), openReading: value => window.__ASH_MANIFEST__?.openReading(value), setObjective: value => window.__ASH_MANIFEST__?.setObjective(value) });
+    relicWorld = selectedLevelId === 'golem-trial' ? null : (0, relic_world_js_1.createRelicWorld)({ map: doorScene.map, openDialogue: value => window.__ASH_MANIFEST__?.openDialogue(value), openReading: value => window.__ASH_MANIFEST__?.openReading(value), setObjective: value => window.__ASH_MANIFEST__?.setObjective(value) });
     combatDoor = (0, combat_door_controller_js_1.createCombatDoorController)({ world, scene: doorScene, targeting, active: () => mode === 'game' && (!frozen || manualAdvance) });
     keys.clear();
     commands.length = 0;
@@ -1819,11 +1946,13 @@ function rebuildSelectedLevel() {
     acc = 0;
     drawAt = 0;
 }
-function launchLevel(id) { (0, registry_js_1.gameLevel)(id); const previous = selectedLevelId; selectedLevelId = id; try {
+function launchLevel(id) { (0, registry_js_1.gameLevel)(id); const previous = selectedLevelId, oldCheckpoint = golemCheckpoint; if (id === 'golem-trial' && previous !== 'golem-trial')
+    golemCheckpoint = (0, golem_trial_state_js_1.captureGolemLoadout)(world.current); selectedLevelId = id; try {
     start();
 }
 catch (error) {
     selectedLevelId = previous;
+    golemCheckpoint = oldCheckpoint;
     throw error;
 } return { id: selectedLevelId }; }
 window.__ASH_LEVELS__ = Object.freeze({ list: () => registry_js_1.GAME_LEVELS.map(l => ({ ...l })), current: () => ({ ...(0, registry_js_1.gameLevel)(selectedLevelId) }), start: launchLevel, menu: () => window.__ASH_THRONE__?.levels?.() });
@@ -1857,7 +1986,7 @@ function home() { targeting.clear(); if (mode === 'gallery')
 function pause() { if (mode !== 'game')
     return; enemyHealth.reset(); manifest?.dismiss(); combatDoor.cancel('pause'); targeting.clear(); mode = 'pause'; selected = 0; keys.clear(); commands.length = 0; simLast = null; acc = 0; }
 const point = e => { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * 864 / r.height }; };
-const ritualInputAllowed = () => !manifest?.blocking() && (0, intent_js_1.interactionInputAllowed)({ mode: interactionContext(), actor: world.current, frozen, hidden: document.hidden, queued: commands.length > 0 });
+const ritualInputAllowed = () => selectedLevelId !== 'golem-trial' && !manifest?.blocking() && (0, intent_js_1.interactionInputAllowed)({ mode: interactionContext(), actor: world.current, frozen, hidden: document.hidden, queued: commands.length > 0 });
 window.addEventListener('keydown', event => {
     if (event.code !== 'KeyF' || event.repeat || event.defaultPrevented || mode !== 'game' || event.target?.isContentEditable || event.target?.closest?.('input,select,textarea,button,[contenteditable]'))
         return;
@@ -1942,7 +2071,7 @@ cv.addEventListener('pointerdown', e => { cv.focus(); if (mode === 'gallery')
     if (i >= 0 && i < items().length && p.x > 220 && p.x < 788)
         items()[i][1]();
     return;
-} if (frozen || world.current.dash || p.y >= 720)
+} if (frozen || world.current.dash || (0, world_surface_js_1.heroHudHit)(p, W, H))
     return; e.preventDefault(); const kind = e.button === 0 ? 'light' : e.button === 2 ? 'heavy' : e.button === 1 ? 'sweep' : null; if (kind && commands.length < 8)
     commands.push({ kind, aim: unpr(p) }); });
 cv.addEventListener('contextmenu', e => e.preventDefault());
@@ -1954,6 +2083,11 @@ $('restart').onclick = start;
 $('bestiaryTrial').onclick = startBoneboundTrial;
 $('undeadTrial').onclick = () => launchLevel('undead-trial');
 $('archerTrial').onclick = () => launchLevel('archer-trial');
+const golemButton = document.createElement('button');
+golemButton.id = 'golemTrial';
+golemButton.textContent = 'GOLEM TRIAL';
+golemButton.onclick = () => launchLevel('golem-trial');
+$('archerTrial').after(golemButton);
 $('freeze').onclick = () => { if (mode !== 'game')
     return; frozen = !frozen; combatDoor.cancel('freeze'); keys.clear(); commands.length = 0; simLast = null; acc = 0; $('freeze').textContent = frozen ? 'RESUME' : 'FREEZE FRAME'; cv.focus(); };
 $('perfToggle').onclick = () => $('perf').hidden = !$('perf').hidden;
@@ -2089,7 +2223,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.basePoint = exports.screenPoint = void 0;
 exports.viewportMetrics = viewportMetrics;
 exports.installViewport = installViewport;
-function viewportMetrics(w, h) { w = Number.isFinite(w) && w > 0 ? w : 1008; h = Number.isFinite(h) && h > 0 ? h : 864; const width = Math.max(1008, Math.min(4096, Math.round(432 * w / h) * 2)), height = 864, scale = Math.min(w / width, h / height); return { width, height, cols: Math.round(196 * width / 1008), rows: 140, displayWidth: width * scale, displayHeight: height * scale }; }
+function viewportMetrics(w, h) { w = Number.isFinite(w) && w > 0 ? w : 1008; h = Number.isFinite(h) && h > 0 ? h : 864; const width = Math.max(64, Math.min(4096, Math.round(432 * w / h) * 2)), height = 864, scale = Math.min(w / width, h / height); return { width, height, cols: Math.round(196 * width / 1008), rows: 168, displayWidth: width * scale, displayHeight: height * scale }; }
 const screenPoint = (p, width) => [p[0] + (width - 1008) / 2, p[1]];
 exports.screenPoint = screenPoint;
 const basePoint = (p, width) => [p[0] - (width - 1008) / 2, p[1]];
@@ -2174,6 +2308,23 @@ function visibleTargetSamples({ parts, targets, project, targetId, zoom = 1, vie
         }
     return samples;
 }
+
+},
+"app/world-surface.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.WORLD_SURFACE = void 0;
+exports.heroHudBounds = heroHudBounds;
+exports.heroHudHit = heroHudHit;
+exports.WORLD_SURFACE = Object.freeze({ height: 864, rows: 168 });
+function heroHudBounds(width, height = 864) {
+    const cols = Math.round(196 * width / 1008), hudCols = Math.min(cols - 2, Math.max(1, Math.round(cols * .65))), hudRows = Math.min(21, 168 - 1), cellX = width / cols, cellY = height / 168;
+    if (cols < 64)
+        return { x: 0, y: height, width: 0, height: 0 };
+    return { x: Math.floor((cols - hudCols) / 2) * cellX, y: (168 - hudRows - 1) * cellY, width: hudCols * cellX, height: hudRows * cellY };
+}
+function heroHudHit(point, width, height = 864) { if (!point || ![point.x, point.y, width, height].every(Number.isFinite) || width <= 0 || height <= 0)
+    return false; const r = heroHudBounds(width, height); return r.width > 0 && r.height > 0 && point.x >= r.x && point.x <= r.x + r.width && point.y >= r.y && point.y <= r.y + r.height; }
 
 },
 "combat/action-machine.js":function(require,module,exports){
@@ -2330,10 +2481,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.BESTIARY = void 0;
 exports.enemyDefinition = enemyDefinition;
 exports.makeBestiaryEnemy = makeBestiaryEnemy;
+const corpse_golem_js_1 = require("./corpse-golem.js");
 const marrow_archer_js_1 = require("./marrow-archer.js");
 const config_js_1 = require("./config.js");
 const melee_undead_js_1 = require("./melee-undead.js");
-const profiles = { ...melee_undead_js_1.MELEE_UNDEAD, 'marrow-archer': marrow_archer_js_1.MARROW_ARCHER,
+const profiles = { ...melee_undead_js_1.MELEE_UNDEAD, 'marrow-archer': marrow_archer_js_1.MARROW_ARCHER, 'corpse-golem': corpse_golem_js_1.CORPSE_GOLEM,
     'test-warden': { id: 'test-warden', name: 'Test Warden', category: 'human', maxHp: config_js_1.COMBAT.enemyLife, damage: config_js_1.COMBAT.enemyDamage, radius: .35, speed: config_js_1.COMBAT.enemySpeed, windup: config_js_1.COMBAT.enemyWindup, recover: config_js_1.COMBAT.enemyRecover, reach: config_js_1.COMBAT.enemyReach, cooldown: config_js_1.COMBAT.enemyCooldown, stagger: config_js_1.COMBAT.staggerDuration },
     bonebound: { id: 'bonebound', name: 'Bonebound', category: 'undead', maxHp: 36, damage: 8, radius: .32, speed: .8, windup: .72, recover: .8, reach: 1.15, cooldown: 1.35, stagger: .45 }
 };
@@ -2366,6 +2518,7 @@ exports.advanceGolemExecution = advanceGolemExecution;
 exports.golemFinisherFrame = golemFinisherFrame;
 exports.golemExecutionPresentation = golemExecutionPresentation;
 exports.stepCorpseGolem = stepCorpseGolem;
+const golem_motion_js_1 = require("../animation/golem-motion.js");
 // Provisional balance. There are no health-dependent combat phases.
 exports.CORPSE_GOLEM = Object.freeze({
     id: 'corpse-golem', name: 'Corpse Golem', category: 'undead', boss: true,
@@ -2451,7 +2604,7 @@ function golemExecutionPresentation(e) {
         regrip: ramp(t, 4.8, 5.2), pull: ramp(t, 5.2, 6.1), back: f.withdraw,
         cameraZoom: 1 + .09 * focus, cameraShake: 0 };
 }
-function stepCorpseGolem({ enemy: e, dt, player, map, damage, solid, blocked, allowAttack = true }) {
+function stepCorpseGolemCore({ enemy: e, dt, player, map, damage, solid, blocked, allowAttack = true }) {
     if (e.archetype !== 'corpse-golem')
         return false;
     if (e.hp <= 0 || e.mode === 'dead' || !Number.isFinite(dt) || dt <= 0)
@@ -2532,6 +2685,14 @@ function stepCorpseGolem({ enemy: e, dt, player, map, damage, solid, blocked, al
     if (d > 1.3 && d < 10)
         move(e.fx, e.fy, Math.min(exports.CORPSE_GOLEM.speed * dt, d - 1.3));
     return true;
+}
+// GOLEM_MOTION_WRAPPER_V4
+function stepCorpseGolem(args) {
+    const e = args.enemy, before = { x: e.x, y: e.y };
+    const handled = stepCorpseGolemCore(args);
+    if (handled && e.archetype === 'corpse-golem' && e.hp > 0 && e.mode !== 'dead' && Number.isFinite(args.dt) && args.dt > 0)
+        (0, golem_motion_js_1.updateGolemMotion)(e, args.dt, before);
+    return handled;
 }
 
 },
@@ -2944,7 +3105,7 @@ exports.stepMeleeEnemy = stepMeleeEnemy;
 // Provisional tuning, not final balance.
 exports.MELEE_UNDEAD = Object.freeze(Object.fromEntries(Object.entries({
     'ossuary-guard': { name: 'Ossuary Guard', maxHp: 80, damage: 14, radius: .38, speed: .62, windup: .95, recover: 1.1, reach: 1.4, cooldown: 1.65, stagger: .45, arc: 85 },
-    gravebearer: { name: 'Gravebearer', maxHp: 96, damage: 20, radius: .4, speed: .48, windup: 1.45, recover: 1.6, reach: 2.1, cooldown: 2.2, stagger: .55, arc: 160 },
+    gravebearer: { name: 'Coffin Bearer', maxHp: 96, damage: 20, radius: .4, speed: .48, windup: 1.45, recover: 1.6, reach: 2.1, cooldown: 2.2, stagger: .55, arc: 160 },
     'bloated-remnant': { name: 'Bloated Remnant', maxHp: 110, damage: 16, radius: .54, speed: .42, windup: 1.1, recover: 1.35, reach: 1.35, cooldown: 1.8, stagger: .55, arc: 110 },
     ashbound: { name: 'Ashbound', maxHp: 32, damage: 7, radius: .28, speed: 1.18, windup: .48, recover: .85, reach: 1.05, cooldown: 1.15, stagger: .4, arc: 70 }
 }).map(([id, p]) => [id, Object.freeze({ id, category: 'undead', ...p })])));
@@ -4804,6 +4965,10 @@ function enableCombatLights(door) {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CombatWorld = void 0;
+const undead_motion_js_1 = require("../animation/undead-motion.js");
+// GOLEM_TRIAL_CONNECTED_V1
+const golem_trial_state_js_1 = require("./golem-trial-state.js");
+const corpse_golem_js_1 = require("../combat/corpse-golem.js");
 // MARROW_ARCHER_CONNECTED_V1
 const marrow_archer_js_1 = require("../combat/marrow-archer.js");
 const lamp_life_js_1 = require("../combat/lamp-life.js");
@@ -4822,6 +4987,8 @@ const enemy_js_1 = require("../combat/enemy.js");
 const geometry_js_1 = require("../combat/geometry.js");
 function initial() { const enemy = (0, enemy_js_1.makeEnemy)(); return { x: 8, y: 12, fx: 0, fy: -1, time: 0, walkDistance: 0, moving: false, motion: (0, motion_js_1.createMotion)(), footContacts: null, combatEntry: null, dash: null, dashCooldown: 0, execution: null, interaction: null, lamp: lamp_life_js_1.LAMP_LIFE.max, cameraX: 8, cameraY: 12, phase: 'playing', action: null, sweepProgress: null, enemy, enemies: [enemy], particles: [], cone: null, hitReaction: 0, deathTime: 0, note: 'Approach the warden. LMB light / RMB heavy / E sparks.' }; }
 class CombatWorld {
+    golemTrial = null;
+    golemStaging = null;
     current = initial();
     previous = initial();
     actions = new action_machine_js_1.ActionMachine();
@@ -4836,7 +5003,7 @@ class CombatWorld {
     map;
     tipProvider;
     constructor(map = geometry_js_1.OBSTACLES, tipProvider = null) { this.map = map; this.tipProvider = tipProvider; }
-    reset() { this.arrowSystem.reset(); this.arrowVictoryPending = false; this.current = initial(); this.previous = initial(); this.actions.clear(); this.sparks.clear(); this.events = []; this.sweepElapsed = null; this.sweepFired = false; this.dashSerial = 0; }
+    reset() { this.golemTrial?.reset(); this.golemTrial = null; this.golemStaging = null; this.arrowSystem.reset(); this.arrowVictoryPending = false; this.current = initial(); this.previous = initial(); this.actions.clear(); this.sparks.clear(); this.events = []; this.sweepElapsed = null; this.sweepFired = false; this.dashSerial = 0; }
     record(event) {
         this.events.push({ ...event, time: this.current.time });
         if (this.events.length > 400)
@@ -4855,6 +5022,8 @@ class CombatWorld {
     hooks() {
         return { position: () => this.current, facing: () => ({ x: this.current.fx, y: this.current.fy }), lunge: (dx, dy) => { this.move(dx, dy); }, hit: a => {
                 const s = this.current;
+                if (this.golemTrial && !this.golemTrial.canFight())
+                    return;
                 let struck = false;
                 for (const e of (0, mechanics_4c_js_1.selectStrikeTargets)(s, { x: a.fx, y: a.fy }, a.kind, (0, enemy_roster_js_1.enemiesOf)(s), this.map, a.hitIds)) {
                     struck = true;
@@ -4865,10 +5034,12 @@ class CombatWorld {
                     e.timer = 0;
                     this.record({ type: 'hit', amount, attackId: a.id, targetId: e.id });
                     this.sparks.spawn([e.x, e.y, .5], a.kind === 'heavy' ? 12 : 6, 1.3);
-                    if (e.hp <= 0)
+                    if (e.hp <= 0) {
+                        e.visualDeathAt = s.time;
                         this.record({ type: 'enemy-dead', targetId: e.id });
+                    }
                 }
-                if (struck && !(0, enemy_roster_js_1.aliveEnemies)(s).length) {
+                if (struck && !(0, enemy_roster_js_1.aliveEnemies)(s).length && !this.golemTrial) {
                     this.arrowVictoryPending = this.arrowSystem.snapshot().length > 0;
                     if (!this.arrowVictoryPending) {
                         s.phase = 'won';
@@ -4906,6 +5077,102 @@ class CombatWorld {
         this.current = { ...s, enemies: roster, enemy: roster[0], phase: 'playing', arrows: [], particles: [], cone: null };
         this.previous = this.snapshot();
     }
+    startGolemTrial() {
+        const s = this.current;
+        s.x = 8;
+        s.y = 17;
+        s.cameraX = 8;
+        s.cameraY = 17;
+        s.fx = 0;
+        s.fy = -1;
+        s.motion = (0, motion_js_1.createMotion)(0, -1);
+        this.setEncounter([(0, bestiary_js_1.makeBestiaryEnemy)('corpse-golem', 1, 8, 7)]);
+        this.golemTrial = (0, golem_trial_state_js_1.createGolemTrialController)(this.map, 1);
+        this.golemStaging = null;
+        this.current.note = 'Enter the arena. The gate will close behind you.';
+        this.golemTrial.step(0, this.current);
+        this.previous = this.snapshot();
+    }
+    golemFinishTarget() {
+        const s = this.current;
+        if (!this.golemTrial?.canFight())
+            return null;
+        const hero = { ...s, busy: !!s.interaction || !!s.execution || !!s.dash || !!this.actions.current || this.sweepElapsed !== null || s.hitReaction > 0 };
+        return (0, enemy_roster_js_1.aliveEnemies)(s).find(e => (0, corpse_golem_js_1.golemExecutionWeak)(e) && (0, corpse_golem_js_1.canFinishGolem)(hero, e, (0, geometry_js_1.blocked)(s, e, this.map)) && !!(0, golem_trial_state_js_1.stageGolem)(s, e, this.map, geometry_js_1.solid, enemy_roster_js_1.actorCanOccupy)) ?? null;
+    }
+    executeGolem() {
+        const s = this.current, boss = this.golemFinishTarget();
+        if (!boss)
+            return false;
+        const goal = (0, golem_trial_state_js_1.stageGolem)(s, boss, this.map, geometry_js_1.solid, enemy_roster_js_1.actorCanOccupy);
+        if (!goal)
+            return false;
+        const entry = (0, corpse_golem_js_1.beginGolemExecution)({ ...s, ...goal, busy: false }, boss, (0, geometry_js_1.blocked)(goal, boss, this.map));
+        if (!entry)
+            return false;
+        this.golemStaging = { x: s.x, y: s.y, heading: s.motion?.heading ?? Math.atan2(s.fy, s.fx), elapsed: 0 };
+        s.execution = entry;
+        s.golemAligning = true;
+        boss.mode = 'stagger';
+        boss.timer = 0;
+        this.actions.clear();
+        s.moving = false;
+        s.footContacts = null;
+        s.combatEntry = null;
+        this.record({ type: 'execution-start', targetId: boss.id });
+        this.sync();
+        return true;
+    }
+    stepGolemExecution(dt) {
+        const s = this.current, entry = s.execution;
+        if (!entry)
+            return;
+        const boss = (0, enemy_roster_js_1.enemiesOf)(s).find(e => e.id === entry.targetId);
+        if (!boss)
+            throw Error('Golem execution target lost');
+        const staging = this.golemStaging;
+        if (staging) {
+            staging.elapsed = Math.min(.35, staging.elapsed + dt);
+            const u = staging.elapsed / .35, w = u * u * (3 - 2 * u);
+            s.x = staging.x + (entry.heroX - staging.x) * w;
+            s.y = staging.y + (entry.heroY - staging.y) * w;
+            const angle = Math.atan2(entry.fy, entry.fx), turn = Math.atan2(Math.sin(angle - staging.heading), Math.cos(angle - staging.heading)), h = staging.heading + turn * w;
+            s.fx = Math.cos(h);
+            s.fy = Math.sin(h);
+            s.motion = (0, motion_js_1.createMotion)(s.fx, s.fy);
+            if (staging.elapsed >= .35) {
+                this.golemStaging = null;
+                s.golemAligning = false;
+            }
+            this.sync();
+            return;
+        }
+        const result = (0, corpse_golem_js_1.advanceGolemExecution)(entry, dt, s.lamp > 0);
+        s.execution = result.state;
+        s.fx = entry.fx;
+        s.fy = entry.fy;
+        s.motion = (0, motion_js_1.createMotion)(s.fx, s.fy);
+        for (const event of result.events) {
+            this.record({ type: 'execution-event', targetId: boss.id, executionEvent: event });
+            if (event === 'extracted' && !entry.extracted) {
+                boss.hp = 0;
+                boss.mode = 'dead';
+                boss.charred = true;
+                boss.timer = 0;
+                boss.deathElapsed = .9;
+                this.record({ type: 'enemy-dead', targetId: boss.id });
+            }
+            if (event === 'finished') {
+                s.execution = null;
+                this.golemStaging = null;
+                this.record({ type: 'execution-end', targetId: boss.id });
+                this.golemTrial?.step(0, s);
+            }
+        }
+        s.cameraX += (s.x - s.cameraX) * Math.min(1, dt * 6);
+        s.cameraY += (s.y - s.cameraY) * Math.min(1, dt * 6);
+        this.sync();
+    }
     startBoneboundTrial() {
         const chosen = [];
         for (const [x, y] of [[8.7, 8.1], [7, 8], [10.1, 7.8], [7, 10], [10, 10], [8, 6.5]]) {
@@ -4922,12 +5189,22 @@ class CombatWorld {
     startUndeadTrial() { const kinds = ['bonebound', 'ossuary-guard', 'gravebearer', 'bloated-remnant', 'ashbound'], positions = [[8.7, 8.1], [7, 8], [10.1, 7.8], [7, 10], [10, 10]]; this.setEncounter(kinds.map((kind, i) => (0, bestiary_js_1.makeBestiaryEnemy)(kind, i + 1, positions[i][0], positions[i][1]))); }
     stepEnemies(dt, excludeId = null, landing = null) {
         const s = this.current;
+        const undeadBefore = new Map((0, enemy_roster_js_1.enemiesOf)(s).map(e => [e.id, { x: e.x, y: e.y }]));
         (0, enemy_roster_js_1.stepEnemyGroup)(s, dt, this.map, n => this.damage(n), (e, t, p, map, damage, allowAttack) => {
-            if (e.archetype === 'marrow-archer')
+            if (e.archetype === 'corpse-golem') {
+                if (!this.golemTrial || this.golemTrial.canFight())
+                    (0, corpse_golem_js_1.stepCorpseGolem)({ enemy: e, dt: t, player: p, map, damage, solid: geometry_js_1.solid, blocked: geometry_js_1.blocked, allowAttack });
+            }
+            else if (e.archetype === 'marrow-archer')
                 (0, marrow_archer_js_1.stepMarrowArcher)({ enemy: e, dt: t, player: p, map, enemies: (0, enemy_roster_js_1.enemiesOf)(s), allowAttack, solid: geometry_js_1.solid, shoot: (owner, direction) => this.arrowSystem.spawn(owner, direction) });
             else
                 (0, enemy_js_1.enemyStep)(e, t, p, map, damage, allowAttack);
         }, excludeId, landing);
+        for (const e of (0, enemy_roster_js_1.enemiesOf)(s)) {
+            const before = undeadBefore.get(e.id);
+            if (e.id !== excludeId && before)
+                (0, undead_motion_js_1.updateUndeadMotion)(e, dt, before);
+        }
         const hadShots = this.arrowSystem.snapshot().length > 0;
         this.arrowSystem.step({ dt, player: s, previousPlayer: this.previous, map: { bounds: { minX: 1.7, maxX: 16, minY: 1.7, maxY: 16 }, ...this.map }, enemies: (0, enemy_roster_js_1.enemiesOf)(s), damage: n => this.damage(n) });
         if (s.phase !== 'playing') {
@@ -4994,10 +5271,17 @@ class CombatWorld {
         this.sync();
         return true;
     }
-    executionTargetReady() { const s = this.current; return s.phase === 'playing' && !s.interaction && !s.execution && (0, enemy_roster_js_1.enemiesOf)(s).some(e => (0, execution_js_1.executionTargetWeak)({ ...e, maxHp: (0, enemy_roster_js_1.enemyMaxHp)(e) })); }
-    executionTarget() { const s = this.current; return (0, enemy_roster_js_1.aliveEnemies)(s).filter(e => (0, execution_js_1.canExecute)({ ...s, busy: !!s.interaction || !!s.execution || !!s.dash || !!this.actions.current || this.sweepElapsed !== null || s.hitReaction > 0 }, { ...e, maxHp: (0, enemy_roster_js_1.enemyMaxHp)(e) }, (0, geometry_js_1.blocked)(s, e, this.map))).sort((a, b) => Math.hypot(a.x - s.x, a.y - s.y) - Math.hypot(b.x - s.x, b.y - s.y) || a.id - b.id)[0] ?? null; }
-    executionAvailable() { return this.executionTarget() !== null; }
+    executionTargetReady() {
+        if (this.golemTrial)
+            return this.golemFinishTarget() !== null;
+        const s = this.current;
+        return s.phase === 'playing' && !s.interaction && !s.execution && (0, enemy_roster_js_1.enemiesOf)(s).some(e => (0, execution_js_1.executionTargetWeak)({ ...e, maxHp: (0, enemy_roster_js_1.enemyMaxHp)(e) }));
+    }
+    executionTarget() { const s = this.current; return (0, enemy_roster_js_1.aliveEnemies)(s).filter(e => e.archetype !== 'corpse-golem' && (0, execution_js_1.canExecute)({ ...s, busy: !!s.interaction || !!s.execution || !!s.dash || !!this.actions.current || this.sweepElapsed !== null || s.hitReaction > 0 }, { ...e, maxHp: (0, enemy_roster_js_1.enemyMaxHp)(e) }, (0, geometry_js_1.blocked)(s, e, this.map))).sort((a, b) => Math.hypot(a.x - s.x, a.y - s.y) - Math.hypot(b.x - s.x, b.y - s.y) || a.id - b.id)[0] ?? null; }
+    executionAvailable() { return this.golemFinishTarget() !== null || this.executionTarget() !== null; }
     execute() {
+        if (this.golemTrial)
+            return this.executeGolem();
         const s = this.current, target = this.executionTarget();
         if (!target)
             return false;
@@ -5019,6 +5303,10 @@ class CombatWorld {
         return true;
     }
     stepExecution(dt) {
+        if (this.current.execution?.kind === 'corpse-golem') {
+            this.stepGolemExecution(dt);
+            return;
+        }
         const s = this.current, entry = s.execution;
         if (!entry)
             return;
@@ -5069,7 +5357,7 @@ class CombatWorld {
         this.sync();
     }
     startArcherTrial() { this.setEncounter([(0, bestiary_js_1.makeBestiaryEnemy)('marrow-archer', 1, 8.7, 6.6), (0, bestiary_js_1.makeBestiaryEnemy)('bonebound', 2, 7, 9), (0, bestiary_js_1.makeBestiaryEnemy)('ossuary-guard', 3, 10, 9)]); }
-    dashReady() { const s = this.current; return s.phase === 'playing' && !s.interaction && !s.execution && !s.dash && (s.dashCooldown ?? 0) <= 0 && !this.actions.current && this.sweepElapsed === null && s.hitReaction <= 0; }
+    dashReady() { const s = this.current; return s.phase === 'playing' && !s.interaction && !s.execution && !s.dash && (s.dashCooldown ?? 0) <= 0 && this.sweepElapsed === null && s.hitReaction <= 0; }
     dash(direction) {
         const s = this.current;
         if (!this.dashReady())
@@ -5077,6 +5365,9 @@ class CombatWorld {
         const d = (0, ash_dash_js_1.planDash)(s, this.map, direction, this.dashSerial + 1);
         if (!d)
             return false;
+        this.actions.clear();
+        s.action = null;
+        s.combatEntry = null;
         this.dashSerial++;
         const heading = s.motion?.heading ?? Math.atan2(s.fy, s.fx);
         s.dash = d;
@@ -5122,6 +5413,8 @@ class CombatWorld {
     }
     damage(n) {
         const s = this.current;
+        if (this.golemTrial && (!this.golemTrial.canFight() || s.execution?.kind === 'corpse-golem'))
+            return;
         if (s.phase !== 'playing' || !Number.isFinite(n) || n <= 0 || (0, ash_dash_js_1.dashInvulnerable)(s.dash))
             return;
         const reaction = !this.actions.current && this.sweepElapsed === null && !s.dash && !s.execution && !s.interaction, feet = reaction ? (0, combat_entry_js_1.captureCombatFeet)(s) : null;
@@ -5182,6 +5475,7 @@ class CombatWorld {
         if (!s.dash)
             s.dashCooldown = Math.max(0, (s.dashCooldown ?? 0) - dt);
         s.time += dt;
+        this.golemTrial?.step(dt, s);
         s.hitReaction = Math.max(0, s.hitReaction - dt);
         s.moving = false;
         this.sparks.step(dt);
@@ -5345,6 +5639,97 @@ function createGolemArena(map, bossId) {
         },
     });
 }
+
+},
+"game/golem-trial-state.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.GOLEM_DEATH = exports.GOLEM_PREPARE = void 0;
+exports.createGolemTrialController = createGolemTrialController;
+exports.stageGolem = stageGolem;
+exports.captureGolemLoadout = captureGolemLoadout;
+exports.restoreGolemLoadout = restoreGolemLoadout;
+exports.GOLEM_PREPARE = 1, exports.GOLEM_DEATH = .9;
+function createGolemTrialController(map, bossId) {
+    if (!Array.isArray(map?.rects) || Object.isFrozen(map.rects))
+        throw Error('Golem requires a mutable collision map');
+    const rects = map.rects, gate = { minX: 6.8, maxX: 9.2, minY: 14.5, maxY: 14.75, golemGate: true };
+    let status = 'waiting', elapsed = 0;
+    function lock(on) { if (map.rects !== rects)
+        throw Error('Golem map ownership changed'); const i = rects.indexOf(gate); if (on && i < 0)
+        rects.push(gate); if (!on && i >= 0)
+        rects.splice(i, 1); }
+    const inRoom = s => s.x >= 2.65 && s.x <= 13.35 && s.y >= 2.65 && s.y <= 14.25;
+    const snapshot = s => ({ bossId, status, inRoom: inRoom(s), active: ['preparing', 'fighting', 'finishing', 'dying'].includes(status), locked: !['waiting', 'won'].includes(status) });
+    return { canFight: () => status === 'fighting', reset() { status = 'waiting'; elapsed = 0; lock(false); }, snapshot,
+        step(dt, s) {
+            if (!Number.isFinite(dt) || dt < 0)
+                throw Error('Invalid golem tick');
+            const boss = (s.enemies ?? [s.enemy]).find(e => e.id === bossId);
+            if (!boss)
+                throw Error('Golem trial lost its boss');
+            if (s.phase === 'dead' || s.lamp <= 0) {
+                status = 'failed';
+                lock(true);
+                s.bossEncounter = snapshot(s);
+                return;
+            }
+            if (status === 'waiting' && inRoom(s)) {
+                status = 'preparing';
+                elapsed = 0;
+                lock(true);
+                s.note = 'The gate closes. Prepare.';
+            }
+            else if (status === 'preparing') {
+                elapsed += dt;
+                if (elapsed >= exports.GOLEM_PREPARE - 1e-9) {
+                    status = 'fighting';
+                    s.note = 'CORPSE GOLEM';
+                }
+            }
+            if (s.execution?.kind === 'corpse-golem')
+                status = 'finishing';
+            else if (boss.hp <= 0 && status !== 'won') {
+                status = 'dying';
+                boss.deathElapsed = boss.charred ? exports.GOLEM_DEATH : (boss.deathElapsed ?? 0) + dt;
+                if (boss.deathElapsed >= exports.GOLEM_DEATH - 1e-9) {
+                    status = 'won';
+                    lock(false);
+                    s.note = 'CORPSE GOLEM DEFEATED';
+                }
+            }
+            if (status !== 'waiting' && status !== 'won') {
+                s.x = Math.max(2.65, Math.min(13.35, s.x));
+                s.y = Math.max(2.65, Math.min(14.25, s.y));
+            }
+            s.bossEncounter = snapshot(s);
+        }
+    };
+}
+function stageGolem(s, boss, map, solid, occupy) {
+    const dx = boss.x - s.x, dy = boss.y - s.y, d = Math.hypot(dx, dy);
+    if (!Number.isFinite(d) || d < 1e-8)
+        return null;
+    const goal = { x: boss.x - dx / d * 1.3, y: boss.y - dy / d * 1.3 }, n = Math.max(1, Math.ceil(Math.hypot(goal.x - s.x, goal.y - s.y) / .02));
+    for (let i = 0; i <= n; i++) {
+        const x = s.x + (goal.x - s.x) * i / n, y = s.y + (goal.y - s.y) * i / n;
+        if (solid(x, y, map, .24) || !occupy(s, x, y))
+            return null;
+    }
+    return goal;
+}
+const transient = new Set('x y fx fy time walkDistance moving motion footContacts combatEntry dash dashCooldown execution interaction cameraX cameraY phase action sweepProgress enemy enemies particles cone arrows hitReaction deathTime note bossEncounter golemAligning'.split(' '));
+function captureGolemLoadout(s) {
+    if (!Number.isFinite(s?.lamp) || s.lamp <= 0 || s.phase === 'dead')
+        throw Error('Enter GOLEM TRIAL with a living hero');
+    const result = {};
+    for (const [k, v] of Object.entries(s))
+        if (!transient.has(k))
+            result[k] = structuredClone(v);
+    return result;
+}
+function restoreGolemLoadout(s, checkpoint) { for (const [k, v] of Object.entries(checkpoint))
+    s[k] = structuredClone(v); }
 
 },
 "game/interaction-room-layout.js":function(require,module,exports){
@@ -10225,6 +10610,58 @@ function buildAshenWallDress(plan, walkable) {
 }
 
 },
+"levels/golem-trial.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.createGolemTrialScene = createGolemTrialScene;
+const golem_arena_js_1 = require("../game/golem-arena.js");
+const candle_field_js_1 = require("../render/candle-field.js");
+function createGolemTrialScene() {
+    const map = (0, golem_arena_js_1.golemArenaMap)();
+    let actor = null, project = null;
+    const fixtures = [(0, candle_field_js_1.candleFixture)({ id: 'trial.single', x: 4.1, y: 15.8, count: 1 }), (0, candle_field_js_1.candleFixture)({ id: 'trial.cluster-a', x: 3.2, y: 5, count: 6 }), (0, candle_field_js_1.candleFixture)({ id: 'trial.cluster-b', x: 12.8, y: 10.8, count: 6 }), (0, candle_field_js_1.candleFixture)({ id: 'trial.cluster-c', x: 12.8, y: 4.5, count: 4 }), (0, candle_field_js_1.candleFixture)({ id: 'trial.chandelier-a', x: 7.5, y: 6, z: 3.65, count: 8, hanging: true }), (0, candle_field_js_1.candleFixture)({ id: 'trial.chandelier-b', x: 8.5, y: 11, z: 3.65, count: 8, hanging: true })];
+    const part = (kind, v, c, w = 1, extra = {}) => ({ kind, v, c, w, hero: false, d: v.reduce((n, p) => n + p[0] + p[1] + p[2] * .006, 0) / v.length, ...extra });
+    const floors = [];
+    for (let x = 2.4; x < 13.6 - 1e-6; x += .7)
+        for (let y = 2.4; y < 19.6 - 1e-6; y += .7) {
+            const X = Math.min(13.6, x + .7), Y = Math.min(19.6, y + .7), tone = 45 + ((Math.round(x * 10) + Math.round(y * 10)) % 3) * 4;
+            floors.push(part(0, [[x, y, 0], [X, y, 0], [X, Y, 0], [x, Y, 0]], [tone, tone - 2, tone - 5], 1, { d: -1000000 + x + y, floor: true }));
+            floors.push(part(1, [[x, y, .004], [X, y, .004], [X, Y, .004]], [66, 62, 54], .65, { d: -999999 + x + y, floor: true }));
+        }
+    function art() {
+        const parts = [...floors];
+        for (const r of map.rects) {
+            if (r.golemGate) {
+                for (let x = 6.85; x < 9.2; x += .18)
+                    parts.push(part(1, [[x, 14.625, .04], [x, 14.625, 2.8]], [113, 108, 96], 3));
+                for (const z of [.5, 1.5, 2.6])
+                    parts.push(part(1, [[6.8, 14.625, z], [9.2, 14.625, z]], [102, 96, 83], 4));
+                continue;
+            }
+            const near = r.minX >= 13.59 || r.minY >= 19.59, h = near ? .48 : 2.65;
+            const edges = [[[r.minX, r.minY], [r.maxX, r.minY]], [[r.maxX, r.minY], [r.maxX, r.maxY]], [[r.maxX, r.maxY], [r.minX, r.maxY]], [[r.minX, r.maxY], [r.minX, r.minY]]];
+            for (const [a, b] of edges) {
+                const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / .45));
+                for (let i = 0; i < n; i++) {
+                    const A = [a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n, 0], B = [a[0] + (b[0] - a[0]) * (i + 1) / n, a[1] + (b[1] - a[1]) * (i + 1) / n, 0], up = p => [p[0], p[1], h];
+                    parts.push(part(0, [A, B, up(B), up(A)], [72, 69, 62], 1, { wall: true }));
+                    parts.push(part(1, [up(A), up(B)], [109, 102, 87], 1, { wall: true }));
+                }
+            }
+        }
+        for (const fixture of fixtures) {
+            const overhead = fixture.parts[0]?.overhead, alpha = overhead ? (0, candle_field_js_1.overheadOpacity)(fixture.parts, actor, project) : 1;
+            for (const p of fixture.parts)
+                parts.push(overhead ? { ...p, alpha } : p);
+        }
+        return parts;
+    }
+    const doorScene = { map, targets: [], parts: [], lightDefinitions: [], interior: null, setActors() { }, getTarget: () => null, getBounds: () => ({ ...golem_arena_js_1.GOLEM_BOUNDS }), getColliders: () => [], revision: () => map.golemRevision ?? 0, step() { }, reset() { }, highlight() { }, snapshot: () => ({ doors: [], golem: true }) };
+    const env = { targets: [], lights: fixtures.flatMap(f => f.lights), setView(s, p) { actor = s; project = p; }, get parts() { return art(); }, step() { } };
+    return { doorScene, env };
+}
+
+},
 "levels/registry.js":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -10232,6 +10669,7 @@ exports.GAME_LEVELS = void 0;
 exports.gameLevel = gameLevel;
 exports.applyLevelSpawn = applyLevelSpawn;
 const entries = [
+    { id: 'golem-trial', title: 'GOLEM TRIAL', description: 'Corpse Golem integration test. Current hero loadout.', status: 'prototype' },
     { id: 'test-chamber', title: 'TEST CHAMBER', description: 'Combat, lighting and interior test room.', status: 'ready' },
     { id: 'ashen-nave', title: 'THE ASHEN NAVE', description: 'Explore the nave, its chapel and burial wing. Defeat the warden.', status: 'prototype' },
     { id: 'bonebound-trial', title: 'BONEBOUND TRIAL', description: 'Three undead. Development combat encounter.', status: 'prototype' },
@@ -10243,6 +10681,10 @@ function gameLevel(id) { const level = exports.GAME_LEVELS.find(l => l.id === id
     throw Error('Unknown game level: ' + id); return level; }
 function applyLevelSpawn(world, id) {
     gameLevel(id);
+    if (id === 'golem-trial') {
+        world.startGolemTrial();
+        return;
+    }
     if (id === 'archer-trial') {
         world.startArcherTrial();
         return;
@@ -10273,11 +10715,14 @@ function applyLevelSpawn(world, id) {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.buildLevelScene = buildLevelScene;
+const golem_trial_js_1 = require("./golem-trial.js");
 const registry_js_1 = require("./registry.js");
 const ashen_layout_js_1 = require("./ashen-layout.js");
 const ashen_environment_js_1 = require("./ashen-environment.js");
 function buildLevelScene(id, { baseObstacles, createDoorScene, createDoorEnvironment }) {
     (0, registry_js_1.gameLevel)(id);
+    if (id === 'golem-trial')
+        return (0, golem_trial_js_1.createGolemTrialScene)();
     if (id === 'test-chamber' || id === 'bonebound-trial' || id === 'undead-trial' || id === 'archer-trial') {
         const doorScene = createDoorScene(baseObstacles);
         return { doorScene, env: createDoorEnvironment(doorScene) };
@@ -10325,7 +10770,8 @@ function shadeAmberCell(data, k, base, warmth, hero = false) {
         base = 0;
     if (!Number.isFinite(warmth))
         warmth = 0;
-    const t = Math.max(0, Math.min(1, warmth)) * (hero ? .65 : 1), r = data[k] * base * (1 + .08 * t), g = data[k + 1] * base * (1 - .28 * t), b = data[k + 2] * base * (1 - .68 * t), peak = Math.max(r, g, b), cap = hero ? 238 : 245, gain = peak > cap ? cap / peak : 1;
+    const warm = Math.max(0, Math.min(1, warmth)), hot = Math.max(0, Math.min(1, (base - .7) / 1.5)), t = warm * (hero ? .65 : 1) * (1 - .5 * hot), shadow = (1 - warm) * Math.max(0, Math.min(1, (.7 - base) / .7));
+    const r = data[k] * base * (1 + .035 * t - .12 * shadow), g = data[k + 1] * base * (1 - .09 * t - .035 * shadow), b = data[k + 2] * base * (1 - .21 * t + .10 * shadow), peak = Math.max(r, g, b), cap = hero ? 238 : 245, gain = peak > cap ? cap / peak : 1;
     data[k] = r * gain;
     data[k + 1] = g * gain;
     data[k + 2] = b * gain;
@@ -10336,6 +10782,7 @@ function shadeAmberCell(data, k, base, warmth, hero = false) {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ASCII = void 0;
+const engine_text_js_1 = require("./engine-text.js");
 const W = 1008, canvas = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }, ramp = ' .,:;i1tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW8&%@';
 class ASCII {
     constructor(target, width = 0) { this.target = target; this.width = width; this.s = canvas(1, 1); this.g = this.s.getContext('2d', { willReadFrequently: true }); this.r = canvas(1, 1); this.rg = this.r.getContext('2d', { willReadFrequently: true }); this.size = 0; this.glyphs = []; this.image = null; }
@@ -10343,7 +10790,7 @@ class ASCII {
         this.s.width = cols;
         this.s.height = rows;
     } this.g.clearRect(0, 0, cols, rows); this.g.drawImage(src, 0, 0, cols, rows); return this.g.getImageData(0, 0, cols, rows).data; }
-    paint(src, cols, rows, y = 0, height = 720, mono = false) { const W = this.width || this.target.canvas?.width || 1008, data = src instanceof Uint8ClampedArray ? src : this.read(src, cols, rows), size = Math.ceil(height / rows * 1.14); if (this.size !== size) {
+    paint(src, cols, rows, y = 0, height = 720, mono = false, annotations = null) { const W = this.width || this.target.canvas?.width || 1008, data = src instanceof Uint8ClampedArray ? src : this.read(src, cols, rows), size = Math.ceil(height / rows * 1.14); if (this.size !== size) {
         this.size = size;
         const c = canvas(size * 2, size * 2 + 4), g = c.getContext('2d', { willReadFrequently: true });
         g.font = size + 'px monospace';
@@ -10375,9 +10822,42 @@ class ASCII {
                     a[p + ch] = (rgb[ch] * alpha + a[p + ch] * old * (1 - alpha)) / full;
                 a[p + 3] = full * 255;
             }
-        } this.rg.putImageData(this.image, 0, 0); this.target.drawImage(this.r, 0, y); }
+        } if (Array.isArray(annotations) && annotations.length)
+        (0, engine_text_js_1.blendEngineText)(a, W, height, annotations, (ch, size) => this.annotationGlyph(ch, size)); this.rg.putImageData(this.image, 0, 0); this.target.drawImage(this.r, 0, y); }
 }
 exports.ASCII = ASCII;
+// ENGINE_TEXT_ATLAS_V7: labels use the same raster/glyph output stage, not output-canvas text.
+ASCII.prototype.annotationGlyph = function (char, size) {
+    if (!this.annotationCache) {
+        this.annotationCache = new Map();
+        this.annotationCanvas = canvas(1, 1);
+        this.annotationContext = this.annotationCanvas.getContext('2d', { willReadFrequently: true });
+    }
+    const key = size + ':' + char;
+    if (this.annotationCache.has(key))
+        return this.annotationCache.get(key);
+    const c = this.annotationCanvas, g = this.annotationContext;
+    if (c.width !== size * 2 || c.height !== size * 2 + 4) {
+        c.width = size * 2;
+        c.height = size * 2 + 4;
+    }
+    g.clearRect(0, 0, c.width, c.height);
+    g.font = size + 'px monospace';
+    g.textBaseline = 'top';
+    g.fillStyle = '#fff';
+    g.fillText(char, 0, 0);
+    const data = g.getImageData(0, 0, c.width, c.height).data, result = [];
+    for (let y = 0; y < c.height; y++)
+        for (let x = 0; x < c.width; x++) {
+            const a = data[(y * c.width + x) * 4 + 3];
+            if (a)
+                result.push([x, y, a / 255]);
+        }
+    if (this.annotationCache.size > 1024)
+        this.annotationCache.clear();
+    this.annotationCache.set(key, result);
+    return result;
+};
 
 },
 "render/ash-dash.js":function(require,module,exports){
@@ -10413,40 +10893,54 @@ function ashDashParts(s) {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.boneboundParts = boneboundParts;
-function boneboundParts(e) {
-    const parts = [], P = (x, y, z) => [e.x + x, e.y + y, z];
-    const line = (v, c = '#b9ab8c', w = 3) => parts.push({ kind: 1, v, c, w, hero: false, d: v.reduce((a, p) => a + p[0] + p[1] + p[2] * .006, 0) / v.length + .005 });
-    const dot = (v, r, c) => parts.push({ kind: 2, v: [v], r, c, hero: false, d: v[0] + v[1] + v[2] * .006 + .01 });
-    if (e.hp <= 0) {
-        line([P(0, -.45, .06), P(0, .4, .06)]);
-        for (const s of [-1, 1]) {
-            line([P(0, 0, .06), P(s * .3, .4, .03)]);
-            line([P(0, -.2, .06), P(s * .28, -.5, .03)]);
+const undead_family_js_1 = require("./undead-family.js");
+function boneboundParts(e, state = {}) { return (0, undead_family_js_1.renderUndead)({ ...e, archetype: 'bonebound' }, state); }
+
+},
+"render/candle-field.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.candleFieldProfile = candleFieldProfile;
+exports.candleFixture = candleFixture;
+exports.overheadOpacity = overheadOpacity;
+const spectral_light_js_1 = require("./spectral-light.js");
+function candleFieldProfile(count, { hanging = false } = {}) {
+    if (!Number.isSafeInteger(count) || count < 1 || count > 16)
+        throw Error('Expected 1..16 candles');
+    const power = (hanging ? .075 : .065) / Math.sqrt(1 + (count - 1) * .3);
+    return Object.freeze({ radius: (hanging ? 57 : 27) + Math.log2(count) * 6, power, totalPower: power * count });
+}
+function candleFixture({ id, x, y, z = .04, count = 1, hanging = false }) {
+    if (![x, y, z].every(Number.isFinite))
+        throw Error('Invalid candle position');
+    const profile = candleFieldProfile(count, { hanging }), parts = [], lights = [], tones = (0, spectral_light_js_1.fixturePalette)(id);
+    const add = (v, c, w = 1) => parts.push({ kind: 1, v, c, w, hero: false, fixtureId: id, overhead: hanging, d: v.reduce((n, p) => n + p[0] + p[1] + p[2] * .006, 0) / v.length + (hanging ? 10000 : .005) });
+    if (hanging) {
+        add([[x, y, z + .35], [x, y, z + 1.65]], [100, 94, 82], 2);
+        add(Array.from({ length: 25 }, (_, i) => { const a = i / 24 * Math.PI * 2; return [x + Math.cos(a) * .75, y + Math.sin(a) * .75, z]; }), [110, 99, 78], 5);
+        for (let i = 0; i < 4; i++) {
+            const a = i * Math.PI / 2;
+            add([[x, y, z + .65], [x + Math.cos(a) * .75, y + Math.sin(a) * .75, z]], [87, 81, 72], 2);
         }
-        dot(P(0, -.55, .08), 7, '#b9ab8c');
-        return parts;
     }
-    const walk = e.walkDistance * 5.13, wind = e.mode === 'windup' ? Math.min(1, e.timer / .72) : 0, strike = e.mode === 'recover' ? Math.max(0, 1 - e.timer / .8) : 0;
-    for (const s of [-1, 1]) {
-        const step = Math.sin(walk) * .1 * s;
-        line([P(s * .1, 0, .68), P(s * .14, step * .5, .35), P(s * .16, step, .05)], '#a99c81', 4);
+    for (let i = 0; i < count; i++) {
+        const a = i / count * Math.PI * 2, r = count === 1 ? 0 : hanging ? .75 : .17 + count * .012, px = x + Math.cos(a) * r, py = y + Math.sin(a) * r, h = .19 + (i % 3) * .035;
+        add([[px, py, z], [px, py, z + h]], [187, 177, 145], hanging ? 3 : 4);
+        add([[px - .012, py, z + h], [px + .015, py, z + h + .12]], tones.outer, 2.8);
+        add([[px, py, z + h + .015], [px - .008, py, z + h + .085]], tones.core, 1.35);
+        lights.push({ x: px, y: py, z: z + h + .04, groundZ: .025, r: profile.radius, power: profile.power, fireWarmth: .7, lightColor: tones.tint, fixtureId: id });
     }
-    line([P(0, 0, .65), P(0, 0, 1.27)], '#c9bc9e', 4);
-    for (let i = 0; i < 5; i++) {
-        const z = .87 + i * .075, w = .19 - i * .014;
-        line([P(-w, 0, z), P(0, .09, z - .06), P(w, 0, z)], '#b9ab8c', 2.5);
-    }
-    line([P(-.19, 0, 1.24), P(.19, 0, 1.24)]);
-    dot(P(0, 0, 1.45), 9, '#c9bc9e');
-    dot(P(-.06, .035, 1.48), 2, '#17151a');
-    dot(P(.06, .035, 1.48), 2, '#17151a');
-    const hand = P(.3 + e.fx * strike * .4, e.fy * strike * .4, 1.02 + wind * .3);
-    line([P(.19, 0, 1.24), hand], '#b9ab8c', 4);
-    line([hand, [hand[0] + .08, hand[1] - .03, hand[2] + .48]], '#97979c', 4);
-    line([P(-.19, 0, 1.24), P(-.3, .05, 1), P(-.25, .14, .79)]);
-    if (wind)
-        dot(P(0, 0, 1.85), 3, '#c58a52');
-    return parts;
+    return { parts, lights };
+}
+function overheadOpacity(parts, s, project) {
+    if (!s || !project)
+        return .82;
+    const q = parts.flatMap(p => p.v.map(v => project(...v, s.cameraX, s.cameraY)));
+    if (!q.length)
+        return .82;
+    const foot = project(s.x, s.y, .05, s.cameraX, s.cameraY), head = project(s.x, s.y, 1.95, s.cameraX, s.cameraY);
+    const minX = Math.min(...q.map(p => p[0])), maxX = Math.max(...q.map(p => p[0])), minY = Math.min(...q.map(p => p[1])), maxY = Math.max(...q.map(p => p[1]));
+    return maxX >= foot[0] - 22 && minX <= foot[0] + 22 && maxY >= head[1] - 12 && minY <= foot[1] + 12 ? .2 : .82;
 }
 
 },
@@ -10495,13 +10989,17 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.golemAttackPose = golemAttackPose;
 exports.corpseGolemParts = corpseGolemParts;
 const corpse_golem_js_1 = require("../combat/corpse-golem.js");
+const golem_volume_light_js_1 = require("./golem-volume-light.js");
+const golem_motion_js_1 = require("../animation/golem-motion.js");
+const undead_motion_js_1 = require("../animation/undead-motion.js");
 const smooth = x => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
 const mix = (a, b, t) => t <= 0 ? [...a] : t >= 1 ? [...b] : a.map((v, i) => v + (b[i] - v) * t);
+const unit = v => { const d = Math.hypot(...v); return d > 1e-8 ? v.map(x => x / d) : [0, 0, 1]; };
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 function golemAttackPose(e) {
     const name = Object.hasOwn(corpse_golem_js_1.GOLEM_ATTACKS, e.golemAttack) ? e.golemAttack : 'slam', a = corpse_golem_js_1.GOLEM_ATTACKS[name];
     const rest = [.86, .04, .95], raised = name === 'slam' ? [.8, -.25, 3.2] : name === 'sweep' ? [2.4, -.4, 1.65] : [.7, .25, 1.5];
-    const impact = name === 'slam' ? [.18, 2.1, .35] : name === 'sweep' ? [-2.1, 1.25, 1.4] : [.45, 1.25, 1.3];
-    const t = Math.max(0, Number.isFinite(e.timer) ? e.timer : 0);
+    const impact = name === 'slam' ? [.18, 2.1, .35] : name === 'sweep' ? [-2.1, 1.25, 1.4] : [.45, 1.25, 1.3], t = Math.max(0, Number.isFinite(e.timer) ? e.timer : 0);
     let hand = rest, lean = 0;
     if (e.mode === 'windup') {
         const u = Math.min(1, t / a.windup), ready = smooth(u / .75), strike = smooth((u - .78) / .22);
@@ -10516,53 +11014,144 @@ function golemAttackPose(e) {
     return { right: hand, left: [-.8, .3, .85], lean };
 }
 function corpseGolemParts(e, state = {}) {
+    const locomotion = e.hp > 0 && !state.execution ? (0, golem_motion_js_1.golemMotionPose)(e) : null;
     const entry = state.execution?.kind === 'corpse-golem' && state.execution.targetId === e.id ? state.execution : null;
     const dead = e.hp <= 0 && !entry, fall = dead ? (Number.isFinite(e.deathElapsed) ? smooth(e.deathElapsed / .9) : 1) : 0;
     const f = entry ? (0, corpse_golem_js_1.golemFinisherFrame)(entry) : { kneel: dead ? 1 : 0, open: 0, burn: e.charred ? 1 : 0, fall, withdraw: 0 };
     const attack = entry ? { right: [.86, .04, .95], left: [-.8, .3, .85], lean: 0 } : golemAttackPose(e);
-    const rawX = entry ? -entry.fx : e.fx, rawY = entry ? -entry.fy : e.fy, n = Math.hypot(rawX, rawY), fx = n ? rawX / n : 0, fy = n ? rawY / n : 1;
-    const tilt = f.fall * 1.5, co = Math.cos(tilt), si = Math.sin(tilt), parts = [];
-    const P = (side, forward, z) => {
-        z -= f.kneel * .75 * Math.max(0, Math.min(1, (z - .1) / 1));
-        forward += attack.lean * Math.max(0, z - .5);
-        const S = side * co + z * si, Z = Math.max(.035, z * co - side * si);
-        return [e.x + fy * S + fx * forward, e.y - fx * S + fy * forward, Z];
-    };
-    const char = Math.max(e.charred ? 1 : 0, f.burn), colour = c => c.map(v => Math.round(v * (1 - char) + 31 * char));
-    const add = (kind, v, c, w = 1, extra = {}) => parts.push({ kind, v, c: colour(c), w, hero: false,
-        d: v.reduce((s, p) => s + p[0] + p[1] + p[2] * .006, 0) / v.length + (kind === 1 ? .005 : 0), ...extra });
-    const line = (v, c = [126, 115, 101], w = 4) => add(1, v, c, w);
-    function box(x, y, z, w, d, h, c) {
-        const v = [P(x - w / 2, y - d / 2, z), P(x + w / 2, y - d / 2, z), P(x + w / 2, y + d / 2, z), P(x - w / 2, y + d / 2, z), P(x - w / 2, y - d / 2, z + h), P(x + w / 2, y - d / 2, z + h), P(x + w / 2, y + d / 2, z + h), P(x - w / 2, y + d / 2, z + h)];
-        [[0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7], [4, 5, 6, 7]].forEach((face, i) => add(0, face.map(j => v[j]), c.map(n => n * [.65, .85, .72, .55, 1][i])));
+    const rawX = entry ? -entry.fx : locomotion ? Math.cos(locomotion.heading) : e.fx, rawY = entry ? -entry.fy : locomotion ? Math.sin(locomotion.heading) : e.fy, n = Math.hypot(rawX, rawY), fx = n ? rawX / n : 0, fy = n ? rawY / n : 1;
+    const accent = entry || dead ? { head: 0, jaw: 0, grip: 0, shoulder: 0 } : (0, undead_motion_js_1.bossAccentPose)(e, state.time ?? 0);
+    const tilt = f.fall * 1.5, co = Math.cos(tilt), si = Math.sin(tilt), parts = [], char = Math.max(e.charred ? 1 : 0, f.burn);
+    const P = (x, y, z) => { z += (entry || dead ? 0 : Math.sin((state.time ?? 0) * 1.7) * .012) * Math.max(0, Math.min(1, (z - .8) / 1.8)) + (locomotion?.bob ?? 0) * Math.max(0, Math.min(1, (z - .3) / 1.5)); z -= f.kneel * .75 * Math.max(0, Math.min(1, (z - .1))); y += attack.lean * Math.max(0, z - .5); const X = x * co + z * si, Z = Math.max(.035, z * co - x * si); return [e.x + fy * X + fx * y, e.y - fx * X + fy * y, Z]; };
+    function add(kind, local, color, w = 1, tag = 'tissue', normal = null, extra = {}) {
+        const v = local.map(p => P(...p)), center = v[0].map((_, i) => v.reduce((s, p) => s + p[i] / v.length, 0));
+        let c = color;
+        if (normal) {
+            const o = local[0], a = P(...o), b = P(...o.map((x, i) => x + normal[i] * .02));
+            c = (0, golem_volume_light_js_1.sculptLighting)(center, b.map((x, i) => x - a[i]), color, state);
+        }
+        c = c.map(x => Math.round(x * (1 - char) + 29 * char));
+        parts.push({ kind, v, c, w, hero: false, golemDetail: tag, d: v.reduce((s, p) => s + p[0] + p[1] + p[2] * .006, 0) / v.length + (kind === 1 ? .006 : 0), ...extra });
     }
-    const walk = Math.sin((e.walkDistance ?? 0) * 3) * .065;
-    for (const side of [-1, 1]) {
-        line([P(side * .35, 0, 1.08), P(side * .46, side * walk, .57), P(side * .51, side * walk, .08)], [105, 94, 88], 18);
-        box(side * .51, side * walk + .09, .035, .34, .49, .14, [83, 77, 73]);
+    function blob(c, r, color, tag, rings = 3, segs = 8) {
+        const point = (j, i) => { const lat = -Math.PI / 2 + j / rings * Math.PI, a = i / segs * Math.PI * 2; return [c[0] + Math.cos(lat) * Math.cos(a) * r[0], c[1] + Math.cos(lat) * Math.sin(a) * r[1], c[2] + Math.sin(lat) * r[2]]; };
+        for (let j = 0; j < rings; j++)
+            for (let i = 0; i < segs; i++) {
+                const v = [point(j, i), point(j, i + 1), point(j + 1, i + 1), point(j + 1, i)], lat = -Math.PI / 2 + (j + .5) / rings * Math.PI, a = (i + .5) / segs * Math.PI * 2;
+                add(0, v, color, 1, tag, [Math.cos(lat) * Math.cos(a) / r[0], Math.cos(lat) * Math.sin(a) / r[1], Math.sin(lat) / r[2]]);
+            }
     }
-    box(0, 0, 1.02, 1.1, .72, 1.55, [105, 91, 85]);
-    box(.3, -.02, 2.45, .79, .75, .44, [121, 104, 93]);
-    box(-.45, -.04, 2.4, .56, .62, .3, [96, 87, 84]);
-    box(-.12, .05, 2.7, .37, .4, .39, [139, 123, 101]);
-    const right = entry ? mix(attack.right, [.9, .6, .06], f.kneel) : attack.right;
-    line([P(.62, 0, 2.55), P(1.02, right[1] * .4, (right[2] + 2.55) / 2), P(...right)], [118, 100, 91], 17);
-    line([P(-.58, 0, 2.4), P(-.9, .17, 1.7), P(...attack.left)], [99, 88, 83], 11);
-    box(right[0], right[1], Math.max(.04, right[2] - .12), .34, .3, .26, [112, 98, 88]);
-    const gap = .025 + f.open * .23;
-    add(0, [P(-gap, .43, 1.8), P(gap, .43, 1.8), P(gap, .43, 2.2), P(-gap, .43, 2.2)], [30, 23, 26], 1, { golemChest: true });
-    for (let i = 0; i < 5; i++) {
-        const z = 1.25 + i * .27, spread = f.open * .12;
-        line([P(-.19 - spread, .445, z), P(-.19 - spread, .46, z + .06), P(.13 + spread, .46, z + .06), P(.13 + spread, .445, z)], [137, 129, 115], 3);
-    }
-    line([P(-.5, .38, 2.42), P(-.24, .42, 2.12), P(-.33, .42, 1.23)], [64, 48, 47], 3);
-    const glow = entry ? f.burn * (1 - smooth((entry.elapsed - 4.8) / .7)) : 0;
-    if (glow > 0) {
-        for (const side of [-1, 1]) {
-            const v = [P(side * gap, .465, 1.83), P(side * (gap + .06), .465, 2), P(side * gap, .465, 2.18)];
-            add(1, v, [243, 161, 59], 2, { c: [Math.round(243 * glow), Math.round(161 * glow), Math.round(59 * glow)], golemGlow: true });
+    function limb(a, b, ra, rb, color, tag) {
+        const dir = unit(b.map((v, i) => v - a[i])), u = unit(cross(dir, Math.abs(dir[2]) < .9 ? [0, 0, 1] : [0, 1, 0])), v = cross(dir, u), ring = (p, r, t) => p.map((x, i) => x + r * (u[i] * Math.cos(t) + v[i] * Math.sin(t)));
+        for (let i = 0; i < 8; i++) {
+            const t = i * Math.PI / 4, T = (i + 1) * Math.PI / 4, m = (t + T) / 2;
+            add(0, [ring(a, ra, t), ring(a, ra, T), ring(b, rb, T), ring(b, rb, t)], color, 1, tag, u.map((x, k) => x * Math.cos(m) + v[k] * Math.sin(m)));
         }
     }
+    const line = (v, c = [52, 39, 48], w = 2, tag = 'seam') => add(1, v, c, w, tag);
+    const skin = [119, 108, 117], old = [103, 105, 107], dark = [91, 78, 88], bone = [167, 154, 129], iron = [80, 77, 75];
+    const planted = locomotion?.feet ?? [[-.48, .12, 0], [.48, .12, 0]];
+    for (let i = 0; i < 2; i++) {
+        const side = i === 0 ? -1 : 1, F = planted[i], hip = [side * .32, -.08, 1.03], knee = [(side * .32 + F[0]) * .5, F[1] * .45, .62 + F[2] * .45], ankle = [F[0], F[1], .15 + F[2]];
+        limb(hip, knee, side === 1 ? .3 : .24, .23, side === 1 ? skin : old, 'leg');
+        limb(knee, ankle, .23, .15, dark, 'leg');
+        blob(knee, [.22, .2, .21], old, 'knee', 2, 6);
+        blob([F[0], F[1], .11 + F[2]], [.23, .32, .1], dark, 'foot', 2, 8);
+        for (let k = 0; k < 3; k++)
+            line([[F[0] - .12 + k * .1, F[1] + .17, .1 + F[2]], [F[0] - .12 + k * .1, F[1] + .31, .07 + F[2]]], bone, 2, 'toe');
+    }
+    blob([.03, -.11, 1.02], [.52, .38, .4], dark, 'hip');
+    blob([.04, -.13, 1.72], [.65, .5, .85], skin, 'main-torso', 4, 10);
+    blob([.47, -.16, 2.06], [.42, .42, .63], [115, 102, 109], 'second-torso');
+    blob([-.43, -.05, 1.55], [.37, .36, .57], old, 'third-torso');
+    blob([.61, -.14, 2.39], [.46, .44, .5], skin, 'high-shoulder');
+    blob([-.58, -.11, 2.16], [.34, .36, .4], dark, 'low-shoulder');
+    function face(c, scale, tag, back = false) {
+        const z = c[2], y = c[1], x = c[0], front = back ? -1 : 1;
+        blob(c, [.18 * scale, .17 * scale, .24 * scale], [134, 126, 123], tag, 3, 8);
+        blob([x, y + front * .025, z - .14 * scale - (tag === 'face-main' ? accent.jaw : 0)], [.145 * scale, .14 * scale, .1 * scale], [118, 110, 109], tag + '-jaw', 2, 6);
+        for (const side of [-1, 1]) {
+            const X = x + side * .075 * scale, Y = y + front * .16 * scale;
+            add(0, [[X - .04 * scale, Y, z + .035 * scale], [X + .035 * scale, Y, z + .02 * scale], [X + .025 * scale, Y, z - .025 * scale], [X - .03 * scale, Y, z - .03 * scale]], [27, 25, 30], 1, tag + '-eye');
+        }
+        line([[x - .09 * scale, y + front * .16 * scale, z - .11 * scale], [x, y + front * .18 * scale, z - .125 * scale], [x + .09 * scale, y + front * .16 * scale, z - .11 * scale]], [44, 34, 40], 1.5, tag + '-mouth');
+        line([[x, y + front * .165 * scale, z + .04 * scale], [x + .025 * scale, y + front * .19 * scale, z - .06 * scale]], bone, 1.4, tag + '-nose');
+    }
+    face([-.06 + accent.head, .12, 2.6 + accent.shoulder], 1.1, 'face-main');
+    face([.65, .26, 2.53], .78, 'face-shoulder');
+    face([-.48, .25, 1.65], .77, 'face-side');
+    face([.06, -.58, 1.95], .73, 'face-back', true);
+    const right = entry ? mix(attack.right, [.9, .6, .06], f.kneel) : attack.right;
+    const left = entry ? [-.8, .3, .85] : [-.8, .3, .85 + Math.sin((e.walkDistance ?? 0) * 2) * .035];
+    const elbowR = [1.01, right[1] * .4, (right[2] + 2.48) / 2], elbowL = [-.87, .09, 1.56];
+    limb([.65, -.02, 2.43], elbowR, .27, .22, skin, 'right-arm');
+    limb(elbowR, right, .25, .2, skin, 'right-arm');
+    limb([-.59, -.03, 2.18], elbowL, .2, .15, old, 'left-arm');
+    limb(elbowL, left, .17, .11, old, 'left-arm');
+    function hand(c, scale, tag) {
+        blob(c, [.17 * scale, .13 * scale, .19 * scale], skin, tag, 2, 6);
+        for (let i = 0; i < 5; i++) {
+            const x = c[0] + (i - 2) * .066 * scale, L = (i === 0 ? .19 : .28 - Math.abs(i - 2) * .025) * scale * (1 - (tag === 'hand-right' ? accent.grip : 0) * .13);
+            line([[x, c[1] + .04, c[2] - .1 * scale], [x + (i - 2) * .018, c[1] + .075, c[2] - L], [x + (i - 2) * .026, c[1] + .12, c[2] - L - .065 * scale]], i % 2 ? old : skin, 2.8 * scale, tag + '-finger');
+        }
+    }
+    hand(right, 1.18, 'hand-right');
+    hand(left, .9, 'hand-left');
+    const lag = entry || dead ? 0 : Math.sin((state.time ?? 0) * 1.7 + (e.walkDistance ?? 0) * 1.6) * .045;
+    limb([.77, -.25, 2.48], [1, -.24, 2.59], .12, .1, dark, 'extra-arm-shoulder');
+    limb([1, -.24, 2.59], [.72, -.04, 2.75], .1, .075, old, 'extra-arm-shoulder');
+    hand([.72, -.04, 2.75], .53, 'hand-extra-shoulder');
+    limb([-.61, .02, 1.9], [-.77, .13, 1.29], .12, .075, old, 'extra-arm-hanging');
+    limb([-.77, .13, 1.29], [-.61, .2 + lag, .96], .075, .06, dark, 'extra-arm-hanging');
+    hand([-.61, .2 + lag, .96], .55, 'hand-extra-hanging');
+    for (let i = 0; i < 5; i++) {
+        const z = 1.28 + i * .19, spread = f.open * .12;
+        for (const side of [-1, 1])
+            line([[side * (.12 + spread), .4, z + .04], [side * (.3 + spread), .36, z + .1], [side * .47, .26, z + .02]], bone, 2.1, 'rib');
+    }
+    const gap = .025 + f.open * .23;
+    add(0, [[-gap, .425, 1.8], [gap, .425, 1.8], [gap, .425, 2.2], [-gap, .425, 2.2]], [25, 22, 29], 1, 'chest', null, { golemChest: true });
+    for (let i = 0; i < 5; i++) {
+        const z = 1.82 + i * .075;
+        line([[-gap - .025, .438, z - .02], [-gap - .045, .455, z + .025], [gap + .045, .455, z + .025], [gap + .025, .438, z - .02]], iron, 1.7, 'chest-staple');
+    }
+    for (const [a, b] of [[[.84, -.2, 2.45], [-.38, .32, 1.03]], [[-.56, .16, 2.15], [-.29, .34, 1.14]], [[.5, -.29, 2.36], [.15, -.61, 1.12]]]) {
+        const strip = Array.from({ length: 7 }, (_, i) => a.map((v, k) => v + (b[k] - v) * i / 6));
+        line(strip, [54, 42, 49], 3, 'major-seam');
+        for (let i = 1; i < 6; i++) {
+            const c = strip[i];
+            line([[c[0] - .05, c[1] + .012, c[2] - .025], [c[0] + .05, c[1] + .012, c[2] + .025]], [132, 119, 105], 1.4, 'stitch');
+        }
+    }
+    for (let i = 0; i < 5; i++)
+        blob([.1, -.53, 1.28 + i * .22], [.075, .09, .11], bone, 'spine', 2, 5);
+    hand([.35, -.43, .95], .5, 'back-hand');
+    // UNDEAD_V5_BOSS_ARMOR: incomplete foreign plates leave faces and chest slit exposed.
+    add(0, [[.38, .18, 2.6], [.85, .13, 2.7], [1, .04, 2.47], [.54, .25, 2.4]], [92, 94, 101], 1, 'boss-pauldron', [0, 1, 1]);
+    line([[.38, .18, 2.6], [.85, .13, 2.7], [1, .04, 2.47]], [144, 139, 126], 2, 'boss-pauldron-rim');
+    add(0, [[-.65, .32, 1.88], [-.31, .39, 1.92], [-.28, .4, 1.57], [-.53, .36, 1.53]], [76, 78, 84], 1, 'boss-chest-fragment', [0, 1, 0]);
+    for (const x of [-.25, .32])
+        line([[x, .31, 1.52], [x + .05, .32, 1.33], [x - .02, .25, 1.14]], [76, 71, 69], 2, 'boss-chain');
+    // CLARITY_V4_SURFACE_DETAIL: larger readable folds and attachment scars.
+    for (let i = 0; i < 10; i++) {
+        const side = i % 2 ? 1 : -1, z = 1.18 + Math.floor(i / 2) * .22;
+        blob([side * (.36 + .035 * Math.sin(i)), .23, z], [.13, .075, .09], i % 3 ? old : skin, 'grafted-scar', 2, 6);
+        line([[side * .22, .35, z - .03], [side * .39, .34, z + .025], [side * .5, .22, z]], dark, 1.5, 'fold');
+    }
+    for (let i = 0; i < 7; i++) {
+        const z = 1.17 + i * .18;
+        line([[.25, -.5, z], [.08, -.6, z + .04], [-.12, -.55, z + .025]], dark, 1.5, 'back-fold');
+    }
+    for (const [x, y, z, scale] of [[-.06, .12, 2.6, 1.1], [.65, .26, 2.53, .78], [-.48, .25, 1.65, .77]]) {
+        for (const side of [-1, 1])
+            line([[x + side * .035 * scale, y + .17 * scale, z + .095 * scale], [x + side * .12 * scale, y + .125 * scale, z + .07 * scale]], bone, 1.5, 'brow');
+        for (let i = 0; i < 4; i++)
+            line([[x + (i - 1.5) * .038 * scale, y + .175 * scale, z - .10 * scale], [x + (i - 1.5) * .038 * scale, y + .177 * scale, z - .14 * scale]], bone, 1.1, 'teeth');
+    }
+    const glow = entry ? f.burn * (1 - smooth((entry.elapsed - 4.8) / .7)) : 0;
+    if (glow > 0)
+        for (const side of [-1, 1])
+            add(1, [[side * gap, .465, 1.83], [side * (gap + .04), .465, 2], [side * gap, .465, 2.18]], [252, 224, 164], 2, 'ember', null, { c: [252, 224, 164].map(v => Math.round(v * glow)), golemGlow: true });
     return parts;
 }
 
@@ -10574,14 +11163,14 @@ exports.enemyParts = enemyParts;
 const bonebound_js_1 = require("./bonebound.js");
 const melee_undead_js_1 = require("./melee-undead.js");
 const marrow_archer_js_1 = require("./marrow-archer.js");
-function enemyParts(e) {
+function enemyParts(e, state = {}) {
     if (e.archetype === 'marrow-archer')
-        return (0, marrow_archer_js_1.marrowArcherParts)(e);
-    const undead = (0, melee_undead_js_1.meleeUndeadParts)(e);
+        return (0, marrow_archer_js_1.marrowArcherParts)(e, state);
+    const undead = (0, melee_undead_js_1.meleeUndeadParts)(e, state);
     if (undead)
         return undead;
     if (e.archetype === 'bonebound')
-        return (0, bonebound_js_1.boneboundParts)(e);
+        return (0, bonebound_js_1.boneboundParts)(e, state);
     let parts = [], heroPart = false;
     function smooth(x) { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); }
     function poly(v, c, s = null, w = 1) { parts.push({ kind: 0, v, c, s, w, hero: heroPart, d: v.reduce((a, q) => a + q[0] + q[1] + (q[2] || 0) * .006, 0) / v.length }); }
@@ -10606,6 +11195,32 @@ function enemyParts(e) {
         dot(e.x, e.y, 1.85, 3, '#c58a52'); }
     drawEnemy({ ...e, state: e.mode, timer: e.timer, walk: e.walkDistance * 5.13 });
     return parts;
+}
+
+},
+"render/engine-text.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.blendEngineText = blendEngineText;
+function blendEngineText(pixels, width, height, annotations, glyphFor) {
+    function blend(x, y, c, alpha) { if (x < 0 || y < 0 || x >= width || y >= height || alpha <= 0)
+        return; const k = (y * width + x) * 4, old = pixels[k + 3] / 255, a = alpha + old * (1 - alpha); if (!a)
+        return; for (let i = 0; i < 3; i++)
+        pixels[k + i] = (c[i] * alpha + pixels[k + i] * old * (1 - alpha)) / a; pixels[k + 3] = a * 255; }
+    for (const item of annotations) {
+        if (!item || ![item.x, item.y].every(Number.isFinite))
+            continue;
+        const size = Math.max(6, Math.min(22, Math.round(item.size ?? 12))), text = String(item.text ?? ''), advance = Math.max(1, Math.round(size * .62)), length = text.length * advance, color = item.color ?? [220, 205, 180], alpha = Math.max(0, Math.min(1, item.alpha ?? 1));
+        let x = Math.round(item.x - (item.align === 'center' ? length / 2 : item.align === 'right' ? length : 0)), y = Math.round(item.y - (item.baseline === 'alphabetic' ? size * .82 : item.baseline === 'middle' ? size * .5 : 0));
+        for (const char of text) {
+            const glyph = glyphFor(char, size);
+            for (const [dx, dy, a] of glyph)
+                blend(x + dx + 1, y + dy + 1, [3, 4, 6], a * alpha);
+            for (const [dx, dy, a] of glyph)
+                blend(x + dx, y + dy, color, a * alpha);
+            x += advance;
+        }
+    }
 }
 
 },
@@ -10707,6 +11322,8 @@ class ExecutionEffects {
             if (this.seen.size > 2048)
                 this.seen.delete(this.seen.values().next().value);
             const bound = (0, enemy_roster_js_1.enemiesOf)(s).find(e => e.id === event.targetId);
+            if (bound?.archetype === 'corpse-golem')
+                continue;
             if (event.type === 'execution-start') {
                 this.target = s.execution?.targetId === event.targetId ? { x: s.execution.targetX, y: s.execution.targetY } : bound ? { x: bound.x, y: bound.y } : null;
                 this.emit = 0;
@@ -10733,7 +11350,7 @@ class ExecutionEffects {
             }
         }
         const e = s.execution;
-        if (e && s.phase === 'playing' && e.phase !== 'cancelled' && e.elapsed >= execution_js_1.EXECUTION.offer && e.elapsed < execution_js_1.EXECUTION.extract) {
+        if (e && e.kind !== 'corpse-golem' && s.phase === 'playing' && e.phase !== 'cancelled' && e.elapsed >= execution_js_1.EXECUTION.offer && e.elapsed < execution_js_1.EXECUTION.extract) {
             this.emit += dt;
             while (this.emit >= .05) {
                 this.emit -= .05;
@@ -10768,13 +11385,17 @@ class ExecutionEffects {
         }
         const e = s.execution;
         let camera = { zoom: 1, weight: 0, focusX: s.x, focusY: s.y, focusZ: .6, shakeX: 0, shakeY: 0 };
-        if (e) {
+        if (e && e.kind !== 'corpse-golem') {
             const v = (0, execution_js_1.executionPresentation)(e), fade = s.phase === 'dead' ? 1 - clamp(s.deathTime / .6) : 1, weight = clamp((v.cameraZoom - 1) / .17) * fade;
             camera = { zoom: options.camera === false ? 1 : 1 + (v.cameraZoom - 1) * fade, weight: options.camera === false ? 0 : weight, focusX: (s.x + e.targetX) / 2, focusY: (s.y + e.targetY) / 2, focusZ: .6, shakeX: options.shake === false ? 0 : v.cameraShake * fade, shakeY: options.shake === false ? 0 : v.cameraShake * .55 * fade };
             if (s.phase === 'playing' && e.elapsed >= execution_js_1.EXECUTION.offer && e.elapsed < execution_js_1.EXECUTION.extract) {
                 const power = .38 * Math.sin(clamp((e.elapsed - execution_js_1.EXECUTION.offer) / (execution_js_1.EXECUTION.extract - execution_js_1.EXECUTION.offer)) * Math.PI);
                 lights.push({ position: [e.targetX, e.targetY, .3], radius: 105, power });
             }
+        }
+        if (e?.kind === 'corpse-golem' && e.elapsed >= 3.25 && e.elapsed < 5.2) {
+            const u = Math.max(0, Math.min(1, (e.elapsed - 3.25) / 1.55)), fade = 1 - Math.max(0, (e.elapsed - 4.8) / .4);
+            lights.push({ position: [e.targetX - e.fx * .42, e.targetY - e.fy * .42, 1.25], radius: 115, power: (.25 + .8 * Math.sin(u * Math.PI / 2)) * fade });
         }
         return { parts, lights, camera };
     }
@@ -10786,16 +11407,20 @@ exports.ExecutionEffects = ExecutionEffects;
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.executionEnemyParts = executionEnemyParts;
+const corpse_golem_js_1 = require("./corpse-golem.js");
 const enemy_js_1 = require("./enemy.js");
+const undead_execution_fold_js_1 = require("./undead-execution-fold.js");
 const enemy_roster_js_1 = require("../combat/enemy-roster.js");
 const execution_js_1 = require("../combat/execution.js");
 function executionEnemyParts(enemy, s) {
+    if (enemy.archetype === 'corpse-golem')
+        return (0, corpse_golem_js_1.corpseGolemParts)(enemy, s);
     const e = s.execution?.targetId === enemy.id ? s.execution : null;
     if (e) {
-        const visual = (0, execution_js_1.executionPresentation)(e), u = visual.pin, fx = e.fx, fy = e.fy, t = e.elapsed, struggle = t >= execution_js_1.EXECUTION.pin && !e.extracted ? (1 - visual.char * .94) : 0, original = (0, enemy_js_1.enemyParts)({ ...enemy, hp: Math.max(1, enemy.hp), mode: 'wait', walkDistance: 0 });
-        return original.map(p => { const v = p.v.map(([x, y, z]) => { const side = x - enemy.x, forward = (y - enemy.y) * (1 - u) + (z - .65) * .75 * u, weight = Math.min(1, Math.abs(z - .65) * 1.8), shake = Math.sin(t * 16 + z * 9) * .055 * struggle * weight; return [enemy.x + fx * forward - fy * (side + shake), enemy.y + fy * forward + fx * (side + shake), Math.max(.025, z * (1 - u) + (.12 + Math.abs(y - enemy.y) * .08) * u + Math.abs(Math.sin(t * 19 + z)) * struggle * weight * .025)]; }); const char = enemy.charred ? 1 : visual.char, c = Array.isArray(p.c) ? p.c : typeof p.c === 'string' && /^#[0-9a-f]{6}$/i.test(p.c) ? [1, 3, 5].map(i => parseInt(p.c.slice(i, i + 2), 16)) : [90, 70, 70]; return { ...p, v, c: c.map(n => n * (1 - char) + 24 * char), d: v.reduce((a, q) => a + q[0] + q[1] + q[2] * .006, 0) / v.length + (p.kind === 1 ? .005 : 0) }; });
+        const visual = (0, execution_js_1.executionPresentation)(e), t = e.elapsed, struggle = t >= execution_js_1.EXECUTION.pin && !e.extracted ? (1 - visual.char * .94) : 0, original = (0, enemy_js_1.enemyParts)({ ...enemy, hp: Math.max(1, enemy.hp), mode: 'wait', walkDistance: 0, undeadMotion: null, archerLocked: false }, s);
+        return (0, undead_execution_fold_js_1.foldUndeadParts)(original, enemy, e, visual, struggle);
     }
-    let parts = (0, enemy_js_1.enemyParts)(enemy);
+    let parts = (0, enemy_js_1.enemyParts)(enemy, s);
     if (enemy.charred)
         return parts.map(p => ({ ...p, c: '#282521' }));
     if (s.phase === 'playing' && (0, execution_js_1.executionTargetWeak)({ ...enemy, maxHp: (0, enemy_roster_js_1.enemyMaxHp)(enemy) })) {
@@ -10880,6 +11505,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.fireProfileKind = fireProfileKind;
 exports.presentFireMesh = presentFireMesh;
 const fire_rules_js_1 = require("../interaction/fire-rules.js");
+const spectral_light_js_1 = require("./spectral-light.js");
 function fireProfileKind(modelId) {
     if (typeof modelId !== 'string')
         throw Error('Invalid fire presentation model');
@@ -10904,13 +11530,90 @@ function presentFireMesh(mesh, modelId, status) {
     const kind = fireProfileKind(modelId), profile = (0, fire_rules_js_1.fireLightingProfile)(kind, { emitters: mesh.lights.length }), gain = ({ candle: 1.5, candelabra: 1.5, lamp: 1.2, brazier: 1.1 })[kind] ?? 1, flames = [];
     for (const source of mesh.flameParts) {
         const center = source.v.reduce((s, v) => s.map((n, i) => n + v[i] / source.v.length), [0, 0, 0]), anchor = points.reduce((best, p) => Math.hypot(...p.map((v, i) => v - center[i])) < Math.hypot(...best.map((v, i) => v - center[i])) ? p : best, points[0]);
-        const part = { ...source, v: source.v.map(v => v.map((n, i) => anchor[i] + (n - anchor[i]) * profile.flameScale)), c: [243, 161, 59], ...(source.kind === 2 ? { r: source.r * profile.flameScale } : {}) };
+        const part = { ...source, v: source.v.map(v => v.map((n, i) => anchor[i] + (n - anchor[i]) * profile.flameScale)), c: [237, 204, 143], ...(source.kind === 2 ? { r: source.r * profile.flameScale } : {}) };
         part.d = depth(part);
         flames.push(part);
         if (part.kind === 2)
-            flames.push({ ...part, c: [255, 208, 120], r: part.r * .52, d: part.d + .0001 });
+            flames.push({ ...part, c: [255, 235, 187], r: part.r * .52, d: part.d + .0001 });
     }
-    return { parts: [...mesh.bodyParts, ...flames], lights: mesh.lights.map(l => ({ ...l, r: profile.radius, power: profile.power * gain })) };
+    return { parts: [...mesh.bodyParts, ...flames], lights: mesh.lights.map(l => ({ ...l, r: profile.radius, power: profile.power * gain, lightColor: kind === 'candle' ? spectral_light_js_1.LIGHT_TINTS.yellow : kind === 'lamp' ? spectral_light_js_1.LIGHT_TINTS.ivory : spectral_light_js_1.LIGHT_TINTS.amber })) };
+}
+
+},
+"render/golem-telegraph.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.golemTelegraphs = golemTelegraphs;
+const corpse_golem_js_1 = require("../combat/corpse-golem.js");
+function golemTelegraphs(s, map, blocked) {
+    if (s.phase !== 'playing' || s.execution || typeof blocked !== 'function')
+        return [];
+    const parts = [];
+    for (const e of s.enemies ?? [s.enemy]) {
+        if (!e || e.archetype !== 'corpse-golem' || e.hp <= 0 || e.mode !== 'windup')
+            continue;
+        const a = corpse_golem_js_1.GOLEM_ATTACKS[e.golemAttack];
+        if (!a)
+            continue;
+        const norm = Math.hypot(e.fx, e.fy);
+        if (norm < 1e-8)
+            continue;
+        const heading = Math.atan2(e.fy, e.fx), half = a.arc * Math.PI / 360, progress = Math.max(0, Math.min(1, e.timer / a.windup)), count = Math.max(12, Math.ceil(a.arc / 5)), points = [];
+        for (let i = 0; i <= count; i++) {
+            const angle = heading - half + 2 * half * i / count, dx = Math.cos(angle), dy = Math.sin(angle);
+            let low = 0, high = a.reach;
+            if (blocked(e, { x: e.x + dx * high, y: e.y + dy * high }, map))
+                for (let k = 0; k < 10; k++) {
+                    const mid = (low + high) / 2;
+                    if (blocked(e, { x: e.x + dx * mid, y: e.y + dy * mid }, map))
+                        high = mid;
+                    else
+                        low = mid;
+                }
+            else
+                low = high;
+            points.push([e.x + dx * low, e.y + dy * low, .012]);
+        }
+        const add = (kind, v, c, w, alpha) => parts.push({ kind, v, c, w, alpha, hero: false, golemTelegraph: true, d: -900000 + e.x + e.y });
+        for (let i = 1; i < points.length; i++)
+            add(0, [[e.x, e.y, .012], points[i - 1], points[i]], [150, 33, 48], 1, .08 + .14 * progress);
+        add(1, points, [224, 72, 79], 1.5, .45 + .5 * progress);
+        add(1, [points[0], [e.x, e.y, .012], points.at(-1)], [174, 48, 64], 1, .4 + .45 * progress);
+        if (e.golemAttack === 'press') {
+            // This is a moving current hit sector, not a predicted future hit location.
+            for (let i = 1; i <= 4; i++) {
+                const z = .014, x = e.x + Math.cos(heading) * i * .22, y = e.y + Math.sin(heading) * i * .22;
+                add(1, [[x - Math.sin(heading) * .08, y + Math.cos(heading) * .08, z], [x + Math.sin(heading) * .08, y - Math.cos(heading) * .08, z]], [211, 87, 82], 1, .55);
+            }
+        }
+    }
+    return parts;
+}
+
+},
+"render/golem-volume-light.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.sculptLighting = sculptLighting;
+const lamp_light_js_1 = require("./lamp-light.js");
+function sculptLighting(position, normal, material, state = {}) {
+    const len = Math.hypot(...normal), n = len > 1e-8 ? normal.map(v => v / len) : [0, 0, 1];
+    const lamp = (0, lamp_light_js_1.lampLighting)(state.lamp ?? 0, state.phase ?? 'playing');
+    const sources = [...(state.visualLights ?? [])];
+    if (lamp.power > 0 && Number.isFinite(state.x) && Number.isFinite(state.y))
+        sources.push({ x: state.x, y: state.y, z: 1.1, r: 145 * lamp.radiusScale * 1.3, power: lamp.power * 1.3, fireWarmth: .8 });
+    let diffuse = 0, warm = 0;
+    for (const l of sources) {
+        if (![l.x, l.y, l.z, l.r, l.power].every(Number.isFinite) || l.r <= 0 || l.power <= 0)
+            continue;
+        const v = [l.x - position[0], l.y - position[1], l.z - position[2]], d = Math.hypot(...v), dot = d > 1e-8 ? Math.max(0, n.reduce((a, c, i) => a + c * v[i] / d, 0)) : 1;
+        const energy = l.power * (.12 + .88 * dot) / (1 + (d / (l.r / 48)) ** 2);
+        diffuse += energy;
+        warm += energy * (l.fireWarmth ?? .6);
+    }
+    const exposure = 1 - Math.exp(-diffuse), t = diffuse > 0 ? Math.min(1, warm / diffuse) : 0;
+    const lift = .62 + .57 * exposure, shade = 1 - exposure;
+    return material.map((v, i) => Math.max(0, Math.min(245, v * lift * ([1 - .08 * shade + .045 * t, 1 - .025 * shade + .012 * t, 1 + .08 * shade - .045 * t][i]))));
 }
 
 },
@@ -11073,7 +11776,7 @@ function proximityFeedback({ parts = [], targets = [], actor = null, time = 0, e
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LAMP_LIGHTING = void 0;
 exports.lampLighting = lampLighting;
-exports.LAMP_LIGHTING = Object.freeze({ maxLife: 100, criticalAt: 1, normalAt: 15, emberPowerScale: .055, emberRadiusScale: .4 });
+exports.LAMP_LIGHTING = Object.freeze({ maxLife: 100, criticalAt: 1, normalAt: 15, emberPowerScale: .055, emberRadiusScale: .58 });
 function lampLighting(life, phase = 'playing') {
     const charge = Number.isFinite(life) ? Math.max(0, Math.min(exports.LAMP_LIGHTING.maxLife, life)) : 0;
     if (phase === 'dead' || charge <= 0)
@@ -11088,16 +11791,8 @@ function lampLighting(life, phase = 'playing') {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.marrowArcherParts = marrowArcherParts;
 exports.arrowParts = arrowParts;
-const marrow_archer_js_1 = require("../combat/marrow-archer.js");
-function marrowArcherParts(e) { const parts = [], n = Math.hypot(e.fx, e.fy), fx = n ? e.fx / n : 0, fy = n ? e.fy / n : 1, P = (s, f, z) => [e.x + fy * s + fx * f, e.y - fx * s + fy * f, z]; const line = (v, c = '#8e8473', w = 3) => parts.push({ kind: 1, v, c, w, hero: false, d: v.reduce((n, p) => n + p[0] + p[1] + p[2] * .006, 0) / v.length + .005 }); if (e.hp <= 0) {
-    line([P(-.15, -.5, .04), P(.12, .5, .06)], '#6b625b', 5);
-    line([P(.2, -.6, .06), P(.4, 0, .06), P(.2, .6, .06)], '#77716b', 2);
-    return parts;
-} const draw = e.mode === 'windup' ? Math.min(1, e.timer / marrow_archer_js_1.MARROW_ARCHER.windup) : 0, walk = Math.sin(e.walkDistance * 5) * .09; for (const s of [-1, 1]) {
-    line([P(s * .1, 0, .7), P(s * .16, s * walk, .34), P(s * .18, s * walk, .04)]);
-    line([P(-.16, 0, .9 + s * .12), P(0, .04, .88 + s * .12), P(.16, 0, .9 + s * .12)], '#827867', 2);
-} line([P(0, 0, .67), P(0, .04, 1.35)], '#9d907a', 4); line([P(-.09, .04, 1.4), P(-.07, .04, 1.56), P(.07, .04, 1.56), P(.09, .04, 1.4), P(-.09, .04, 1.4)], '#ac9c82', 3); line([P(-.16, 0, 1.27), P(-.28, .2, 1.18), P(-.25, .45, 1.22)], '#938777', 3); line([P(.16, 0, 1.27), P(.33, -draw * .18, 1.23), P(.12, -draw * .32, 1.22)], '#938777', 3); line([P(-.25, .45, .5), P(-.25, .63, .85), P(-.25, .68, 1.22), P(-.25, .6, 1.62), P(-.25, .45, 1.94)], '#888077', 3); line([P(-.25, .45, .5), P(.12, -draw * .32, 1.22), P(-.25, .45, 1.94)], '#b4ab94', 1); line([P(.18, -.18, .7), P(.28, -.2, 1.42)], '#494047', 5); if (draw)
-    line([P(.12, -draw * .32, 1.22), P(-.25, .79, 1.22)], '#b8b2a3', 1); return parts; }
+const undead_family_js_1 = require("./undead-family.js");
+function marrowArcherParts(e, state = {}) { return (0, undead_family_js_1.renderUndead)({ ...e, archetype: 'marrow-archer' }, state); }
 function arrowParts(shots, alpha = 1) { alpha = Math.max(0, Math.min(1, alpha)); return shots.map(s => { const x = s.previousX + (s.x - s.previousX) * alpha, y = s.previousY + (s.y - s.previousY) * alpha, v = [[x - s.fx * .27, y - s.fy * .27, 1.05], [x, y, 1.05]]; return { kind: 1, v, c: '#b7b1a2', w: 1.5, hero: false, d: x + y + .0063 }; }); }
 
 },
@@ -11105,62 +11800,274 @@ function arrowParts(shots, alpha = 1) { alpha = Math.max(0, Math.min(1, alpha));
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.meleeUndeadParts = meleeUndeadParts;
-const melee_undead_js_1 = require("../combat/melee-undead.js");
-function meleeUndeadParts(e) {
-    const profile = melee_undead_js_1.MELEE_UNDEAD[e.archetype];
-    if (!profile)
+const undead_family_js_1 = require("./undead-family.js");
+const kinds = new Set(['ossuary-guard', 'gravebearer', 'bloated-remnant', 'ashbound']);
+function meleeUndeadParts(e, state = {}) { return kinds.has(e.archetype) ? (0, undead_family_js_1.renderUndead)(e, state) : null; }
+
+},
+"render/spectral-light.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.LIGHT_TINTS = void 0;
+exports.fixturePalette = fixturePalette;
+exports.lightTint = lightTint;
+exports.exposureShoulder = exposureShoulder;
+exports.shadeColoredCell = shadeColoredCell;
+const amber_cell_js_1 = require("./amber-cell.js");
+exports.LIGHT_TINTS = Object.freeze({ yellow: Object.freeze([1, .93, .64]), amber: Object.freeze([1, .68, .39]), scarlet: Object.freeze([1, .24, .32]), ivory: Object.freeze([1, .96, .84]) });
+function fixturePalette(id = '') {
+    const key = id.includes('cluster-c') ? 'scarlet' : id.includes('chandelier') ? 'yellow' : id.includes('cluster-a') ? 'amber' : 'ivory';
+    return { tint: exports.LIGHT_TINTS[key], outer: key === 'scarlet' ? [204, 66, 83] : key === 'amber' ? [226, 163, 91] : [231, 207, 144], core: key === 'scarlet' ? [255, 184, 166] : [255, 239, 200] };
+}
+function lightTint(l) {
+    if (Array.isArray(l?.lightColor) && l.lightColor.length === 3 && l.lightColor.every(Number.isFinite))
+        return l.lightColor.map(v => Math.max(0, Math.min(1, v)));
+    if (l?.fixtureId)
+        return fixturePalette(l.fixtureId).tint;
+    return l?.fireWarmth > 0 ? exports.LIGHT_TINTS.amber : [1, 1, 1];
+}
+function exposureShoulder(base) { return base <= .55 ? Math.max(0, base) : .55 + .55 * (1 - Math.exp(-(base - .55) / .55)); }
+function shadeColoredCell(data, k, base, warm, hero, spectral) {
+    const a = data[k + 3];
+    (0, amber_cell_js_1.shadeAmberCell)(data, k, exposureShoulder(base), warm, hero);
+    const weight = spectral[3];
+    if (Number.isFinite(weight) && weight > 1e-8) {
+        const rgb = spectral.slice(0, 3).map(v => v / weight), peak = Math.max(...rgb, 1e-8);
+        for (let i = 0; i < 3; i++)
+            data[k + i] *= .76 + .24 * rgb[i] / peak;
+    }
+    data[k + 3] = a;
+}
+
+},
+"render/undead-execution-fold.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.foldUndeadParts = foldUndeadParts;
+function foldUndeadParts(parts, enemy, entry, visual, struggle = 0) {
+    const u = visual.pin, fx = -entry.fx, fy = -entry.fy, t = entry.elapsed;
+    return parts.map(p => {
+        const v = p.v.map(([x, y, z]) => {
+            const dx = x - enemy.x, dy = y - enemy.y, side = fy * dx - fx * dy, forward0 = fx * dx + fy * dy, forward = forward0 * (1 - u) + (z - .65) * .75 * u, weight = Math.min(1, Math.abs(z - .65) * 1.8), shake = Math.sin(t * 16 + z * 9) * .055 * struggle * weight;
+            return [enemy.x + fy * (side + shake) + fx * forward, enemy.y - fx * (side + shake) + fy * forward, Math.max(.025, z * (1 - u) + (.12 + Math.abs(forward0) * .08) * u + Math.abs(Math.sin(t * 19 + z)) * struggle * weight * .025)];
+        });
+        const char = enemy.charred ? 1 : visual.char, c = Array.isArray(p.c) ? p.c : typeof p.c === 'string' && /^#[0-9a-f]{6}$/i.test(p.c) ? [1, 3, 5].map(i => parseInt(p.c.slice(i, i + 2), 16)) : [90, 70, 70];
+        return { ...p, v, c: c.map(n => n * (1 - char) + 24 * char), d: v.reduce((a, q) => a + q[0] + q[1] + q[2] * .006, 0) / v.length + (p.kind === 1 ? .005 : 0) };
+    });
+}
+
+},
+"render/undead-family.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.UNDEAD_SHAPES = void 0;
+exports.archerTipLocal = archerTipLocal;
+exports.undeadReadyLights = undeadReadyLights;
+exports.renderUndead = renderUndead;
+const undead_motion_js_1 = require("../animation/undead-motion.js");
+const marrow_archer_js_1 = require("../combat/marrow-archer.js");
+const golem_volume_light_js_1 = require("./golem-volume-light.js");
+exports.UNDEAD_SHAPES = Object.freeze({ bonebound: { w: .18, h: 1.65 }, 'ossuary-guard': { w: .25, h: 1.9 }, 'marrow-archer': { w: .16, h: 1.65 }, gravebearer: { w: .23, h: 1.56 }, 'bloated-remnant': { w: .43, h: 1.48 }, ashbound: { w: .15, h: 1.7 } });
+const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+function archerTipLocal(e) { return [-.25, .79, 1.22]; }
+function undeadReadyLights(s) {
+    if (s.phase !== 'playing' || s.execution)
+        return [];
+    return (s.enemies ?? [s.enemy]).filter(e => e && (0, undead_motion_js_1.archerReady)(e)).map(e => { const p = archerTipLocal(e), h = (0, undead_motion_js_1.undeadPose)(e)?.heading ?? Math.atan2(e.fy, e.fx), fx = Math.cos(h), fy = Math.sin(h); return { x: e.x + fy * p[0] + fx * p[1], y: e.y - fx * p[0] + fy * p[1], z: p[2], r: 9, power: 1.15, fireWarmth: .55, lightColor: [1, .9, .65], undeadArrowReady: true, ownerId: e.id }; });
+}
+function renderUndead(e, state = {}) {
+    const shape = exports.UNDEAD_SHAPES[e.archetype], pose = (0, undead_motion_js_1.undeadPose)(e);
+    if (!shape || !pose)
         return null;
-    const parts = [], n = Math.hypot(e.fx, e.fy), fx = n ? e.fx / n : 0, fy = n ? e.fy / n : 1;
-    const P = (side, forward, z) => [e.x + fy * side + fx * forward, e.y - fx * side + fy * forward, z];
-    const add = (kind, v, c, w = 1, r = 0) => parts.push({ kind, v, c, w, r, hero: false, d: v.reduce((s, q) => s + q[0] + q[1] + q[2] * .006, 0) / v.length + (kind === 1 ? .005 : kind === 2 ? .01 : 0) });
-    const line = (v, c = '#8e8473', w = 3) => add(1, v, c, w), poly = (v, c) => add(0, v, c), dot = (p, r, c) => add(2, [p], c, 1, r);
-    const guard = e.archetype === 'ossuary-guard', grave = e.archetype === 'gravebearer', bloated = e.archetype === 'bloated-remnant';
-    const w = bloated ? .46 : guard ? .25 : .17, h = guard ? 1.9 : grave ? 1.5 : bloated ? 1.38 : 1.65;
-    if (e.hp <= 0) {
-        poly([P(-w, -.5, .03), P(w, -.5, .03), P(w * .8, .55, .07), P(-w * .7, .65, .04)], '#393237');
-        dot(P(0, -.62, .08), guard ? 8 : 6, '#847965');
-        line([P(-w, 0, .08), P(-w - .25, .35, .03)], '#6e6559', 3);
-        line([P(w, 0, .08), P(w + .25, .4, .03)], '#6e6559', 3);
-        if (grave)
-            poly([P(.2, .2, .04), P(.65, .2, .04), P(.65, .8, .04), P(.2, .8, .04)], '#575154');
-        return parts;
+    const kind = e.archetype, guard = kind === 'ossuary-guard', grave = kind === 'gravebearer', bloated = kind === 'bloated-remnant', ash = kind === 'ashbound', archer = kind === 'marrow-archer', bone = kind === 'bonebound', dead = e.hp <= 0 || e.mode === 'dead';
+    const h = shape.h, w = shape.w, heading = pose.heading, fx = Math.cos(heading), fy = Math.sin(heading), parts = [], skin = bloated ? [119, 112, 106] : ash ? [79, 76, 83] : [137, 127, 112], ivory = [172, 161, 137], metal = guard ? [101, 106, 114] : [87, 88, 94], cloth = ash ? [48, 47, 54] : [67, 57, 65];
+    const death = dead ? (Number.isFinite(e.visualDeathAt) && Number.isFinite(state.time) ? (0, undead_motion_js_1.ease)((state.time - e.visualDeathAt) / .7) : 1) : 0;
+    const P = (x, y, z) => {
+        if (!dead) {
+            z += pose.breath * Math.max(0, Math.min(1, (z - .5)));
+            y += (grave ? .15 : bloated ? .035 : .015) * Math.max(0, z - .5) + pose.hit * Math.max(0, z - .5);
+        }
+        if (death) {
+            const a = death * 1.48, co = Math.cos(a), si = Math.sin(a), side = (e.id ?? 0) % 2 ? 1 : -1, X = x * co + side * z * si;
+            z = Math.max(.025, z * co - side * x * si);
+            x = X;
+        }
+        return [e.x + fy * x + fx * y, e.y - fx * x + fy * y, Math.max(.025, z)];
+    };
+    function add(kind, v, c, width = 1, tag = 'body', normal = null, extra = {}) {
+        const V = v.map(p => P(...p)), center = V[0].map((_, i) => V.reduce((s, p) => s + p[i] / V.length, 0));
+        let color = c;
+        if (normal) {
+            const a = P(0, 0, 1), b = P(...normal.map((v, i) => v * .05 + (i === 2 ? 1 : 0)));
+            color = (0, golem_volume_light_js_1.sculptLighting)(center, b.map((v, i) => v - a[i]), c, state);
+        }
+        if (e.charred)
+            color = color.map(() => 31);
+        parts.push({ kind, v: V, c: color, w: width, hero: false, undeadDetail: tag, undeadKind: e.archetype, d: V.reduce((s, p) => s + p[0] + p[1] + p[2] * .006, 0) / V.length + (kind === 1 ? .006 : 0), ...extra });
     }
-    const walk = Math.sin(e.walkDistance * (bloated ? 3 : 5.1)) * (bloated ? .045 : .1), wind = e.mode === 'windup' ? Math.min(1, e.timer / profile.windup) : 0, hit = e.mode === 'recover' ? Math.max(0, 1 - e.timer / profile.recover) : 0;
-    for (const s of [-1, 1])
-        line([P(s * w * .65, 0, .7), P(s * w * .8, s * walk, .38), P(s * w, s * walk, .05)], bloated ? '#57504b' : '#70675d', bloated ? 11 : 5);
-    const lean = grave ? .25 : bloated ? .06 : .02;
-    poly([P(-w, lean, h - .45), P(w, lean, h - .45), P(w * .8, 0, .6), P(-w * .8, 0, .6)], guard ? '#4d5056' : bloated ? '#73675c' : '#363237');
-    dot(P(0, lean, h - .12), bloated ? 6 : 8, '#a69880');
+    const line = (v, c = ivory, W = 2, tag = 'detail') => add(1, v, c, W, tag);
+    function blob(c, r, color, tag, rings = 2, segs = 6) { const point = (j, i) => { const lat = -Math.PI / 2 + j / rings * Math.PI, a = i / segs * Math.PI * 2; return [c[0] + Math.cos(lat) * Math.cos(a) * r[0], c[1] + Math.cos(lat) * Math.sin(a) * r[1], c[2] + Math.sin(lat) * r[2]]; }; for (let j = 0; j < rings; j++)
+        for (let i = 0; i < segs; i++) {
+            const lat = -Math.PI / 2 + (j + .5) / rings * Math.PI, a = (i + .5) / segs * Math.PI * 2;
+            add(0, [point(j, i), point(j, i + 1), point(j + 1, i + 1), point(j + 1, i)], color, 1, tag, [Math.cos(lat) * Math.cos(a), Math.cos(lat) * Math.sin(a), Math.sin(lat)]);
+        } }
+    function plate(x, y, z, W, H, color, tag = 'armor') {
+        const v = [[x - W * .42, y, z], [x + W * .42, y, z], [x + W * .5, y, z + H * .8], [x + W * .3, y, z + H], [x - W * .3, y, z + H], [x - W * .5, y, z + H * .8]];
+        add(0, v, color, 1, tag, tag.includes('back') ? [0, -1, .15] : [0, 1, .15]);
+        line([v[3], v[4], v[5]], color.map(v => Math.min(200, v * 1.27)), 1.25, tag + '-rim');
+    }
+    const legTop = bloated ? .68 : .76;
+    for (let i = 0; i < 2; i++) {
+        const F = dead ? [i === 0 ? -w : w, 0, 0] : pose.feet[i], hip = [(i === 0 ? -1 : 1) * w * .6, 0, legTop], knee = [F[0] * .88, F[1] * .45, .37 + F[2] * .4], ankle = [F[0], F[1], .09 + F[2]];
+        line([hip, knee, ankle], skin, bloated ? 10 : guard ? 6 : 4, 'leg');
+        blob([F[0], F[1] + .055, .065 + F[2]], [bloated ? .14 : .095, .15, .055], ash ? cloth : skin, 'foot');
+        if (guard || i === 0 && !archer)
+            plate(F[0], F[1] + .06, .18 + F[2], bloated ? .2 : .13, .25, metal, 'greave');
+    }
+    if (bone || archer) {
+        line([[0, 0, .68], [0, 0, h - .3]], ivory, 3, 'spine');
+        for (let i = 0; i < 5; i++) {
+            const z = .87 + i * .075;
+            line([[-w, .01, z], [0, .09, z - .045], [w, .01, z]], ivory, 1.8, 'ribs');
+        }
+    }
+    else
+        blob([0, -.025, h * .58], [w, bloated ? .3 : .18, h * .25], bloated ? skin : cloth, 'torso', 3, 8);
+    if (bloated)
+        blob([.025, .10, .83], [.39, .27, .37], skin, 'belly', 3, 8);
+    const headShift = !dead ? pose.idle * .035 * (pose.gestureVariant ? 1 : -1) : 0, headZ = h - .14;
+    blob([headShift, .045, headZ], [bloated ? .13 : .13, .12, guard ? .18 : .16], skin, 'head');
+    for (const side of [-1, 1])
+        add(0, [[headShift + side * .052 - .025, .153, headZ + .025], [headShift + side * .052 + .025, .153, headZ + .025], [headShift + side * .052 + .02, .155, headZ - .015], [headShift + side * .052 - .02, .155, headZ - .02]], [22, 23, 29], 1, 'eye');
+    line([[headShift - .065, .155, headZ - .065], [headShift + .06, .155, headZ - .075]], cloth, 1.5, 'mouth');
+    let restR = [w + .12, .10, 1.0], restL = [-w - .12, .12, .86], raisedR = [w + .14, -.12, h - .10], impactR = [w * .35, .62, 1.01];
+    if (ash) {
+        raisedR = [.2, -.03, 1.3];
+        impactR = [.12, .66, 1.05];
+    }
+    if (grave) {
+        restR = [.25, .25, 1.1];
+        restL = [-.24, .12, 1.05];
+        raisedR = [.32, -.05, 1.32];
+        impactR = [.2, .68, 1.03];
+    }
+    if (bloated) {
+        restR = [.49, .1, .72];
+        restL = [-.48, .1, .72];
+        raisedR = [.5, -.02, 1.05];
+        impactR = [.28, .65, .76];
+    }
+    let R = restR, L = restL, funeralTip = null, archRaise = 0;
+    if (e.mode === 'windup')
+        R = mix(mix(restR, raisedR, pose.raise), impactR, pose.strike);
+    else if (e.mode === 'recover')
+        R = mix(impactR, restR, pose.recover);
+    if (bloated)
+        L = [-R[0], R[1], R[2]];
+    if (!dead && ['wait', 'chase'].includes(e.mode)) {
+        R = [R[0], R[1] - pose.idle * .035, R[2] + pose.idle * .05];
+        L = [L[0], L[1], L[2] + Math.sin(pose.time * 1.3) * .012];
+    }
+    if (grave) {
+        const rest = [.58, -.12, 1.83], raised = [.88, -.18, 1.6], hit = [0, 1.95, .94];
+        funeralTip = e.mode === 'windup' ? mix(mix(rest, raised, pose.raise), hit, pose.strike) : e.mode === 'recover' ? mix(hit, rest, pose.recover) : rest;
+        const d = funeralTip.map((v, i) => v - R[i]), n = Math.hypot(...d);
+        L = R.map((v, i) => v - d[i] / n * .36);
+    }
+    if (archer) {
+        archRaise = e.mode === 'windup' ? (0, undead_motion_js_1.ease)(e.timer / .35) : e.mode === 'recover' ? 1 - (0, undead_motion_js_1.ease)((e.timer - .12) / .4) : 0;
+        L = mix([-.25, .30, .92], [-.25, .45, 1.22], archRaise);
+        if (e.mode === 'windup') {
+            const draw = (0, undead_motion_js_1.ease)((e.timer - .28) / Math.max(.01, marrow_archer_js_1.MARROW_ARCHER.aimLock - .28));
+            R = e.timer < .28 ? mix([.25, -.18, 1.4], [-.25, .12, 1.22], (0, undead_motion_js_1.ease)(e.timer / .28)) : [-.25, .12 - .44 * draw, 1.22];
+        }
+        else if (e.mode === 'recover')
+            R = mix([-.25, -.32, 1.22], [.23, -.16, 1.21], (0, undead_motion_js_1.ease)(e.timer / .7));
+        else
+            R = [.23, -.16, 1.21];
+    }
+    for (const [side, hand] of [[1, R], [-1, L]]) {
+        const shoulder = [side * w, 0, h - .42], elbow = [side * (w + .13), hand[1] * .4, (shoulder[2] + hand[2]) / 2];
+        line([shoulder, elbow, hand], skin, bloated ? 8 : 4, 'arm');
+        blob(hand, [bloated ? .12 : .075, .075, .09], skin, 'hand');
+        for (let k = 0; k < 3; k++)
+            line([[hand[0] + (k - 1) * .035, hand[1] + .03, hand[2] - .035], [hand[0] + (k - 1) * .045, hand[1] + .09, hand[2] - .09]], skin, 1.5, 'finger');
+    }
+    if (bone) {
+        plate(.17, .055, 1.17, .23, .22, metal, 'shoulder-armor');
+        plate(-.085, .12, .94, .16, .24, metal, 'broken-breastplate');
+        line([[-.19, .16, 1.3], [.15, .13, .67]], cloth, 5, 'chest-binding');
+    }
     if (guard) {
-        poly([P(-.48, .14, .65), P(-.12, .14, .65), P(-.1, .14, 1.4), P(-.46, .14, 1.46)], '#55585b');
+        plate(0, .16, .85, .43, .58, metal, 'breastplate');
+        plate(0, .16, headZ - .08, .25, .29, metal, 'helmet');
+        line([[-.095, .175, headZ + .035], [.095, .175, headZ + .035]], [23, 23, 28], 2, 'visor');
+        plate(.26, 0, 1.4, .27, .22, metal, 'pauldron');
+        plate(-.28, 0, 1.36, .23, .19, metal, 'pauldron');
+        const shieldY = .22 - pose.raise * .10;
+        plate(-.34, shieldY, .65, .36, .84, metal, 'shield');
         for (let i = 0; i < 3; i++)
-            line([P(-.43 + i * .12, .16, .76), P(-.4 + i * .12, .16, 1.35)], '#9d9078', 3);
-        const hand = P(.36, .1 + hit * .5, 1.05 + wind * .35);
-        line([P(.2, lean, h - .4), hand], '#8e8473', 5);
-        line([hand, [hand[0] + fx * .15, hand[1] + fy * .15, hand[2] + .45]], '#a8adb3', 5);
+            line([[-.46 + i * .11, shieldY + .01, .76], [-.44 + i * .11, shieldY + .01, 1.34]], ivory, 2, 'shield-rib');
     }
-    else if (grave) {
-        const angle = -1.7 + wind * 2.5 - hit * 2.8, side = Math.sin(angle) * .8, forward = Math.cos(angle) * .8 - .15, z = .06 + wind * .7 + hit * .35;
-        const hand = P(.15, .25 + wind * .15, 1.05);
-        line([P(.13, lean, 1.2), hand], '#8e8473', 5);
-        const end = P(side, forward, z);
-        line([hand, P(side * .5, forward * .5, .3 + wind * .6), end], '#777b80', 2);
-        poly([P(side - .24, forward - .34, z), P(side + .24, forward - .34, z), P(side + .24, forward + .34, z), P(side - .24, forward + .34, z)], '#777173');
+    if (grave) {
+        plate(0, -.27, .68, .60, 1.56, [76, 67, 64], 'coffin');
+        // Back-facing lid has visible metal strips from the rear view.
+        plate(0, -.43, .68, .56, 1.48, [70, 61, 59], 'coffin-back');
+        for (const side of [-1, 1])
+            add(0, [[side * .3, -.27, .68], [side * .3, -.43, .68], [side * .3, -.43, 2.1], [side * .3, -.27, 2.16]], [65, 60, 60], 1, 'coffin-side', [side, 0, 0]);
+        for (const z of [.91, 1.75])
+            line([[-.26, -.45, z], [.26, -.45, z]], metal, 4, 'coffin-clamp');
+        for (const side of [-1, 1])
+            line([[side * .23, -.25, 1.8], [side * .14, .15, 1.25], [side * .16, .12, .7]], cloth, 5, 'coffin-strap');
+        add(0, [[-.2, .12, 1.46], [0, -.08, 1.83], [.2, .12, 1.46]], cloth, 1, 'coffin-hood');
+        const shaft = funeralTip.map((v, i) => v - R[i]), N = Math.hypot(...shaft), butt = R.map((v, i) => v - shaft[i] / N * .8);
+        line([butt, funeralTip], metal, 3, 'funeral-pole');
+        line([[funeralTip[0] - .29, funeralTip[1], funeralTip[2]], [funeralTip[0] + .29, funeralTip[1], funeralTip[2]]], ivory, 5, 'pole-crosspiece');
+        plate(.22, .03, 1.23, .2, .22, metal, 'shoulder-armor');
     }
-    else if (bloated) {
+    if (bloated) {
+        for (const side of [-1, 1]) {
+            plate(side * .25, .29, .82, .24, .37, metal, 'split-armor');
+            line([[side * .39, .11, .72], [side * .25, .31, .79], [0, .36, .78]], cloth, 4, 'belly-strap');
+        }
+        line([[-.03, .38, .65], [.025, .4, .89], [-.02, .34, 1.13]], cloth, 2, 'belly-seam');
+    }
+    if (ash) {
+        plate(.16, .02, 1.25, .18, .22, metal, 'burned-pauldron');
+        for (let i = 0; i < 3; i++) {
+            const x = (i - 1) * .12;
+            add(0, [[x - .04, -.04, .8], [x + .04, -.04, .8], [x + .045, Math.sin(pose.time + i) * .012, .42]], cloth, 1, 'burned-cloth');
+        }
+        line([[-.08, .13, 1.16], [.04, .14, 1.04], [0, .13, .92]], [117, 67, 58], 1, 'coal-crack');
+    }
+    if (archer) {
+        add(0, [[-.17, .02, 1.46], [0, -.08, 1.8], [.17, .02, 1.46]], cloth, 1, 'hood');
+        plate(.12, .12, 1.02, .19, .3, metal, 'light-breastplate');
+        plate(-.2, .05, 1.24, .19, .17, metal, 'bow-shoulder');
+        line([[.18, -.15, .75], [.27, -.18, 1.44]], cloth, 6, 'quiver');
         for (let i = 0; i < 3; i++)
-            line([P(-w, .02, .7 + i * .17), P(0, .22, .67 + i * .17), P(w, .02, .7 + i * .17)], '#30292d', 4);
-        for (const s of [-1, 1])
-            line([P(s * w, lean, 1.03), P(s * (w + .12), .12, .75), P(s * w, .22 + hit * .45, .6 + wind * .2)], '#8b7d6a', 8);
+            line([[.2 + i * .045, -.18, 1.2], [.24 + i * .045, -.18, 1.62]], ivory, 1, 'quiver-arrow');
+        const angle = .55 * (1 - archRaise), co = Math.cos(angle), si = Math.sin(angle), bow = [[0, 0, -.72], [0, .18, -.37], [0, .23, 0], [0, .15, .4], [0, 0, .72]].map(([x, y, z]) => [L[0] + x, L[1] + y * co - z * si, L[2] + y * si + z * co]);
+        line(bow, [137, 126, 103], 3, 'bow');
+        line([bow[0], R, bow.at(-1)], [181, 171, 147], 1, 'bow-string');
+        if (e.mode === 'windup' && !e.hitFired) {
+            const tip = e.timer < .22 ? [R[0], R[1] + .4, R[2]] : archerTipLocal(e);
+            line([R, tip], ivory, 1.4, 'nocked-arrow');
+            if ((0, undead_motion_js_1.archerReady)(e)) {
+                line([[tip[0], tip[1] - .07, tip[2]], tip], [244, 205, 119], 3, 'ready-arrow');
+                add(2, [tip], [255, 239, 190], 1, 'ready-arrow', null, { r: 2, arrowReady: true });
+            }
+        }
     }
-    else {
-        for (const s of [-1, 1])
-            line([P(s * .16, .08, 1.21), P(s * .31, .02, .9), P(s * .22, .18 + hit * .5, 1 + wind * .22)], '#938777', 4);
-        line([P(-.16, .1, 1.3), P(.16, .1, .72)], '#777c83', 2);
-        line([P(0, .1, 1.22), P(.09, .1, .8)], '#aca08c', 2);
+    if (!guard && !grave && !archer && !bloated) {
+        line([R, [R[0] + .04, R[1] + .04, R[2] + (ash ? .32 : .43)]], metal, 3, 'blade');
     }
-    if (wind)
-        line([P(-.12, lean, h + .1), P(.12, lean, h + .1)], '#b78c60', 2);
+    if (guard)
+        line([R, [R[0] + .06, R[1] + .1, R[2] + .47]], ivory, 4, 'sword');
+    if (!archer && !dead && ((e.mode === 'windup' && pose.strike > .15) || (e.mode === 'recover' && e.timer < .12))) {
+        const tip = grave ? funeralTip : bloated ? [R[0] + .12, R[1] + .04, R[2]] : [R[0] + .04, R[1] + .05, R[2] + .32];
+        line([mix(R, tip, .55), tip], [196, 166, 127], 1.6, 'attack-accent');
+    }
     return parts;
 }
 
@@ -11432,6 +12339,8 @@ function drawDashHud(out, hud, s, ready, cooldown) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.enemyHealthRows = enemyHealthRows;
 exports.paintAsciiEnemyHealth = paintAsciiEnemyHealth;
+const rendered_enemy_health_js_1 = require("./rendered-enemy-health.js");
+const stone_health_js_1 = require("./stone-health.js");
 const ascii = s => String(s).replace(/[^\x20-\x7e]/g, '?');
 function enemyHealthRows(e, cols = 42) {
     if (!e || ![e.hp, e.maxHp].every(Number.isFinite) || e.hp <= 0 || e.maxHp <= 0)
@@ -11442,39 +12351,13 @@ function enemyHealthRows(e, cols = 42) {
     const name = '[ ' + ascii(e.name ?? 'UNDEAD').toUpperCase().slice(0, cols - 10) + ' ]', left = Math.floor((inner - name.length) / 2), numbers = String(Number(hp.toFixed(1))) + ' / ' + String(Number(e.maxHp.toFixed(1)));
     return ['+' + '-'.repeat(left) + name + '-'.repeat(inner - name.length - left) + '+', '| [' + '#'.repeat(count) + ':'.repeat(slots - count) + '] |', '|' + center(numbers) + '|', '+' + '='.repeat(inner) + '+'];
 }
-function paintAsciiEnemyHealth(ctx, view, { width, height = 720 } = {}) {
-    if (!ctx || !Number.isFinite(width) || !Number.isFinite(height) || width < 160 || height < 100)
+function paintAsciiEnemyHealth(ctx, view, { width, height = 864 } = {}) {
+    if (!ctx || !Number.isFinite(width) || !Number.isFinite(height) || width < 120 || height < 100)
         return;
-    ctx.save();
-    try {
-        ctx.beginPath();
-        ctx.rect(0, 0, width, height);
-        ctx.clip();
-        ctx.globalAlpha = 1;
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-        ctx.font = 'bold 12px monospace';
-        const cell = ctx.measureText('M').width;
-        if (!Number.isFinite(cell) || cell <= 0)
-            return;
-        function plate(e, y, boss) { const cols = Math.min(boss ? 76 : 42, Math.floor((width - 20) / cell)), rows = enemyHealthRows(e, cols); if (!rows.length)
-            return; const x = Math.round((width - cols * cell) / 2); for (let r = 0; r < rows.length; r++)
-            for (let c = 0; c < rows[r].length; c++) {
-                const ch = rows[r][c];
-                if (ch === ' ')
-                    continue;
-                const X = x + c * cell, Y = y + r * 14;
-                ctx.fillStyle = '#09080c';
-                ctx.fillText(ch, X + 1, Y + 2);
-                ctx.fillStyle = r === 1 && ch === '#' ? '#b65c46' : ch === ':' ? '#51434a' : r === 0 || r === 3 ? '#b3a38b' : '#dccbb0';
-                ctx.fillText(ch, X, Y);
-            } }
-        plate(view?.boss, 12, true);
-        plate(view?.target, view?.boss ? 86 : 12, false);
-    }
-    finally {
-        ctx.restore();
-    }
+    if (view?.boss)
+        (0, rendered_enemy_health_js_1.paintRenderedEnemyHealth)(ctx, view.boss, { width, height, y: 10, boss: true });
+    if (view?.target)
+        (0, rendered_enemy_health_js_1.paintRenderedEnemyHealth)(ctx, view.target, { width, height, y: view?.boss ? 105 : 10 });
 }
 
 },
@@ -11543,6 +12426,103 @@ function createEnemyHealthModel({ linger = 2, defaultMaxHp = 70 } = {}) {
 }
 var enemy_health_ascii_js_1 = require("./enemy-health-ascii.js");
 Object.defineProperty(exports, "paintEnemyHealth", { enumerable: true, get: function () { return enemy_health_ascii_js_1.paintAsciiEnemyHealth; } });
+
+},
+"ui/engine-hud-pass.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.blendHudCells = blendHudCells;
+exports.createEngineHudPass = createEngineHudPass;
+function blendHudCells(frame, cells) {
+    if (frame.length !== cells.length)
+        throw Error('HUD/world grids must match');
+    for (let k = 0; k < frame.length; k += 4) {
+        const a = cells[k + 3] / 255;
+        if (a <= 0)
+            continue;
+        for (let c = 0; c < 3; c++)
+            frame[k + c] = cells[k + c] * a + frame[k + c] * (1 - a);
+        frame[k + 3] = Math.round((a + (frame[k + 3] / 255) * (1 - a)) * 255);
+    }
+    return frame;
+}
+function rgb(style) { if (typeof style === 'string' && /^#[0-9a-f]{6}$/i.test(style))
+    return [1, 3, 5].map(i => parseInt(style.slice(i, i + 2), 16)); return [220, 205, 180]; }
+function createEngineHudPass(makeCanvas) {
+    const layer = makeCanvas(1, 1), small = makeCanvas(1, 1), ctx = layer.getContext('2d', { willReadFrequently: true }), read = small.getContext('2d', { willReadFrequently: true });
+    let labels = [];
+    const target = new Proxy(ctx, { get(o, k) { if (k === 'fillText')
+            return (text, x, y) => { const size = Number.parseFloat(o.font) || 12; labels.push({ text: String(text), x, y, size: Math.max(8, Math.min(18, size)), color: rgb(o.fillStyle), align: o.textAlign, baseline: o.textBaseline, alpha: o.globalAlpha }); }; const v = Reflect.get(o, k, o); return typeof v === 'function' ? v.bind(o) : v; }, set(o, k, v) { return Reflect.set(o, k, v, o); } });
+    return {
+        begin(width, height) { if (layer.width !== width || layer.height !== height) {
+            layer.width = width;
+            layer.height = height;
+        } ctx.clearRect(0, 0, width, height); labels = []; return target; },
+        compose(frame, cols, rows) { if (small.width !== cols || small.height !== rows) {
+            small.width = cols;
+            small.height = rows;
+        } read.clearRect(0, 0, cols, rows); read.drawImage(layer, 0, 0, cols, rows); return blendHudCells(frame, read.getImageData(0, 0, cols, rows).data); },
+        annotations() { return labels.map(p => ({ ...p, color: [...p.color] })); }
+    };
+}
+
+},
+"ui/golem-trial-hud.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.golemHudRows = golemHudRows;
+exports.paintGolemTrialHud = paintGolemTrialHud;
+const rendered_enemy_health_js_1 = require("./rendered-enemy-health.js");
+const stone_health_js_1 = require("./stone-health.js");
+const center = (s, n) => { s = String(s).replace(/[\r\n\t]/g, ' ').slice(0, n); const left = Math.floor((n - s.length) / 2); return ' '.repeat(left) + s + ' '.repeat(n - s.length - left); };
+function golemHudRows(boss, width = 80, { available = false } = {}) {
+    if (!Number.isFinite(boss?.hp) || !Number.isFinite(boss?.maxHp) || boss.maxHp <= 0)
+        return [];
+    const n = Math.max(32, Math.min(92, Number.isFinite(width) ? Math.floor(width) : 80)), inner = n - 4, hp = Math.max(0, Math.min(boss.maxHp, boss.hp)), slots = n - 6, fill = hp > 0 ? Math.max(1, Math.round(slots * hp / boss.maxHp)) : 0;
+    const carved = n => { const a = '=<>='; return Array.from({ length: n }, (_, i) => a[i % a.length]).join(''); };
+    return [' /' + carved(n - 4) + '\\ ', '| ' + center('/|\\  CORPSE GOLEM  /|\\', inner) + ' |', '| ' + center('---<+>---{ X }---<+>---', inner) + ' |', '|<[' + '#'.repeat(fill) + ':'.repeat(slots - fill) + ']>|', '| ' + center(`${hp} / ${boss.maxHp}`, inner) + ' |', ' \\' + carved(n - 4) + '/ ', center(available ? 'R — Последний уголь' : '', n)].map(s => s.length < n ? s + ' '.repeat(n - s.length) : s.slice(0, n));
+}
+function paintGolemTrialHud(ctx, s, { width, enabled, available }) {
+    const a = s.bossEncounter;
+    if (!enabled || !a?.inRoom || !a.active || s.phase === 'dead')
+        return;
+    const boss = (s.enemies ?? [s.enemy]).find(e => e.id === a.bossId);
+    if (!boss)
+        return;
+    (0, rendered_enemy_health_js_1.paintRenderedEnemyHealth)(ctx, boss, { width, height: 864, y: 10, boss: true, time: s.time, available: available && !s.execution });
+}
+
+},
+"ui/hero-overlay-labels.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.paintHeroOverlayLabels = paintHeroOverlayLabels;
+const world_surface_js_1 = require("../app/world-surface.js");
+function paintHeroOverlayLabels(ctx, s, { width, height = 864, ready = false } = {}) {
+    const r = (0, world_surface_js_1.heroHudBounds)(width, height);
+    if (r.width <= 0 || r.height <= 0)
+        return;
+    ctx.save();
+    try {
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'alphabetic';
+        ctx.shadowColor = '#000';
+        ctx.shadowBlur = 2;
+        const life = Math.max(0, Math.min(100, Number.isFinite(s.lamp) ? s.lamp : 0));
+        ctx.fillStyle = life <= 1 ? '#d68c79' : '#d2b991';
+        ctx.fillText(`LAMP ${Math.ceil(life)}/100`, r.x + r.width * .15, r.y + r.height * .94);
+        ctx.fillStyle = ready ? '#c2d4d8' : '#89858a';
+        ctx.fillText(ready ? 'DASH READY' : 'DASH', r.x + r.width * .85, r.y + r.height * .94);
+        if (life <= 15) {
+            ctx.fillStyle = life <= 1 ? '#dd8a7b' : '#c5a37a';
+            ctx.fillText(life <= 0 ? 'THE FLAME IS OUT' : life <= 1 ? 'LAST EMBER' : 'LOW EMBER', width / 2, r.y + r.height * .82);
+        }
+    }
+    finally {
+        ctx.restore();
+    }
+}
 
 },
 "ui/manifest-layout.js":function(require,module,exports){
@@ -12653,6 +13633,180 @@ function installManifest({ canvas, dimensions, active, root = window, onModalCha
             }
         },
     };
+}
+
+},
+"ui/rendered-enemy-health.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.enemyBarLayout = enemyBarLayout;
+exports.paintRenderedEnemyHealth = paintRenderedEnemyHealth;
+const histories = new WeakMap();
+const clamp = x => Math.max(0, Math.min(1, x));
+function enemyBarLayout(width, { boss = false, y = 12 } = {}) {
+    const cap = boss ? 34 : 22, available = Math.max(40, width - 2 * cap - 12), barWidth = Math.min(available, boss ? 920 : 310, Math.max(boss ? 300 : 200, width * (boss ? .60 : .21))), barHeight = boss ? 29 : 15;
+    const x = (width - barWidth) / 2, barY = y + 22;
+    return { x, barY, barWidth, barHeight, cap, nameY: y + 11, numbersY: barY + barHeight + 15, bottom: barY + barHeight + 36 };
+}
+function path(ctx, points, fill, stroke = null, lineWidth = 1) { ctx.beginPath(); points.forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p)); ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); if (stroke) {
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = lineWidth;
+    ctx.stroke();
+} }
+function gradient(ctx, x, y, w, h, stops) { const g = ctx.createLinearGradient(x, y, x + w, y + h); for (const [p, c] of stops)
+    g.addColorStop(p, c); return g; }
+function cap(ctx, x, y, h, side) {
+    const P = (a, b) => [x + side * a * (h / 22), y + b * (h / 22)], gold = gradient(ctx, x, y, 0, h, [[0, '#dfc47b'], [.28, '#9b793c'], [.55, '#514023'], [.78, '#ac8747'], [1, '#302919']]);
+    path(ctx, [P(1, 2), P(8, -1), P(15, 1), P(22, 7), P(16, 10), P(20, 15), P(11, 16), P(5, 20), P(0, 17), P(3, 11), P(-1, 8)], gold, '#1c1b13', 1.3);
+    path(ctx, [P(1, 6), P(8, 3), P(5, 9), P(13, 8), P(8, 13), P(13, 15), P(4, 15), P(5, 11), P(0, 10)], '#756039', '#c5a765', .7);
+    ctx.beginPath();
+    ctx.moveTo(...P(5, 5));
+    ctx.lineTo(...P(17, 7));
+    ctx.lineTo(...P(11, 11));
+    ctx.lineTo(...P(15, 14));
+    ctx.strokeStyle = '#e1c88d';
+    ctx.lineWidth = .75;
+    ctx.stroke();
+    path(ctx, [P(2, 7), P(6, 9), P(2, 12), P(0, 9)], '#342c20', '#b49a5b', .7);
+}
+function paintRenderedEnemyHealth(ctx, e, { width, height = 864, y = 12, boss = false, time = null, available = false } = {}) {
+    if (!ctx || !Number.isFinite(width) || width < 120 || !e || ![e.hp, e.maxHp].every(Number.isFinite) || e.maxHp <= 0 || e.hp < 0)
+        return;
+    const l = enemyBarLayout(width, { boss, y }), hp = Math.max(0, Math.min(e.maxHp, e.hp)), target = hp / e.maxHp, now = Number.isFinite(time) ? time : (globalThis.performance?.now?.() ?? 0) / 1000;
+    let cache = histories.get(ctx);
+    if (!cache) {
+        cache = new Map();
+        histories.set(ctx, cache);
+    }
+    const key = (boss ? 'boss:' : 'target:') + (e.id ?? e.name ?? 'enemy'), old = cache.get(key), reset = !old || old.max !== e.maxHp || now < old.time, dt = old ? Math.max(0, Math.min(.1, now - old.time)) : 0;
+    const fraction = hp === 0 ? 0 : reset ? target : old.fraction + (target - old.fraction) * (1 - Math.exp(-dt / .11));
+    cache.set(key, { fraction, time: now, max: e.maxHp });
+    if (cache.size > 64)
+        cache.delete(cache.keys().next().value);
+    const x = l.x, Y = l.barY, W = l.barWidth, H = l.barHeight;
+    ctx.save();
+    try {
+        ctx.globalAlpha = 1;
+        ctx.beginPath();
+        ctx.rect(0, 0, width, height);
+        ctx.clip();
+        // Recessed dark channel, thin bevelled metal, and mirrored carved end pieces.
+        ctx.shadowColor = 'rgba(0,0,0,.9)';
+        ctx.shadowBlur = 4;
+        ctx.shadowOffsetY = 2;
+        path(ctx, [[x - 2, Y - 2], [x + W + 2, Y - 2], [x + W + 2, Y + H + 2], [x - 2, Y + H + 2]], '#100c0b', '#2c261a', 1.5);
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetY = 0;
+        ctx.fillStyle = gradient(ctx, x, Y, 0, H, [[0, '#070607'], [.5, '#211011'], [1, '#080609']]);
+        ctx.fillRect(x, Y, W, H);
+        const fill = Math.min(W - 4, Math.max(0, (W - 4) * fraction));
+        if (fill > 0) {
+            ctx.fillStyle = gradient(ctx, x, Y + 2, 0, H - 4, [[0, '#d03028'], [.2, '#ad1517'], [.55, '#72090e'], [.82, '#52060b'], [1, '#8b171a']]);
+            ctx.fillRect(x + 2, Y + 2, fill, H - 4);
+            ctx.fillStyle = 'rgba(245,101,67,.32)';
+            ctx.fillRect(x + 3, Y + 3, Math.max(0, fill - 2), 1);
+            ctx.fillStyle = 'rgba(37,1,7,.5)';
+            ctx.fillRect(x + 2, Y + H - 4, fill, 2);
+        }
+        ctx.strokeStyle = '#a58b4d';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x - .5, Y - .5, W + 1, H + 1);
+        ctx.strokeStyle = '#ddc48b';
+        ctx.beginPath();
+        ctx.moveTo(x, Y - 1);
+        ctx.lineTo(x + W, Y - 1);
+        ctx.stroke();
+        ctx.strokeStyle = '#302719';
+        ctx.beginPath();
+        ctx.moveTo(x, Y + H + 1);
+        ctx.lineTo(x + W, Y + H + 1);
+        ctx.stroke();
+        cap(ctx, x, Y - 2, H + 4, -1);
+        cap(ctx, x + W, Y - 2, H + 4, 1);
+        for (const u of [.25, .5, .75])
+            path(ctx, [[x + W * u - 4, Y - 2], [x + W * u, Y - 5], [x + W * u + 4, Y - 2], [x + W * u, Y]], '#90713b', '#c5a766', .5);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'alphabetic';
+        ctx.font = `${boss ? 16 : 13}px Georgia,serif`;
+        ctx.fillStyle = boss ? '#b29ac9' : '#d1c1a9';
+        ctx.shadowColor = '#000';
+        ctx.shadowBlur = 2;
+        let name = String(e.name ?? (boss ? 'CORPSE GOLEM' : 'UNDEAD')).replace(/[\r\n\t]/g, ' ').toUpperCase();
+        while (name.length > 4 && ctx.measureText(name).width > W + 30)
+            name = name.slice(0, -2) + '…';
+        ctx.fillText(name, width / 2, l.nameY);
+        ctx.shadowBlur = 0;
+        ctx.font = '10px Georgia,serif';
+        ctx.fillStyle = '#bfb4a2';
+        ctx.fillText(`${Number(hp.toFixed(1))} / ${Number(e.maxHp.toFixed(1))}`, width / 2, l.numbersY);
+        if (boss && available) {
+            ctx.font = '12px Georgia,serif';
+            ctx.fillStyle = '#ddc9a0';
+            ctx.fillText('R — Последний уголь', width / 2, l.numbersY + 18);
+        }
+    }
+    finally {
+        ctx.restore();
+    }
+}
+
+},
+"ui/stone-health.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.stoneHealthRows = stoneHealthRows;
+exports.paintStoneHealth = paintStoneHealth;
+const clean = s => String(s).replace(/[^\x20-\x7e]/g, '?');
+const center = (s, n) => { s = clean(s).slice(0, n); const a = Math.floor((n - s.length) / 2); return ' '.repeat(a) + s + ' '.repeat(n - a - s.length); };
+const trackers = new WeakMap();
+function stoneHealthRows(e, cols = 42, { fraction = null, boss = false } = {}) {
+    if (!e || ![e.hp, e.maxHp].every(Number.isFinite) || e.maxHp <= 0 || e.hp < 0)
+        return [];
+    const n = Math.max(24, Math.min(96, Math.floor(cols))), slots = n - 6, hp = Math.max(0, Math.min(e.maxHp, e.hp)), f = fraction === null ? hp / e.maxHp : Math.max(0, Math.min(1, fraction)), fill = hp > 0 ? Math.max(1, Math.round(slots * f)) : 0;
+    const name = boss ? 'CORPSE GOLEM' : clean(e.name ?? 'UNDEAD').toUpperCase();
+    return [' __' + '='.repeat(n - 6) + '__ ', '/##' + ':'.repeat(n - 6) + '##\\', '|| ' + center(name, n - 6) + ' ||', '|| ' + center(boss ? '--<X>---{ + }---<X>--' : ':  :  :  :  :', n - 6) + ' ||', '||[' + '#'.repeat(fill) + '.'.repeat(slots - fill) + ']||', '|| ' + center(`${Number(hp.toFixed(1))} / ${Number(e.maxHp.toFixed(1))}`, n - 6) + ' ||', '\\##' + '='.repeat(n - 6) + '##/', ' ..' + ':'.repeat(n - 6) + '.. '].map(s => s.padEnd(n).slice(0, n));
+}
+function paintStoneHealth(ctx, e, { width, y = 12, boss = false, time = null, available = false } = {}) {
+    if (!e || !Number.isFinite(width) || width < 100)
+        return;
+    let cache = trackers.get(ctx);
+    if (!cache) {
+        cache = new Map();
+        trackers.set(ctx, cache);
+    }
+    const now = Number.isFinite(time) ? time : (globalThis.performance?.now?.() ?? 0) / 1000, key = (boss ? 'boss:' : 'mob:') + (e.id ?? e.name ?? 'enemy'), target = Math.max(0, Math.min(1, e.hp / e.maxHp));
+    const old = cache.get(key), dt = old ? Math.max(0, Math.min(.1, now - old.time)) : 0, reset = !old || now < old.time || old.max !== e.maxHp;
+    const fraction = reset ? target : old.fraction + (target - old.fraction) * (1 - Math.exp(-dt / .12));
+    cache.set(key, { fraction, time: now, max: e.maxHp });
+    if (cache.size > 64)
+        cache.delete(cache.keys().next().value);
+    const cols = Math.max(24, Math.min(boss ? 92 : 44, Math.floor((width - 16) / 7.5))), rows = stoneHealthRows(e, cols, { fraction, boss });
+    if (!rows.length)
+        return;
+    const font = Math.min(boss ? 13 : 11, Math.max(4, (width - 16) / (cols * .64))), cw = font * .62, ch = font * 1.05, x = (width - cols * cw) / 2;
+    ctx.save();
+    ctx.globalAlpha = 1;
+    ctx.font = `${font}px monospace`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    for (let r = 0; r < rows.length; r++)
+        for (let c = 0; c < cols; c++) {
+            const glyph = rows[r][c];
+            if (glyph === ' ')
+                continue;
+            const X = x + c * cw, Y = y + r * ch;
+            ctx.fillStyle = '#08090b';
+            ctx.fillText(glyph, X + 1, Y + 2);
+            ctx.fillStyle = r === 4 ? (glyph === '#' ? (boss ? '#b92b3c' : '#a95148') : glyph === '.' ? '#30282b' : '#81756a') : r === 2 || r === 5 ? '#e0d1c5' : r === 7 ? '#353437' : r === 0 || glyph === '=' ? '#a69d88' : glyph === ':' ? '#4b4846' : boss ? '#88565b' : '#736e64';
+            ctx.fillText(glyph, X, Y);
+        }
+    if (boss && available) {
+        ctx.fillStyle = '#e4c9bc';
+        const text = 'R — Последний уголь', left = (width - text.length * cw) / 2;
+        for (let i = 0; i < text.length; i++)
+            ctx.fillText(text[i], left + i * cw, y + rows.length * ch + 3);
+    }
+    ctx.restore();
 }
 
 },

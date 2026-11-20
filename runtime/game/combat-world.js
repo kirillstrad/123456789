@@ -1,3 +1,7 @@
+import { updateUndeadMotion } from '../animation/undead-motion.js';
+// GOLEM_TRIAL_CONNECTED_V1
+import { createGolemTrialController, stageGolem } from './golem-trial-state.js';
+import { stepCorpseGolem, golemExecutionWeak, canFinishGolem, beginGolemExecution, advanceGolemExecution } from '../combat/corpse-golem.js';
 // MARROW_ARCHER_CONNECTED_V1
 import { createArrowSystem, stepMarrowArcher } from '../combat/marrow-archer.js';
 import { LAMP_LIFE, lampAfterDamage, lampCostPreview } from '../combat/lamp-life.js';
@@ -16,6 +20,8 @@ import { makeEnemy, enemyStep } from '../combat/enemy.js';
 import { OBSTACLES, solid, blocked } from '../combat/geometry.js';
 function initial() { const enemy = makeEnemy(); return { x: 8, y: 12, fx: 0, fy: -1, time: 0, walkDistance: 0, moving: false, motion: createMotion(), footContacts: null, combatEntry: null, dash: null, dashCooldown: 0, execution: null, interaction: null, lamp: LAMP_LIFE.max, cameraX: 8, cameraY: 12, phase: 'playing', action: null, sweepProgress: null, enemy, enemies: [enemy], particles: [], cone: null, hitReaction: 0, deathTime: 0, note: 'Approach the warden. LMB light / RMB heavy / E sparks.' }; }
 export class CombatWorld {
+    golemTrial = null;
+    golemStaging = null;
     current = initial();
     previous = initial();
     actions = new ActionMachine();
@@ -30,13 +36,14 @@ export class CombatWorld {
     map;
     tipProvider;
     constructor(map = OBSTACLES, tipProvider = null) { this.map = map; this.tipProvider = tipProvider; }
-    reset() { this.arrowSystem.reset(); this.arrowVictoryPending = false; this.current = initial(); this.previous = initial(); this.actions.clear(); this.sparks.clear(); this.events = []; this.sweepElapsed = null; this.sweepFired = false; this.dashSerial = 0; }
+    reset() { this.golemTrial?.reset(); this.golemTrial = null; this.golemStaging = null; this.arrowSystem.reset(); this.arrowVictoryPending = false; this.current = initial(); this.previous = initial(); this.actions.clear(); this.sparks.clear(); this.events = []; this.sweepElapsed = null; this.sweepFired = false; this.dashSerial = 0; }
     record(event) { this.events.push({ ...event, time: this.current.time }); if (this.events.length > 400)
         this.events.shift(); }
     move(dx, dy) { const s = this.current, ox = s.x, oy = s.y, actorFree = (x, y) => actorCanOccupy(s, x, y); if (!solid(s.x + dx, s.y, this.map) && actorFree(s.x + dx, s.y))
         s.x += dx; if (!solid(s.x, s.y + dy, this.map) && actorFree(s.x, s.y + dy))
         s.y += dy; const distance = Math.hypot(s.x - ox, s.y - oy); s.walkDistance += distance; return distance; }
-    hooks() { return { position: () => this.current, facing: () => ({ x: this.current.fx, y: this.current.fy }), lunge: (dx, dy) => { this.move(dx, dy); }, hit: a => { const s = this.current; let struck = false; for (const e of selectStrikeTargets(s, { x: a.fx, y: a.fy }, a.kind, enemiesOf(s), this.map, a.hitIds)) {
+    hooks() { return { position: () => this.current, facing: () => ({ x: this.current.fx, y: this.current.fy }), lunge: (dx, dy) => { this.move(dx, dy); }, hit: a => { const s = this.current; if (this.golemTrial && !this.golemTrial.canFight())
+            return; let struck = false; for (const e of selectStrikeTargets(s, { x: a.fx, y: a.fy }, a.kind, enemiesOf(s), this.map, a.hitIds)) {
             struck = true;
             a.hitIds.add(e.id);
             const amount = a.kind === 'heavy' ? COMBAT.heavyDamage : COMBAT.lightDamage;
@@ -45,9 +52,11 @@ export class CombatWorld {
             e.timer = 0;
             this.record({ type: 'hit', amount, attackId: a.id, targetId: e.id });
             this.sparks.spawn([e.x, e.y, .5], a.kind === 'heavy' ? 12 : 6, 1.3);
-            if (e.hp <= 0)
+            if (e.hp <= 0) {
+                e.visualDeathAt = s.time;
                 this.record({ type: 'enemy-dead', targetId: e.id });
-        } if (struck && !aliveEnemies(s).length) {
+            }
+        } if (struck && !aliveEnemies(s).length && !this.golemTrial) {
             this.arrowVictoryPending = this.arrowSystem.snapshot().length > 0;
             if (!this.arrowVictoryPending) {
                 s.phase = 'won';
@@ -68,6 +77,102 @@ export class CombatWorld {
         for (let j = i + 1; j < enemies.length; j++)
             if (Math.hypot(enemies[i].x - enemies[j].x, enemies[i].y - enemies[j].y) < enemyRadius(enemies[i]) + enemyRadius(enemies[j]))
                 throw Error('Overlapping spawns'); this.arrowSystem.reset(); this.arrowVictoryPending = false; const roster = enemies.map(e => ({ ...e })); this.sparks.clear(); this.events = []; this.current = { ...s, enemies: roster, enemy: roster[0], phase: 'playing', arrows: [], particles: [], cone: null }; this.previous = this.snapshot(); }
+    startGolemTrial() {
+        const s = this.current;
+        s.x = 8;
+        s.y = 17;
+        s.cameraX = 8;
+        s.cameraY = 17;
+        s.fx = 0;
+        s.fy = -1;
+        s.motion = createMotion(0, -1);
+        this.setEncounter([makeBestiaryEnemy('corpse-golem', 1, 8, 7)]);
+        this.golemTrial = createGolemTrialController(this.map, 1);
+        this.golemStaging = null;
+        this.current.note = 'Enter the arena. The gate will close behind you.';
+        this.golemTrial.step(0, this.current);
+        this.previous = this.snapshot();
+    }
+    golemFinishTarget() {
+        const s = this.current;
+        if (!this.golemTrial?.canFight())
+            return null;
+        const hero = { ...s, busy: !!s.interaction || !!s.execution || !!s.dash || !!this.actions.current || this.sweepElapsed !== null || s.hitReaction > 0 };
+        return aliveEnemies(s).find(e => golemExecutionWeak(e) && canFinishGolem(hero, e, blocked(s, e, this.map)) && !!stageGolem(s, e, this.map, solid, actorCanOccupy)) ?? null;
+    }
+    executeGolem() {
+        const s = this.current, boss = this.golemFinishTarget();
+        if (!boss)
+            return false;
+        const goal = stageGolem(s, boss, this.map, solid, actorCanOccupy);
+        if (!goal)
+            return false;
+        const entry = beginGolemExecution({ ...s, ...goal, busy: false }, boss, blocked(goal, boss, this.map));
+        if (!entry)
+            return false;
+        this.golemStaging = { x: s.x, y: s.y, heading: s.motion?.heading ?? Math.atan2(s.fy, s.fx), elapsed: 0 };
+        s.execution = entry;
+        s.golemAligning = true;
+        boss.mode = 'stagger';
+        boss.timer = 0;
+        this.actions.clear();
+        s.moving = false;
+        s.footContacts = null;
+        s.combatEntry = null;
+        this.record({ type: 'execution-start', targetId: boss.id });
+        this.sync();
+        return true;
+    }
+    stepGolemExecution(dt) {
+        const s = this.current, entry = s.execution;
+        if (!entry)
+            return;
+        const boss = enemiesOf(s).find(e => e.id === entry.targetId);
+        if (!boss)
+            throw Error('Golem execution target lost');
+        const staging = this.golemStaging;
+        if (staging) {
+            staging.elapsed = Math.min(.35, staging.elapsed + dt);
+            const u = staging.elapsed / .35, w = u * u * (3 - 2 * u);
+            s.x = staging.x + (entry.heroX - staging.x) * w;
+            s.y = staging.y + (entry.heroY - staging.y) * w;
+            const angle = Math.atan2(entry.fy, entry.fx), turn = Math.atan2(Math.sin(angle - staging.heading), Math.cos(angle - staging.heading)), h = staging.heading + turn * w;
+            s.fx = Math.cos(h);
+            s.fy = Math.sin(h);
+            s.motion = createMotion(s.fx, s.fy);
+            if (staging.elapsed >= .35) {
+                this.golemStaging = null;
+                s.golemAligning = false;
+            }
+            this.sync();
+            return;
+        }
+        const result = advanceGolemExecution(entry, dt, s.lamp > 0);
+        s.execution = result.state;
+        s.fx = entry.fx;
+        s.fy = entry.fy;
+        s.motion = createMotion(s.fx, s.fy);
+        for (const event of result.events) {
+            this.record({ type: 'execution-event', targetId: boss.id, executionEvent: event });
+            if (event === 'extracted' && !entry.extracted) {
+                boss.hp = 0;
+                boss.mode = 'dead';
+                boss.charred = true;
+                boss.timer = 0;
+                boss.deathElapsed = .9;
+                this.record({ type: 'enemy-dead', targetId: boss.id });
+            }
+            if (event === 'finished') {
+                s.execution = null;
+                this.golemStaging = null;
+                this.record({ type: 'execution-end', targetId: boss.id });
+                this.golemTrial?.step(0, s);
+            }
+        }
+        s.cameraX += (s.x - s.cameraX) * Math.min(1, dt * 6);
+        s.cameraY += (s.y - s.cameraY) * Math.min(1, dt * 6);
+        this.sync();
+    }
     startBoneboundTrial() { const chosen = []; for (const [x, y] of [[8.7, 8.1], [7, 8], [10.1, 7.8], [7, 10], [10, 10], [8, 6.5]]) {
         if (chosen.length === 3)
             break;
@@ -77,10 +182,18 @@ export class CombatWorld {
     } if (chosen.length !== 3)
         throw Error('No clear trial spawns'); this.setEncounter(chosen); }
     startUndeadTrial() { const kinds = ['bonebound', 'ossuary-guard', 'gravebearer', 'bloated-remnant', 'ashbound'], positions = [[8.7, 8.1], [7, 8], [10.1, 7.8], [7, 10], [10, 10]]; this.setEncounter(kinds.map((kind, i) => makeBestiaryEnemy(kind, i + 1, positions[i][0], positions[i][1]))); }
-    stepEnemies(dt, excludeId = null, landing = null) { const s = this.current; stepEnemyGroup(s, dt, this.map, n => this.damage(n), (e, t, p, map, damage, allowAttack) => { if (e.archetype === 'marrow-archer')
+    stepEnemies(dt, excludeId = null, landing = null) { const s = this.current; const undeadBefore = new Map(enemiesOf(s).map(e => [e.id, { x: e.x, y: e.y }])); stepEnemyGroup(s, dt, this.map, n => this.damage(n), (e, t, p, map, damage, allowAttack) => { if (e.archetype === 'corpse-golem') {
+        if (!this.golemTrial || this.golemTrial.canFight())
+            stepCorpseGolem({ enemy: e, dt: t, player: p, map, damage, solid, blocked, allowAttack });
+    }
+    else if (e.archetype === 'marrow-archer')
         stepMarrowArcher({ enemy: e, dt: t, player: p, map, enemies: enemiesOf(s), allowAttack, solid, shoot: (owner, direction) => this.arrowSystem.spawn(owner, direction) });
     else
-        enemyStep(e, t, p, map, damage, allowAttack); }, excludeId, landing); const hadShots = this.arrowSystem.snapshot().length > 0; this.arrowSystem.step({ dt, player: s, previousPlayer: this.previous, map: { bounds: { minX: 1.7, maxX: 16, minY: 1.7, maxY: 16 }, ...this.map }, enemies: enemiesOf(s), damage: n => this.damage(n) }); if (s.phase !== 'playing') {
+        enemyStep(e, t, p, map, damage, allowAttack); }, excludeId, landing); for (const e of enemiesOf(s)) {
+        const before = undeadBefore.get(e.id);
+        if (e.id !== excludeId && before)
+            updateUndeadMotion(e, dt, before);
+    } const hadShots = this.arrowSystem.snapshot().length > 0; this.arrowSystem.step({ dt, player: s, previousPlayer: this.previous, map: { bounds: { minX: 1.7, maxX: 16, minY: 1.7, maxY: 16 }, ...this.map }, enemies: enemiesOf(s), damage: n => this.damage(n) }); if (s.phase !== 'playing') {
         this.arrowSystem.reset();
         this.arrowVictoryPending = false;
     } s.arrows = this.arrowSystem.snapshot(); if (hadShots && !aliveEnemies(s).length)
@@ -133,13 +246,18 @@ export class CombatWorld {
     }
     finishInteraction(id) { const s = this.current; if (s.phase !== 'playing' || !s.interaction || s.interaction.id !== id)
         return false; s.interaction = null; this.record({ type: 'interaction-end', interactionId: id }); this.sync(); return true; }
-    executionTargetReady() { const s = this.current; return s.phase === 'playing' && !s.interaction && !s.execution && enemiesOf(s).some(e => executionTargetWeak({ ...e, maxHp: enemyMaxHp(e) })); }
-    executionTarget() { const s = this.current; return aliveEnemies(s).filter(e => canExecute({ ...s, busy: !!s.interaction || !!s.execution || !!s.dash || !!this.actions.current || this.sweepElapsed !== null || s.hitReaction > 0 }, { ...e, maxHp: enemyMaxHp(e) }, blocked(s, e, this.map))).sort((a, b) => Math.hypot(a.x - s.x, a.y - s.y) - Math.hypot(b.x - s.x, b.y - s.y) || a.id - b.id)[0] ?? null; }
-    executionAvailable() { return this.executionTarget() !== null; }
-    execute() { const s = this.current, target = this.executionTarget(); if (!target)
+    executionTargetReady() { if (this.golemTrial)
+        return this.golemFinishTarget() !== null; const s = this.current; return s.phase === 'playing' && !s.interaction && !s.execution && enemiesOf(s).some(e => executionTargetWeak({ ...e, maxHp: enemyMaxHp(e) })); }
+    executionTarget() { const s = this.current; return aliveEnemies(s).filter(e => e.archetype !== 'corpse-golem' && canExecute({ ...s, busy: !!s.interaction || !!s.execution || !!s.dash || !!this.actions.current || this.sweepElapsed !== null || s.hitReaction > 0 }, { ...e, maxHp: enemyMaxHp(e) }, blocked(s, e, this.map))).sort((a, b) => Math.hypot(a.x - s.x, a.y - s.y) - Math.hypot(b.x - s.x, b.y - s.y) || a.id - b.id)[0] ?? null; }
+    executionAvailable() { return this.golemFinishTarget() !== null || this.executionTarget() !== null; }
+    execute() { if (this.golemTrial)
+        return this.executeGolem(); const s = this.current, target = this.executionTarget(); if (!target)
         return false; const execution = beginExecution({ ...s, busy: false }, { ...target, maxHp: enemyMaxHp(target) }, blocked(s, target, this.map)); if (!execution)
         return false; s.execution = execution; target.mode = 'stagger'; target.timer = 0; this.actions.clear(); s.fx = execution.fx; s.fy = execution.fy; s.motion = createMotion(s.fx, s.fy); s.moving = false; s.footContacts = null; s.combatEntry = null; this.record({ type: 'execution-start', targetId: target.id }); this.sync(); return true; }
-    stepExecution(dt) { const s = this.current, entry = s.execution; if (!entry)
+    stepExecution(dt) { if (this.current.execution?.kind === 'corpse-golem') {
+        this.stepGolemExecution(dt);
+        return;
+    } const s = this.current, entry = s.execution; if (!entry)
         return; const target = enemiesOf(s).find(e => e.id === entry.targetId); if (!target || (!entry.extracted && (target.hp <= 0 || Math.hypot(target.x - entry.targetX, target.y - entry.targetY) > .05))) {
         this.record({ type: 'execution-cancelled', targetId: entry.targetId });
         s.execution = null;
@@ -174,10 +292,10 @@ export class CombatWorld {
         }
     } finishMotion(s.motion ??= createMotion(), dt, s.fx, s.fy, false, true); s.cameraX += (s.x - s.cameraX) * Math.min(1, dt * 6); s.cameraY += (s.y - s.cameraY) * Math.min(1, dt * 6); this.sync(); }
     startArcherTrial() { this.setEncounter([makeBestiaryEnemy('marrow-archer', 1, 8.7, 6.6), makeBestiaryEnemy('bonebound', 2, 7, 9), makeBestiaryEnemy('ossuary-guard', 3, 10, 9)]); }
-    dashReady() { const s = this.current; return s.phase === 'playing' && !s.interaction && !s.execution && !s.dash && (s.dashCooldown ?? 0) <= 0 && !this.actions.current && this.sweepElapsed === null && s.hitReaction <= 0; }
+    dashReady() { const s = this.current; return s.phase === 'playing' && !s.interaction && !s.execution && !s.dash && (s.dashCooldown ?? 0) <= 0 && this.sweepElapsed === null && s.hitReaction <= 0; }
     dash(direction) { const s = this.current; if (!this.dashReady())
         return false; const d = planDash(s, this.map, direction, this.dashSerial + 1); if (!d)
-        return false; this.dashSerial++; const heading = s.motion?.heading ?? Math.atan2(s.fy, s.fx); s.dash = d; s.motion = createMotion(Math.cos(heading), Math.sin(heading)); s.fx = d.fx; s.fy = d.fy; s.moving = false; s.footContacts = null; s.combatEntry = null; s.note = 'Smoke carries the ember.'; return true; }
+        return false; this.actions.clear(); s.action = null; s.combatEntry = null; this.dashSerial++; const heading = s.motion?.heading ?? Math.atan2(s.fy, s.fx); s.dash = d; s.motion = createMotion(Math.cos(heading), Math.sin(heading)); s.fx = d.fx; s.fy = d.fy; s.moving = false; s.footContacts = null; s.combatEntry = null; s.note = 'Smoke carries the ember.'; return true; }
     attack(command) { if (this.current.phase !== 'playing' || this.current.interaction || this.current.execution || this.sweepElapsed !== null || this.current.dash)
         return false; const feet = captureCombatFeet(this.current), started = this.actions.started, ok = this.actions.request(command, this.hooks()); if (this.actions.started !== started)
         this.record({ type: 'strike-start', attackId: this.actions.current?.id }); this.sync(); if (this.actions.started !== started)
@@ -190,7 +308,8 @@ export class CombatWorld {
             s.fy = dy / d;
         }
     } this.sweepElapsed = 0; this.sweepFired = false; s.sweepProgress = 0; s.footContacts = null; s.combatEntry = bindCombatEntry(feet, s); s.note = 'Steel across stone. Read the room in sparks.'; return true; }
-    damage(n) { const s = this.current; if (s.phase !== 'playing' || !Number.isFinite(n) || n <= 0 || dashInvulnerable(s.dash))
+    damage(n) { const s = this.current; if (this.golemTrial && (!this.golemTrial.canFight() || s.execution?.kind === 'corpse-golem'))
+        return; if (s.phase !== 'playing' || !Number.isFinite(n) || n <= 0 || dashInvulnerable(s.dash))
         return; const reaction = !this.actions.current && this.sweepElapsed === null && !s.dash && !s.execution && !s.interaction, feet = reaction ? captureCombatFeet(s) : null; const result = lampAfterDamage(s.lamp, n, !!s.interaction, s.interaction?.lastEmberUsed ?? false); s.lamp = result.life; if (result.usedGrace && s.interaction)
         s.interaction = { ...s.interaction, lastEmberUsed: true }; if (reaction)
         s.hitReaction = .65; this.record({ type: 'damage', amount: n }); s.note = 'The lamp falters.'; if (s.lamp === 0) {
@@ -231,6 +350,7 @@ export class CombatWorld {
         if (!s.dash)
             s.dashCooldown = Math.max(0, (s.dashCooldown ?? 0) - dt);
         s.time += dt;
+        this.golemTrial?.step(dt, s);
         s.hitReaction = Math.max(0, s.hitReaction - dt);
         s.moving = false;
         this.sparks.step(dt);

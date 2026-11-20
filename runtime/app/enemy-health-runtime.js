@@ -32,7 +32,7 @@ export function createEnemyHealthRuntime({defaultMaxHp=70,diagnosticsTarget=null
    if(!enabled){hover=null;visible=[];candidates=[];view=model.update({time:state.time,worldKey:state,enabled:false});return view;}
    const begin=performance.now(),index=createHealthHitIndex({parts,groups,project,zoom,viewport}),visibleIds=healthVisibleIds(index,cells,viewport,{pointer});visible=[...visibleIds];
    const picked=index.pick(pointer);hover=visibleIds.has(picked)?picked:null;const boss=state.bossEncounter;
-   view=model.update({time:state.time,worldKey:state,enemies:roster(state),visibleIds,hoverId:hover,hits:events,bossId:boss?.bossId??null,inBossRoom:boss?.active===true&&boss?.inRoom===true,enabled:true});
+   view=model.update({time:state.time,worldKey:state,enemies:roster(state).filter(e=>e.archetype!=='corpse-golem'),visibleIds,hoverId:hover,hits:events,bossId:boss?.bossId??null,inBossRoom:boss?.active===true&&boss?.inRoom===true,enabled:true});
    candidates=diagnosticsTarget?index.records.filter(r=>Number.isSafeInteger(r.id)).slice(0,256).map(r=>[r.v.reduce((n,p)=>n+p[0],0)/r.v.length,r.v.reduce((n,p)=>n+p[1],0)/r.v.length]):[];
    stats={records:index.records.length,buckets:index.bucketCount,updateMs:performance.now()-begin};return view;
   },paint(ctx,options){paintEnemyHealth(ctx,view,options);}
