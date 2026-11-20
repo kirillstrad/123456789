@@ -1,3 +1,5 @@
+// MARROW_ARCHER_CONNECTED_V1
+import { createArrowSystem, stepMarrowArcher } from '../combat/marrow-archer.js';
 import { LAMP_LIFE, lampAfterDamage, lampCostPreview } from '../combat/lamp-life.js';
 import { canExecute, beginExecution, advanceExecution, executionLampAfterExtraction, executionTargetWeak } from '../combat/execution.js';
 import { planDash, advanceDash, dashInvulnerable } from '../combat/ash-dash.js';
@@ -19,6 +21,8 @@ export class CombatWorld {
     actions = new ActionMachine();
     sparks = new SparkSystem();
     events = [];
+    arrowSystem = createArrowSystem();
+    arrowVictoryPending = false;
     sweepElapsed = null;
     sweepFired = false;
     dashSerial = 0;
@@ -26,7 +30,7 @@ export class CombatWorld {
     map;
     tipProvider;
     constructor(map = OBSTACLES, tipProvider = null) { this.map = map; this.tipProvider = tipProvider; }
-    reset() { this.current = initial(); this.previous = initial(); this.actions.clear(); this.sparks.clear(); this.events = []; this.sweepElapsed = null; this.sweepFired = false; this.dashSerial = 0; }
+    reset() { this.arrowSystem.reset(); this.arrowVictoryPending = false; this.current = initial(); this.previous = initial(); this.actions.clear(); this.sparks.clear(); this.events = []; this.sweepElapsed = null; this.sweepFired = false; this.dashSerial = 0; }
     record(event) { this.events.push({ ...event, time: this.current.time }); if (this.events.length > 400)
         this.events.shift(); }
     move(dx, dy) { const s = this.current, ox = s.x, oy = s.y, actorFree = (x, y) => actorCanOccupy(s, x, y); if (!solid(s.x + dx, s.y, this.map) && actorFree(s.x + dx, s.y))
@@ -44,8 +48,11 @@ export class CombatWorld {
             if (e.hp <= 0)
                 this.record({ type: 'enemy-dead', targetId: e.id });
         } if (struck && !aliveEnemies(s).length) {
-            s.phase = 'won';
-            s.note = 'The nave is silent.';
+            this.arrowVictoryPending = this.arrowSystem.snapshot().length > 0;
+            if (!this.arrowVictoryPending) {
+                s.phase = 'won';
+                s.note = 'The nave is silent.';
+            }
         } } }; }
     setEncounter(enemies) { const s = this.current; if (s.phase !== 'playing' || !Number.isFinite(s.lamp) || s.lamp <= 0)
         throw Error('Actor is not alive'); if (s.interaction || s.execution || s.dash || this.actions.current || this.sweepElapsed !== null)
@@ -60,7 +67,7 @@ export class CombatWorld {
     } for (let i = 0; i < enemies.length; i++)
         for (let j = i + 1; j < enemies.length; j++)
             if (Math.hypot(enemies[i].x - enemies[j].x, enemies[i].y - enemies[j].y) < enemyRadius(enemies[i]) + enemyRadius(enemies[j]))
-                throw Error('Overlapping spawns'); const roster = enemies.map(e => ({ ...e })); this.sparks.clear(); this.events = []; this.current = { ...s, enemies: roster, enemy: roster[0], phase: 'playing', particles: [], cone: null }; this.previous = this.snapshot(); }
+                throw Error('Overlapping spawns'); this.arrowSystem.reset(); this.arrowVictoryPending = false; const roster = enemies.map(e => ({ ...e })); this.sparks.clear(); this.events = []; this.current = { ...s, enemies: roster, enemy: roster[0], phase: 'playing', arrows: [], particles: [], cone: null }; this.previous = this.snapshot(); }
     startBoneboundTrial() { const chosen = []; for (const [x, y] of [[8.7, 8.1], [7, 8], [10.1, 7.8], [7, 10], [10, 10], [8, 6.5]]) {
         if (chosen.length === 3)
             break;
@@ -70,7 +77,18 @@ export class CombatWorld {
     } if (chosen.length !== 3)
         throw Error('No clear trial spawns'); this.setEncounter(chosen); }
     startUndeadTrial() { const kinds = ['bonebound', 'ossuary-guard', 'gravebearer', 'bloated-remnant', 'ashbound'], positions = [[8.7, 8.1], [7, 8], [10.1, 7.8], [7, 10], [10, 10]]; this.setEncounter(kinds.map((kind, i) => makeBestiaryEnemy(kind, i + 1, positions[i][0], positions[i][1]))); }
-    stepEnemies(dt, excludeId = null, landing = null) { stepEnemyGroup(this.current, dt, this.map, n => this.damage(n), enemyStep, excludeId, landing); }
+    stepEnemies(dt, excludeId = null, landing = null) { const s = this.current; stepEnemyGroup(s, dt, this.map, n => this.damage(n), (e, t, p, map, damage, allowAttack) => { if (e.archetype === 'marrow-archer')
+        stepMarrowArcher({ enemy: e, dt: t, player: p, map, enemies: enemiesOf(s), allowAttack, solid, shoot: (owner, direction) => this.arrowSystem.spawn(owner, direction) });
+    else
+        enemyStep(e, t, p, map, damage, allowAttack); }, excludeId, landing); const hadShots = this.arrowSystem.snapshot().length > 0; this.arrowSystem.step({ dt, player: s, previousPlayer: this.previous, map: { bounds: { minX: 1.7, maxX: 16, minY: 1.7, maxY: 16 }, ...this.map }, enemies: enemiesOf(s), damage: n => this.damage(n) }); if (s.phase !== 'playing') {
+        this.arrowSystem.reset();
+        this.arrowVictoryPending = false;
+    } s.arrows = this.arrowSystem.snapshot(); if (hadShots && !aliveEnemies(s).length)
+        this.arrowVictoryPending = true; if (this.arrowVictoryPending && s.phase === 'playing' && !s.arrows.length && !aliveEnemies(s).length && !s.execution && !s.interaction && !s.dash) {
+        s.phase = 'won';
+        s.note = 'The nave is silent.';
+        this.arrowVictoryPending = false;
+    } }
     beginInteraction(kind) {
         const s = this.current;
         if (!['door', 'ignite', 'campfire'].includes(kind) || s.phase !== 'playing' || !Number.isFinite(s.lamp) || s.lamp <= 0 || s.interaction || s.execution || s.dash || this.actions.current || this.sweepElapsed !== null || s.hitReaction > 0)
@@ -125,8 +143,11 @@ export class CombatWorld {
         return; const target = enemiesOf(s).find(e => e.id === entry.targetId); if (!target || (!entry.extracted && (target.hp <= 0 || Math.hypot(target.x - entry.targetX, target.y - entry.targetY) > .05))) {
         this.record({ type: 'execution-cancelled', targetId: entry.targetId });
         s.execution = null;
-        if (!aliveEnemies(s).length)
-            s.phase = 'won';
+        if (!aliveEnemies(s).length) {
+            this.arrowVictoryPending = this.arrowSystem.snapshot().length > 0;
+            if (!this.arrowVictoryPending)
+                s.phase = 'won';
+        }
         this.sync();
         return;
     } this.stepEnemies(dt, entry.targetId); if (s.phase !== 'playing') {
@@ -145,10 +166,14 @@ export class CombatWorld {
         if (event === 'finished') {
             this.record({ type: 'execution-end', targetId: entry.targetId });
             s.execution = null;
-            if (!aliveEnemies(s).length)
-                s.phase = 'won';
+            if (!aliveEnemies(s).length) {
+                this.arrowVictoryPending = this.arrowSystem.snapshot().length > 0;
+                if (!this.arrowVictoryPending)
+                    s.phase = 'won';
+            }
         }
     } finishMotion(s.motion ??= createMotion(), dt, s.fx, s.fy, false, true); s.cameraX += (s.x - s.cameraX) * Math.min(1, dt * 6); s.cameraY += (s.y - s.cameraY) * Math.min(1, dt * 6); this.sync(); }
+    startArcherTrial() { this.setEncounter([makeBestiaryEnemy('marrow-archer', 1, 8.7, 6.6), makeBestiaryEnemy('bonebound', 2, 7, 9), makeBestiaryEnemy('ossuary-guard', 3, 10, 9)]); }
     dashReady() { const s = this.current; return s.phase === 'playing' && !s.interaction && !s.execution && !s.dash && (s.dashCooldown ?? 0) <= 0 && !this.actions.current && this.sweepElapsed === null && s.hitReaction <= 0; }
     dash(direction) { const s = this.current; if (!this.dashReady())
         return false; const d = planDash(s, this.map, direction, this.dashSerial + 1); if (!d)
@@ -294,5 +319,5 @@ export class CombatWorld {
         s.footContacts = advanceWorldFootContacts(s, dt);
     }
     snapshot(alpha = 1) { const s = this.current, p = this.previous, t = Math.max(0, Math.min(1, alpha)), m = (a, b) => a + (b - a) * t, action = s.action ? { ...s.action } : null; if (action && p.action?.id === action.id)
-        action.progress = m(p.action.progress, action.progress); const enemies = cloneEnemyRoster(p, s, t); return { ...s, interaction: s.interaction ? { ...s.interaction } : null, execution: s.execution ? { ...s.execution, elapsed: p.execution?.targetId === s.execution.targetId && p.execution.elapsed <= s.execution.elapsed && p.execution.phase !== 'cancelled' && s.execution.phase !== 'cancelled' ? m(p.execution.elapsed, s.execution.elapsed) : s.execution.elapsed } : null, motion: interpolateMotion(p.motion, s.motion, t), footContacts: interpolateFootContacts(p.footContacts, s.footContacts, t), combatEntry: cloneCombatEntry(s.combatEntry), dash: s.dash ? { ...s.dash, elapsed: p.dash?.id === s.dash.id ? m(p.dash.elapsed, s.dash.elapsed) : s.dash.elapsed } : null, x: m(p.x, s.x), y: m(p.y, s.y), time: m(p.time, s.time), walkDistance: m(p.walkDistance, s.walkDistance), cameraX: m(p.cameraX, s.cameraX), cameraY: m(p.cameraY, s.cameraY), enemies, enemy: enemies.find(e => e.id === s.enemy.id) ?? { ...s.enemy }, action, particles: s.particles.map(p => ({ ...p })), cone: s.cone ? { ...s.cone } : null }; }
+        action.progress = m(p.action.progress, action.progress); const enemies = cloneEnemyRoster(p, s, t); return { ...s, arrows: (s.arrows ?? []).map(a => ({ ...a, x: m(a.previousX, a.x), y: m(a.previousY, a.y) })), interaction: s.interaction ? { ...s.interaction } : null, execution: s.execution ? { ...s.execution, elapsed: p.execution?.targetId === s.execution.targetId && p.execution.elapsed <= s.execution.elapsed && p.execution.phase !== 'cancelled' && s.execution.phase !== 'cancelled' ? m(p.execution.elapsed, s.execution.elapsed) : s.execution.elapsed } : null, motion: interpolateMotion(p.motion, s.motion, t), footContacts: interpolateFootContacts(p.footContacts, s.footContacts, t), combatEntry: cloneCombatEntry(s.combatEntry), dash: s.dash ? { ...s.dash, elapsed: p.dash?.id === s.dash.id ? m(p.dash.elapsed, s.dash.elapsed) : s.dash.elapsed } : null, x: m(p.x, s.x), y: m(p.y, s.y), time: m(p.time, s.time), walkDistance: m(p.walkDistance, s.walkDistance), cameraX: m(p.cameraX, s.cameraX), cameraY: m(p.cameraY, s.cameraY), enemies, enemy: enemies.find(e => e.id === s.enemy.id) ?? { ...s.enemy }, action, particles: s.particles.map(p => ({ ...p })), cone: s.cone ? { ...s.cone } : null }; }
 }

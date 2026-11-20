@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ASH / IRON — Iteration 3B.1 Desktop</title><style>*{box-sizing:border-box}body{margin:0;background:#000;color:#aaa;font:12px/1.7 monospace}main{max-width:1220px;margin:auto;padding:18px}.stage{border:1px solid #282828}canvas{display:block;width:100%;height:auto;outline:none;touch-action:none;cursor:crosshair}.tools{display:flex;gap:8px;flex-wrap:wrap}button{font:11px monospace;background:#080808;color:#aaa;border:1px solid #444;padding:8px;cursor:pointer}button:hover{color:#eee}p{color:#897b6b;font-size:11px}#status{min-height:20px;margin:10px 0;color:#a58d75}section{border-top:1px solid #42362d;margin:15px 0;padding:12px}label{display:flex;gap:10px;margin:10px 0}input{accent-color:#b45344}pre{white-space:pre-wrap}[hidden]{display:none!important}</style><main><div class="stage"><canvas id="game" width="1008" height="864" tabindex="0" aria-label="ASH IRON ASCII game"></canvas></div><div id="status">ASH / IRON — ITERATION 3B.1 / DESKTOP</div><div class="tools"><button id="menuButton">MENU / ESC</button><button id="restart">RESTART NAVE</button><button id="bestiaryTrial">BONEBOUND TRIAL</button><button id="undeadTrial">UNDEAD TRIAL</button><button id="freeze">FREEZE FRAME</button><button id="export">SAVE FRAME PNG</button><button id="report">SAVE REPORT</button><button id="perfToggle">PERFORMANCE</button></div><section id="settings" hidden><h2>THE EMBER CHAMBER</h2><label>FLOW SPEED<input id="flow" type="range" min="10" max="160" value="32"></label><label>FIRE STRENGTH<input id="power" type="range" min="20" max="140" value="86"></label><label><input id="dim" type="checkbox" checked>DIM BACKGROUND</label><label><input id="fireFreeze" type="checkbox">FREEZE THE FLAME</label><p>192 columns / ASCII fire. Menu settings do not change the 196 x 140 world.</p><button id="settingsClose">CLOSE SETTINGS</button></section><section id="perf" hidden><pre id="perfText">Collecting frames...</pre></section><p>WASD / ARROWS: MOVE. LMB: LIGHT. RMB: HEAVY. Separate presses chain up to three strikes. E / MIDDLE CLICK: LIGHT-CASTING SWEEP. ESC: PAUSE.</p><p>The lamp is the only life pool. HEALTH and LAMP display that same value. No execution, dash, healing, checkpoints, saves, new rooms or installer.</p><p>Draft defaults: cursor-at-press aim, locked strike direction, damage does not interrupt a strike, movement may leave the last 14% of recovery. Canvas2D lighting is evaluated at ASCII-cell resolution; not a pixel-identical WebGL comparison. Target 30 FPS is not guaranteed.</p></main><script>
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ASH / IRON — Iteration 3B.1 Desktop</title><style>*{box-sizing:border-box}body{margin:0;background:#000;color:#aaa;font:12px/1.7 monospace}main{max-width:1220px;margin:auto;padding:18px}.stage{border:1px solid #282828}canvas{display:block;width:100%;height:auto;outline:none;touch-action:none;cursor:crosshair}.tools{display:flex;gap:8px;flex-wrap:wrap}button{font:11px monospace;background:#080808;color:#aaa;border:1px solid #444;padding:8px;cursor:pointer}button:hover{color:#eee}p{color:#897b6b;font-size:11px}#status{min-height:20px;margin:10px 0;color:#a58d75}section{border-top:1px solid #42362d;margin:15px 0;padding:12px}label{display:flex;gap:10px;margin:10px 0}input{accent-color:#b45344}pre{white-space:pre-wrap}[hidden]{display:none!important}</style><main><div class="stage"><canvas id="game" width="1008" height="864" tabindex="0" aria-label="ASH IRON ASCII game"></canvas></div><div id="status">ASH / IRON — ITERATION 3B.1 / DESKTOP</div><div class="tools"><button id="menuButton">MENU / ESC</button><button id="restart">RESTART NAVE</button><button id="bestiaryTrial">BONEBOUND TRIAL</button><button id="undeadTrial">UNDEAD TRIAL</button><button id="archerTrial">ARCHER TRIAL</button><button id="freeze">FREEZE FRAME</button><button id="export">SAVE FRAME PNG</button><button id="report">SAVE REPORT</button><button id="perfToggle">PERFORMANCE</button></div><section id="settings" hidden><h2>THE EMBER CHAMBER</h2><label>FLOW SPEED<input id="flow" type="range" min="10" max="160" value="32"></label><label>FIRE STRENGTH<input id="power" type="range" min="20" max="140" value="86"></label><label><input id="dim" type="checkbox" checked>DIM BACKGROUND</label><label><input id="fireFreeze" type="checkbox">FREEZE THE FLAME</label><p>192 columns / ASCII fire. Menu settings do not change the 196 x 140 world.</p><button id="settingsClose">CLOSE SETTINGS</button></section><section id="perf" hidden><pre id="perfText">Collecting frames...</pre></section><p>WASD / ARROWS: MOVE. LMB: LIGHT. RMB: HEAVY. Separate presses chain up to three strikes. E / MIDDLE CLICK: LIGHT-CASTING SWEEP. ESC: PAUSE.</p><p>The lamp is the only life pool. HEALTH and LAMP display that same value. No execution, dash, healing, checkpoints, saves, new rooms or installer.</p><p>Draft defaults: cursor-at-press aim, locked strike direction, damage does not interrupt a strike, movement may leave the last 14% of recovery. Canvas2D lighting is evaluated at ASCII-cell resolution; not a pixel-identical WebGL comparison. Target 30 FPS is not guaranteed.</p></main><script>
 
 (function(root){'use strict';
 const TAU=Math.PI*2,C=(x,a=0,b=1)=>Math.max(a,Math.min(b,x)),sm=x=>{x=C(x);return x*x*(3-2*x)},mix=(a,b,t)=>a+(b-a)*t,add=(a,b)=>a.map((v,i)=>v+b[i]),sub=(a,b)=>a.map((v,i)=>v-b[i]),mul=(a,s)=>a.map(v=>v*s),dot=(a,b)=>a.reduce((s,v,i)=>s+v*b[i],0),len=a=>Math.hypot(...a),norm=v=>mul(v,1/Math.max(1e-9,len(v))),cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],blend=(a,b,t)=>a.map((v,i)=>mix(v,b[i],t)),rot=(v,a)=>[v[0]*Math.cos(a)-v[1]*Math.sin(a),v[0]*Math.sin(a)+v[1]*Math.cos(a),v[2]];
@@ -1468,6 +1468,7 @@ function installIronCursor(canvas, { read = () => ({}) } = {}) {
 "app/main.js":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+const marrow_archer_js_1 = require("../render/marrow-archer.js");
 const registry_js_1 = require("../levels/registry.js");
 const enemy_roster_js_1 = require("../combat/enemy-roster.js");
 const enemy_health_runtime_js_1 = require("./enemy-health-runtime.js"); // ENEMY_HEALTH_CONNECTED_V2
@@ -1609,7 +1610,7 @@ function render(s = world.snapshot(), galleryFrame = null) {
     camera = { x: s.cameraX, y: s.cameraY };
     view = { zoom: v.zoom, dx: (504 - focus[0]) * (v.zoom - 1) + v.weight * (504 - focus[0]) * .3 + v.shakeX, dy: (430 - focus[1]) * (v.zoom - 1) + v.weight * (430 - focus[1]) * .3 + v.shakeY };
     const enemyGroups = galleryFrame ? [] : enemyHealth.geometry(s, execution_enemy_js_1.executionEnemyParts);
-    const drawState = { ...s, visualZoom: view.zoom }, galleryDraw = galleryFrame ? (0, render_frame_js_1.galleryRenderLayers)(galleryFrame) : null, parts = galleryDraw ? [...galleryDraw.objects, ...hero.parts].sort((a, b) => a.d - b.d) : [...env.parts, ...enemyGroups.flatMap(g => g.parts), ...hero.parts, ...visual.parts, ...(ritualArt?.parts ?? [])].sort((a, b) => a.d - b.d);
+    const drawState = { ...s, visualZoom: view.zoom }, galleryDraw = galleryFrame ? (0, render_frame_js_1.galleryRenderLayers)(galleryFrame) : null, parts = galleryDraw ? [...galleryDraw.objects, ...hero.parts].sort((a, b) => a.d - b.d) : [...env.parts, ...enemyGroups.flatMap(g => g.parts), ...(0, marrow_archer_js_1.arrowParts)(s.arrows ?? []), ...hero.parts, ...visual.parts, ...(ritualArt?.parts ?? [])].sort((a, b) => a.d - b.d);
     if (!galleryFrame && relicWorld) {
         parts.push(...relicWorld.parts(s));
         parts.sort((a, b) => a.d - b.d);
@@ -1896,6 +1897,7 @@ $('menuButton').onclick = () => mode === 'gallery' ? closeGallery() : mode === '
 $('restart').onclick = start;
 $('bestiaryTrial').onclick = startBoneboundTrial;
 $('undeadTrial').onclick = () => launchLevel('undead-trial');
+$('archerTrial').onclick = () => launchLevel('archer-trial');
 $('freeze').onclick = () => { if (mode !== 'game')
     return; frozen = !frozen; combatDoor.cancel('freeze'); keys.clear(); commands.length = 0; simLast = null; acc = 0; $('freeze').textContent = frozen ? 'RESUME' : 'FREEZE FRAME'; cv.focus(); };
 $('perfToggle').onclick = () => $('perf').hidden = !$('perf').hidden;
@@ -2272,9 +2274,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.BESTIARY = void 0;
 exports.enemyDefinition = enemyDefinition;
 exports.makeBestiaryEnemy = makeBestiaryEnemy;
+const marrow_archer_js_1 = require("./marrow-archer.js");
 const config_js_1 = require("./config.js");
 const melee_undead_js_1 = require("./melee-undead.js");
-const profiles = { ...melee_undead_js_1.MELEE_UNDEAD,
+const profiles = { ...melee_undead_js_1.MELEE_UNDEAD, 'marrow-archer': marrow_archer_js_1.MARROW_ARCHER,
     'test-warden': { id: 'test-warden', name: 'Test Warden', category: 'human', maxHp: config_js_1.COMBAT.enemyLife, damage: config_js_1.COMBAT.enemyDamage, radius: .35, speed: config_js_1.COMBAT.enemySpeed, windup: config_js_1.COMBAT.enemyWindup, recover: config_js_1.COMBAT.enemyRecover, reach: config_js_1.COMBAT.enemyReach, cooldown: config_js_1.COMBAT.enemyCooldown, stagger: config_js_1.COMBAT.staggerDuration },
     bonebound: { id: 'bonebound', name: 'Bonebound', category: 'undead', maxHp: 36, damage: 8, radius: .32, speed: .8, windup: .72, recover: .8, reach: 1.15, cooldown: 1.35, stagger: .45 }
 };
@@ -2524,6 +2527,152 @@ function lampCostPreview(life, cost) {
     const remaining = Math.max(Math.min(exports.LAMP_LIFE.lastEmber, life), life - cost);
     return { remaining, warning: cost > 0 && life - cost <= exports.LAMP_LIFE.lastEmber ? 'LAST EMBER - ONE HIT LEFT' : null };
 }
+
+},
+"combat/marrow-archer.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.MARROW_ARCHER = void 0;
+exports.segmentCircle = segmentCircle;
+exports.segmentRect = segmentRect;
+exports.firstObstacle = firstObstacle;
+exports.clearArcherShot = clearArcherShot;
+exports.createArrowSystem = createArrowSystem;
+exports.stepMarrowArcher = stepMarrowArcher;
+exports.MARROW_ARCHER = Object.freeze({ id: 'marrow-archer', name: 'Marrow Archer', category: 'undead', maxHp: 30, damage: 9, radius: .29, speed: .72, windup: 1.25, aimLock: .85, recover: 1.1, cooldown: 1.8, reach: 7, stagger: .45, near: 2.4, comfortable: 5.5, retreatDistance: .8, retreatSpeed: 1.25, arrowSpeed: 7, arrowRange: 10, arrowRadius: .035 });
+const clamp = x => Math.max(0, Math.min(1, x));
+function segmentCircle(a, b, c, r) { const x = a.x - c.x, y = a.y - c.y, dx = b.x - a.x, dy = b.y - a.y, A = dx * dx + dy * dy, C = x * x + y * y - r * r; if (C <= 0)
+    return 0; if (A < 1e-18)
+    return null; const B = 2 * (x * dx + y * dy), D = B * B - 4 * A * C; if (D < 0)
+    return null; const t = (-B - Math.sqrt(D)) / (2 * A); return t >= 0 && t <= 1 ? t : null; }
+function segmentRect(a, b, r, padding = 0) { let lo = 0, hi = 1; for (const [k, min, max] of [['x', r.minX - padding, r.maxX + padding], ['y', r.minY - padding, r.maxY + padding]]) {
+    const d = b[k] - a[k];
+    if (Math.abs(d) < 1e-12) {
+        if (a[k] < min || a[k] > max)
+            return null;
+    }
+    else {
+        let t0 = (min - a[k]) / d, t1 = (max - a[k]) / d;
+        if (t0 > t1)
+            [t0, t1] = [t1, t0];
+        lo = Math.max(lo, t0);
+        hi = Math.min(hi, t1);
+        if (lo > hi)
+            return null;
+    }
+} return lo; }
+function firstObstacle(a, b, map, padding = 0) { let hit = null; const put = t => { if (t !== null && (hit === null || t < hit))
+    hit = t; }; for (const c of map.circles ?? [])
+    put(segmentCircle(a, b, c, c.r + padding)); for (const r of map.rects ?? [])
+    put(segmentRect(a, b, r, padding)); const box = map.bounds; if (box)
+    for (const [k, min, max] of [['x', box.minX + padding, box.maxX - padding], ['y', box.minY + padding, box.maxY - padding]]) {
+        if (a[k] < min || a[k] > max) {
+            put(0);
+            continue;
+        }
+        const d = b[k] - a[k];
+        if (b[k] < min && d < 0)
+            put(clamp((min - a[k]) / d));
+        if (b[k] > max && d > 0)
+            put(clamp((max - a[k]) / d));
+    } return hit; }
+function clearArcherShot(e, target, map, enemies = []) { if (firstObstacle(e, target, map, exports.MARROW_ARCHER.arrowRadius) !== null)
+    return false; return !enemies.some(o => o.id !== e.id && o.hp > 0 && o.mode !== 'dead' && segmentCircle(e, target, o, (o.radius ?? .35) + exports.MARROW_ARCHER.arrowRadius) !== null); }
+function createArrowSystem() { let serial = 0, shots = []; return Object.freeze({ reset() { shots = []; serial = 0; }, spawn(owner, direction) { const n = Math.hypot(direction.x, direction.y); if (owner.hp <= 0 || !Number.isFinite(n) || n < 1e-9 || ![owner.x, owner.y].every(Number.isFinite))
+        return null; const shot = { id: ++serial, ownerId: owner.id, x: owner.x, y: owner.y, previousX: owner.x, previousY: owner.y, fx: direction.x / n, fy: direction.y / n, remaining: exports.MARROW_ARCHER.arrowRange }; shots.push(shot); return { ...shot }; }, snapshot() { return shots.map(s => ({ ...s })); }, step({ dt, player, previousPlayer = player, map, enemies = [], damage }) { if (!Number.isFinite(dt) || dt <= 0)
+        return; const kept = []; for (const s of shots) {
+        const distance = Math.min(s.remaining, exports.MARROW_ARCHER.arrowSpeed * dt), a = { x: s.x, y: s.y }, b = { x: s.x + s.fx * distance, y: s.y + s.fy * distance };
+        let time = firstObstacle(a, b, map, exports.MARROW_ARCHER.arrowRadius), kind = time === null ? null : 'wall';
+        for (const e of enemies) {
+            if (e.id === s.ownerId || e.hp <= 0 || e.mode === 'dead')
+                continue;
+            const t = segmentCircle(a, b, e, (e.radius ?? .35) + exports.MARROW_ARCHER.arrowRadius);
+            if (t !== null && (time === null || t < time)) {
+                time = t;
+                kind = 'ally';
+            }
+        }
+        const fraction = Math.min(1, distance / (exports.MARROW_ARCHER.arrowSpeed * dt)), heroEnd = { x: previousPlayer.x + (player.x - previousPlayer.x) * fraction, y: previousPlayer.y + (player.y - previousPlayer.y) * fraction };
+        const t = segmentCircle({ x: a.x - previousPlayer.x, y: a.y - previousPlayer.y }, { x: b.x - heroEnd.x, y: b.y - heroEnd.y }, { x: 0, y: 0 }, .24 + exports.MARROW_ARCHER.arrowRadius);
+        if (t !== null && (time === null || t < time)) {
+            time = t;
+            kind = 'hero';
+        }
+        if (time !== null) {
+            if (kind === 'hero')
+                damage(exports.MARROW_ARCHER.damage);
+            continue;
+        }
+        s.previousX = s.x;
+        s.previousY = s.y;
+        s.x = b.x;
+        s.y = b.y;
+        s.remaining -= distance;
+        if (s.remaining > 1e-9)
+            kept.push(s);
+    } shots = kept; } }); }
+function stepMarrowArcher({ enemy: e, dt, player, map, enemies = [], allowAttack = true, solid, shoot }) { if (e.archetype !== 'marrow-archer')
+    return false; const p = exports.MARROW_ARCHER; if (!Number.isFinite(dt) || dt <= 0 || e.hp <= 0 || e.mode === 'dead')
+    return true; e.cooldown = Math.max(0, e.cooldown - dt); e.timer += dt; const dx = player.x - e.x, dy = player.y - e.y, d = Math.hypot(dx, dy), face = () => { if (d > 1e-9) {
+    e.fx = dx / d;
+    e.fy = dy / d;
+} e.archerAimX = player.x; e.archerAimY = player.y; }, recover = () => { e.mode = 'recover'; e.timer = 0; e.cooldown = p.cooldown; }; if (e.mode === 'stagger') {
+    e.archerRetreatRemaining = 0;
+    e.archerLocked = false;
+    if (e.timer >= p.stagger) {
+        e.mode = 'chase';
+        e.timer = 0;
+    }
+    return true;
+} if (e.mode === 'windup') {
+    if (!e.archerLocked) {
+        face();
+        if (e.timer >= p.aimLock)
+            e.archerLocked = true;
+    }
+    if (e.timer >= p.windup && !e.hitFired) {
+        e.hitFired = true;
+        const target = { x: e.archerAimX ?? e.x + e.fx * p.reach, y: e.archerAimY ?? e.y + e.fy * p.reach };
+        if (clearArcherShot(e, target, map, enemies))
+            shoot(e, { x: e.fx, y: e.fy });
+        recover();
+    }
+    return true;
+} if (e.mode === 'recover') {
+    if (e.timer >= p.recover) {
+        e.mode = 'chase';
+        e.timer = 0;
+    }
+    return true;
+} if (e.mode === 'wait') {
+    if (d < p.reach && clearArcherShot(e, player, map, enemies)) {
+        e.mode = 'chase';
+        e.timer = 0;
+    }
+    return true;
+} if (e.mode !== 'chase')
+    return true; face(); if (d > p.near + .8)
+    e.archerRetreatUsed = false; if (d < p.near && !e.archerRetreatUsed) {
+    e.archerRetreatUsed = true;
+    e.archerRetreatRemaining = p.retreatDistance;
+} function move(sign, amount) { const oldX = e.x, oldY = e.y, x = e.x + e.fx * amount * sign, y = e.y + e.fy * amount * sign; if (!solid(x, e.y, map, p.radius) && Math.hypot(x - player.x, e.y - player.y) >= p.radius + .24)
+    e.x = x; if (!solid(e.x, y, map, p.radius) && Math.hypot(e.x - player.x, y - player.y) >= p.radius + .24)
+    e.y = y; const moved = Math.hypot(e.x - oldX, e.y - oldY); e.walkDistance += moved; return moved; } if ((e.archerRetreatRemaining ?? 0) > 0) {
+    const amount = Math.min(e.archerRetreatRemaining, p.retreatSpeed * dt), moved = move(-1, amount);
+    e.archerRetreatRemaining = Math.max(0, e.archerRetreatRemaining - moved);
+    if (moved < amount * .5 || e.archerRetreatRemaining < 1e-6) {
+        e.archerRetreatRemaining = 0;
+        e.cooldown = Math.max(e.cooldown, p.recover);
+    }
+    return true;
+} if (e.cooldown <= 0 && allowAttack && d <= p.reach && clearArcherShot(e, player, map, enemies)) {
+    e.mode = 'windup';
+    e.timer = 0;
+    e.hitFired = false;
+    e.archerLocked = false;
+    return true;
+} if (d > p.comfortable && d < 12)
+    move(1, Math.min(p.speed * dt, d - p.comfortable)); return true; }
 
 },
 "combat/mechanics-4c.js":function(require,module,exports){
@@ -4419,6 +4568,8 @@ function enableCombatLights(door) {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CombatWorld = void 0;
+// MARROW_ARCHER_CONNECTED_V1
+const marrow_archer_js_1 = require("../combat/marrow-archer.js");
 const lamp_life_js_1 = require("../combat/lamp-life.js");
 const execution_js_1 = require("../combat/execution.js");
 const ash_dash_js_1 = require("../combat/ash-dash.js");
@@ -4440,6 +4591,8 @@ class CombatWorld {
     actions = new action_machine_js_1.ActionMachine();
     sparks = new sparks_js_1.SparkSystem();
     events = [];
+    arrowSystem = (0, marrow_archer_js_1.createArrowSystem)();
+    arrowVictoryPending = false;
     sweepElapsed = null;
     sweepFired = false;
     dashSerial = 0;
@@ -4447,7 +4600,7 @@ class CombatWorld {
     map;
     tipProvider;
     constructor(map = geometry_js_1.OBSTACLES, tipProvider = null) { this.map = map; this.tipProvider = tipProvider; }
-    reset() { this.current = initial(); this.previous = initial(); this.actions.clear(); this.sparks.clear(); this.events = []; this.sweepElapsed = null; this.sweepFired = false; this.dashSerial = 0; }
+    reset() { this.arrowSystem.reset(); this.arrowVictoryPending = false; this.current = initial(); this.previous = initial(); this.actions.clear(); this.sparks.clear(); this.events = []; this.sweepElapsed = null; this.sweepFired = false; this.dashSerial = 0; }
     record(event) {
         this.events.push({ ...event, time: this.current.time });
         if (this.events.length > 400)
@@ -4480,8 +4633,11 @@ class CombatWorld {
                         this.record({ type: 'enemy-dead', targetId: e.id });
                 }
                 if (struck && !(0, enemy_roster_js_1.aliveEnemies)(s).length) {
-                    s.phase = 'won';
-                    s.note = 'The nave is silent.';
+                    this.arrowVictoryPending = this.arrowSystem.snapshot().length > 0;
+                    if (!this.arrowVictoryPending) {
+                        s.phase = 'won';
+                        s.note = 'The nave is silent.';
+                    }
                 }
             } };
     }
@@ -4506,10 +4662,12 @@ class CombatWorld {
             for (let j = i + 1; j < enemies.length; j++)
                 if (Math.hypot(enemies[i].x - enemies[j].x, enemies[i].y - enemies[j].y) < (0, enemy_roster_js_1.enemyRadius)(enemies[i]) + (0, enemy_roster_js_1.enemyRadius)(enemies[j]))
                     throw Error('Overlapping spawns');
+        this.arrowSystem.reset();
+        this.arrowVictoryPending = false;
         const roster = enemies.map(e => ({ ...e }));
         this.sparks.clear();
         this.events = [];
-        this.current = { ...s, enemies: roster, enemy: roster[0], phase: 'playing', particles: [], cone: null };
+        this.current = { ...s, enemies: roster, enemy: roster[0], phase: 'playing', arrows: [], particles: [], cone: null };
         this.previous = this.snapshot();
     }
     startBoneboundTrial() {
@@ -4526,7 +4684,29 @@ class CombatWorld {
         this.setEncounter(chosen);
     }
     startUndeadTrial() { const kinds = ['bonebound', 'ossuary-guard', 'gravebearer', 'bloated-remnant', 'ashbound'], positions = [[8.7, 8.1], [7, 8], [10.1, 7.8], [7, 10], [10, 10]]; this.setEncounter(kinds.map((kind, i) => (0, bestiary_js_1.makeBestiaryEnemy)(kind, i + 1, positions[i][0], positions[i][1]))); }
-    stepEnemies(dt, excludeId = null, landing = null) { (0, enemy_roster_js_1.stepEnemyGroup)(this.current, dt, this.map, n => this.damage(n), enemy_js_1.enemyStep, excludeId, landing); }
+    stepEnemies(dt, excludeId = null, landing = null) {
+        const s = this.current;
+        (0, enemy_roster_js_1.stepEnemyGroup)(s, dt, this.map, n => this.damage(n), (e, t, p, map, damage, allowAttack) => {
+            if (e.archetype === 'marrow-archer')
+                (0, marrow_archer_js_1.stepMarrowArcher)({ enemy: e, dt: t, player: p, map, enemies: (0, enemy_roster_js_1.enemiesOf)(s), allowAttack, solid: geometry_js_1.solid, shoot: (owner, direction) => this.arrowSystem.spawn(owner, direction) });
+            else
+                (0, enemy_js_1.enemyStep)(e, t, p, map, damage, allowAttack);
+        }, excludeId, landing);
+        const hadShots = this.arrowSystem.snapshot().length > 0;
+        this.arrowSystem.step({ dt, player: s, previousPlayer: this.previous, map: { bounds: { minX: 1.7, maxX: 16, minY: 1.7, maxY: 16 }, ...this.map }, enemies: (0, enemy_roster_js_1.enemiesOf)(s), damage: n => this.damage(n) });
+        if (s.phase !== 'playing') {
+            this.arrowSystem.reset();
+            this.arrowVictoryPending = false;
+        }
+        s.arrows = this.arrowSystem.snapshot();
+        if (hadShots && !(0, enemy_roster_js_1.aliveEnemies)(s).length)
+            this.arrowVictoryPending = true;
+        if (this.arrowVictoryPending && s.phase === 'playing' && !s.arrows.length && !(0, enemy_roster_js_1.aliveEnemies)(s).length && !s.execution && !s.interaction && !s.dash) {
+            s.phase = 'won';
+            s.note = 'The nave is silent.';
+            this.arrowVictoryPending = false;
+        }
+    }
     beginInteraction(kind) {
         const s = this.current;
         if (!['door', 'ignite', 'campfire'].includes(kind) || s.phase !== 'playing' || !Number.isFinite(s.lamp) || s.lamp <= 0 || s.interaction || s.execution || s.dash || this.actions.current || this.sweepElapsed !== null || s.hitReaction > 0)
@@ -4610,8 +4790,11 @@ class CombatWorld {
         if (!target || (!entry.extracted && (target.hp <= 0 || Math.hypot(target.x - entry.targetX, target.y - entry.targetY) > .05))) {
             this.record({ type: 'execution-cancelled', targetId: entry.targetId });
             s.execution = null;
-            if (!(0, enemy_roster_js_1.aliveEnemies)(s).length)
-                s.phase = 'won';
+            if (!(0, enemy_roster_js_1.aliveEnemies)(s).length) {
+                this.arrowVictoryPending = this.arrowSystem.snapshot().length > 0;
+                if (!this.arrowVictoryPending)
+                    s.phase = 'won';
+            }
             this.sync();
             return;
         }
@@ -4637,8 +4820,11 @@ class CombatWorld {
             if (event === 'finished') {
                 this.record({ type: 'execution-end', targetId: entry.targetId });
                 s.execution = null;
-                if (!(0, enemy_roster_js_1.aliveEnemies)(s).length)
-                    s.phase = 'won';
+                if (!(0, enemy_roster_js_1.aliveEnemies)(s).length) {
+                    this.arrowVictoryPending = this.arrowSystem.snapshot().length > 0;
+                    if (!this.arrowVictoryPending)
+                        s.phase = 'won';
+                }
             }
         }
         (0, motion_js_1.finishMotion)(s.motion ??= (0, motion_js_1.createMotion)(), dt, s.fx, s.fy, false, true);
@@ -4646,6 +4832,7 @@ class CombatWorld {
         s.cameraY += (s.y - s.cameraY) * Math.min(1, dt * 6);
         this.sync();
     }
+    startArcherTrial() { this.setEncounter([(0, bestiary_js_1.makeBestiaryEnemy)('marrow-archer', 1, 8.7, 6.6), (0, bestiary_js_1.makeBestiaryEnemy)('bonebound', 2, 7, 9), (0, bestiary_js_1.makeBestiaryEnemy)('ossuary-guard', 3, 10, 9)]); }
     dashReady() { const s = this.current; return s.phase === 'playing' && !s.interaction && !s.execution && !s.dash && (s.dashCooldown ?? 0) <= 0 && !this.actions.current && this.sweepElapsed === null && s.hitReaction <= 0; }
     dash(direction) {
         const s = this.current;
@@ -4851,7 +5038,7 @@ class CombatWorld {
         if (action && p.action?.id === action.id)
             action.progress = m(p.action.progress, action.progress);
         const enemies = (0, enemy_roster_js_1.cloneEnemyRoster)(p, s, t);
-        return { ...s, interaction: s.interaction ? { ...s.interaction } : null, execution: s.execution ? { ...s.execution, elapsed: p.execution?.targetId === s.execution.targetId && p.execution.elapsed <= s.execution.elapsed && p.execution.phase !== 'cancelled' && s.execution.phase !== 'cancelled' ? m(p.execution.elapsed, s.execution.elapsed) : s.execution.elapsed } : null, motion: (0, motion_js_1.interpolateMotion)(p.motion, s.motion, t), footContacts: (0, foot_contact_world_js_1.interpolateFootContacts)(p.footContacts, s.footContacts, t), combatEntry: (0, combat_entry_js_1.cloneCombatEntry)(s.combatEntry), dash: s.dash ? { ...s.dash, elapsed: p.dash?.id === s.dash.id ? m(p.dash.elapsed, s.dash.elapsed) : s.dash.elapsed } : null, x: m(p.x, s.x), y: m(p.y, s.y), time: m(p.time, s.time), walkDistance: m(p.walkDistance, s.walkDistance), cameraX: m(p.cameraX, s.cameraX), cameraY: m(p.cameraY, s.cameraY), enemies, enemy: enemies.find(e => e.id === s.enemy.id) ?? { ...s.enemy }, action, particles: s.particles.map(p => ({ ...p })), cone: s.cone ? { ...s.cone } : null };
+        return { ...s, arrows: (s.arrows ?? []).map(a => ({ ...a, x: m(a.previousX, a.x), y: m(a.previousY, a.y) })), interaction: s.interaction ? { ...s.interaction } : null, execution: s.execution ? { ...s.execution, elapsed: p.execution?.targetId === s.execution.targetId && p.execution.elapsed <= s.execution.elapsed && p.execution.phase !== 'cancelled' && s.execution.phase !== 'cancelled' ? m(p.execution.elapsed, s.execution.elapsed) : s.execution.elapsed } : null, motion: (0, motion_js_1.interpolateMotion)(p.motion, s.motion, t), footContacts: (0, foot_contact_world_js_1.interpolateFootContacts)(p.footContacts, s.footContacts, t), combatEntry: (0, combat_entry_js_1.cloneCombatEntry)(s.combatEntry), dash: s.dash ? { ...s.dash, elapsed: p.dash?.id === s.dash.id ? m(p.dash.elapsed, s.dash.elapsed) : s.dash.elapsed } : null, x: m(p.x, s.x), y: m(p.y, s.y), time: m(p.time, s.time), walkDistance: m(p.walkDistance, s.walkDistance), cameraX: m(p.cameraX, s.cameraX), cameraY: m(p.cameraY, s.cameraY), enemies, enemy: enemies.find(e => e.id === s.enemy.id) ?? { ...s.enemy }, action, particles: s.particles.map(p => ({ ...p })), cone: s.cone ? { ...s.cone } : null };
     }
 }
 exports.CombatWorld = CombatWorld;
@@ -9746,12 +9933,17 @@ const entries = [
     { id: 'ashen-nave', title: 'THE ASHEN NAVE', description: 'Explore the nave, its chapel and burial wing. Defeat the warden.', status: 'prototype' },
     { id: 'bonebound-trial', title: 'BONEBOUND TRIAL', description: 'Three undead. Development combat encounter.', status: 'prototype' },
     { id: 'undead-trial', title: 'UNDEAD TRIAL', description: 'Five distinct melee undead. Provisional balance.', status: 'prototype' },
+    { id: 'archer-trial', title: 'ARCHER TRIAL', description: 'Marrow Archer with two melee allies. Draft balance.', status: 'prototype' },
 ];
 exports.GAME_LEVELS = Object.freeze(entries.map(e => Object.freeze(e)));
 function gameLevel(id) { const level = exports.GAME_LEVELS.find(l => l.id === id); if (!level)
     throw Error('Unknown game level: ' + id); return level; }
 function applyLevelSpawn(world, id) {
     gameLevel(id);
+    if (id === 'archer-trial') {
+        world.startArcherTrial();
+        return;
+    }
     if (id === 'undead-trial') {
         world.startUndeadTrial();
         return;
@@ -9783,7 +9975,7 @@ const ashen_layout_js_1 = require("./ashen-layout.js");
 const ashen_environment_js_1 = require("./ashen-environment.js");
 function buildLevelScene(id, { baseObstacles, createDoorScene, createDoorEnvironment }) {
     (0, registry_js_1.gameLevel)(id);
-    if (id === 'test-chamber' || id === 'bonebound-trial' || id === 'undead-trial') {
+    if (id === 'test-chamber' || id === 'bonebound-trial' || id === 'undead-trial' || id === 'archer-trial') {
         const doorScene = createDoorScene(baseObstacles);
         return { doorScene, env: createDoorEnvironment(doorScene) };
     }
@@ -9977,7 +10169,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.enemyParts = enemyParts;
 const bonebound_js_1 = require("./bonebound.js");
 const melee_undead_js_1 = require("./melee-undead.js");
+const marrow_archer_js_1 = require("./marrow-archer.js");
 function enemyParts(e) {
+    if (e.archetype === 'marrow-archer')
+        return (0, marrow_archer_js_1.marrowArcherParts)(e);
     const undead = (0, melee_undead_js_1.meleeUndeadParts)(e);
     if (undead)
         return undead;
@@ -10482,6 +10677,24 @@ function lampLighting(life, phase = 'playing') {
     const t = Math.max(0, Math.min(1, (charge - exports.LAMP_LIGHTING.criticalAt) / (exports.LAMP_LIGHTING.normalAt - exports.LAMP_LIGHTING.criticalAt))), ease = t * t * (3 - 2 * t), dim = exports.LAMP_LIGHTING.emberPowerScale + (1 - exports.LAMP_LIGHTING.emberPowerScale) * ease;
     return { power: (.72 + .28 * charge / exports.LAMP_LIGHTING.maxLife) * dim, radiusScale: exports.LAMP_LIGHTING.emberRadiusScale + (1 - exports.LAMP_LIGHTING.emberRadiusScale) * ease, warmth: dim, mode: charge <= exports.LAMP_LIGHTING.criticalAt ? 'last-ember' : charge < exports.LAMP_LIGHTING.normalAt ? 'low' : 'normal' };
 }
+
+},
+"render/marrow-archer.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.marrowArcherParts = marrowArcherParts;
+exports.arrowParts = arrowParts;
+const marrow_archer_js_1 = require("../combat/marrow-archer.js");
+function marrowArcherParts(e) { const parts = [], n = Math.hypot(e.fx, e.fy), fx = n ? e.fx / n : 0, fy = n ? e.fy / n : 1, P = (s, f, z) => [e.x + fy * s + fx * f, e.y - fx * s + fy * f, z]; const line = (v, c = '#8e8473', w = 3) => parts.push({ kind: 1, v, c, w, hero: false, d: v.reduce((n, p) => n + p[0] + p[1] + p[2] * .006, 0) / v.length + .005 }); if (e.hp <= 0) {
+    line([P(-.15, -.5, .04), P(.12, .5, .06)], '#6b625b', 5);
+    line([P(.2, -.6, .06), P(.4, 0, .06), P(.2, .6, .06)], '#77716b', 2);
+    return parts;
+} const draw = e.mode === 'windup' ? Math.min(1, e.timer / marrow_archer_js_1.MARROW_ARCHER.windup) : 0, walk = Math.sin(e.walkDistance * 5) * .09; for (const s of [-1, 1]) {
+    line([P(s * .1, 0, .7), P(s * .16, s * walk, .34), P(s * .18, s * walk, .04)]);
+    line([P(-.16, 0, .9 + s * .12), P(0, .04, .88 + s * .12), P(.16, 0, .9 + s * .12)], '#827867', 2);
+} line([P(0, 0, .67), P(0, .04, 1.35)], '#9d907a', 4); line([P(-.09, .04, 1.4), P(-.07, .04, 1.56), P(.07, .04, 1.56), P(.09, .04, 1.4), P(-.09, .04, 1.4)], '#ac9c82', 3); line([P(-.16, 0, 1.27), P(-.28, .2, 1.18), P(-.25, .45, 1.22)], '#938777', 3); line([P(.16, 0, 1.27), P(.33, -draw * .18, 1.23), P(.12, -draw * .32, 1.22)], '#938777', 3); line([P(-.25, .45, .5), P(-.25, .63, .85), P(-.25, .68, 1.22), P(-.25, .6, 1.62), P(-.25, .45, 1.94)], '#888077', 3); line([P(-.25, .45, .5), P(.12, -draw * .32, 1.22), P(-.25, .45, 1.94)], '#b4ab94', 1); line([P(.18, -.18, .7), P(.28, -.2, 1.42)], '#494047', 5); if (draw)
+    line([P(.12, -draw * .32, 1.22), P(-.25, .79, 1.22)], '#b8b2a3', 1); return parts; }
+function arrowParts(shots, alpha = 1) { alpha = Math.max(0, Math.min(1, alpha)); return shots.map(s => { const x = s.previousX + (s.x - s.previousX) * alpha, y = s.previousY + (s.y - s.previousY) * alpha, v = [[x - s.fx * .27, y - s.fy * .27, 1.05], [x, y, 1.05]]; return { kind: 1, v, c: '#b7b1a2', w: 1.5, hero: false, d: x + y + .0063 }; }); }
 
 },
 "render/melee-undead.js":function(require,module,exports){
