@@ -5,7 +5,9 @@ import {ROOM_DOORS,ROOM_WORLD_BOUNDS,ROOM_ROUTE_BOUNDS} from './interaction-room
 export const COMBAT_DOORS=ROOM_DOORS;
 const rect=c=>({minX:Math.min(...c.points.map(p=>p[0])),maxX:Math.max(...c.points.map(p=>p[0])),minY:Math.min(...c.points.map(p=>p[1])),maxY:Math.max(...c.points.map(p=>p[1]))});
 const polygon=r=>({kind:'polygon',points:[[r.minX,r.minY],[r.maxX,r.minY],[r.maxX,r.maxY],[r.minX,r.maxY]],minZ:0,maxZ:3});
-export function createCombatDoorScene(base,definitions=COMBAT_DOORS){
+export function createCombatDoorScene(base,definitions=COMBAT_DOORS,options={}){
+ const worldBounds=options.bounds??ROOM_WORLD_BOUNDS,routeBounds=options.routeBounds??ROOM_ROUTE_BOUNDS;
+ for(const b of [worldBounds,routeBounds])if(!['minX','maxX','minY','maxY'].every(k=>Number.isFinite(b[k]))||b.minX>=b.maxX||b.minY>=b.maxY)throw Error('Invalid level bounds');
  if(!base||!Array.isArray(base.circles)||!Array.isArray(base.rects)||!Array.isArray(definitions)||!definitions.length)throw Error('Invalid combat map');
  const interior=definitions===COMBAT_DOORS?createNaveInterior({circles:base.circles,rects:base.rects}):null;
  let revision=0,actors=()=>[];const seen=new Set();
@@ -16,8 +18,8 @@ export function createCombatDoorScene(base,definitions=COMBAT_DOORS){
   const target={id:d.id,modelId:d.modelId,kind:'door',parts:[...closed.parts],approach:goal(1),availability:'ready'};
   return{target,transform,assembly,closed,mesh:closed,normal,goal,status:'closed',elapsed:0,progress:0,side:1,actionId:null,blocked:false,reservation:[],colors:new WeakMap()};
  });
- const byId=new Map(doors.map(d=>[d.target.id,d])),matches=base.rects.filter(r=>r.minX===7.15&&r.maxX===8.85&&r.minY===2.52&&r.maxY===3.08);if(matches.length!==1)throw Error('Nave gate collider changed; review integration');
- const staticRects=base.rects.filter(r=>r!==matches[0]).map(r=>({...r})),map={circles:base.circles.map(c=>({...c})),rects:[],bounds:{...ROOM_WORLD_BOUNDS}};
+ const byId=new Map(doors.map(d=>[d.target.id,d])),matches=base.rects.filter(r=>r.minX===7.15&&r.maxX===8.85&&r.minY===2.52&&r.maxY===3.08);if(options.legacyGate!==false&&matches.length!==1)throw Error('Nave gate collider changed; review integration');
+ const staticRects=base.rects.filter(r=>options.legacyGate===false||r!==matches[0]).map(r=>({...r})),map={circles:base.circles.map(c=>({...c})),rects:[],bounds:{...worldBounds}};
  if(interior)staticRects.push(...interior.rects);
  const physical=d=>[...d.mesh.frameColliders,...d.mesh.leafColliders].filter(c=>c.minZ<2.2&&c.maxZ>0);
  function obstacles(d){return[...staticRects.map(polygon),...map.circles.map(c=>({kind:'circle',center:[c.x,c.y],radius:c.r,minZ:0,maxZ:3})),...doors.filter(o=>o!==d).flatMap(physical),...actors().map(a=>({kind:'circle',center:[a.x,a.y],radius:a.radius??.24,minZ:0,maxZ:a.height??2.2}))];}
@@ -27,12 +29,12 @@ export function createCombatDoorScene(base,definitions=COMBAT_DOORS){
  function publish(d){d.mesh=d.assembly.mesh(d.progress,d.side);d.target.parts.splice(d.closed.frameParts.length,d.target.parts.length-d.closed.frameParts.length,...d.mesh.leafParts);}
  sync();
  return Object.freeze({map,targets:doors.map(d=>d.target),get parts(){return doors.flatMap(d=>d.target.parts);},
-  interior,
+  interior,lightDefinitions:options.lights,
   setActors(provider){if(typeof provider!=='function')throw Error('Invalid door actor provider');actors=provider;},highlight(id){for(const d of doors)shade(d,id);},
   getTarget:id=>byId.get(id)?.target??null,facePoint:id=>{const d=byId.get(id),p=d?.assembly.world([0,0,0]);return p?{x:p[0],y:p[1]}:null;},
   approachCandidates(id,actor){const d=byId.get(id);if(!d)return[];const dot=(actor.x-d.transform.x)*d.normal.x+(actor.y-d.transform.y)*d.normal.y,side=dot<0?-1:1;return[{side,goal:d.goal(side)},{side:-side,goal:d.goal(-side)}];},
   contacts(id){const d=byId.get(id);return d?d.assembly.contacts(d.progress,d.side):[];},isBlocked:id=>byId.get(id)?.blocked??false,
-  getBounds:()=>({...ROOM_ROUTE_BOUNDS}),revision:()=>revision,
+  getBounds:()=>({...routeBounds}),revision:()=>revision,
   getColliders:()=>[...map.rects.map(polygon),...map.circles.map(c=>({kind:'polygon',points:Array.from({length:32},(_,i)=>{const a=i*Math.PI/16,r=c.r/Math.cos(Math.PI/32);return[c.x+r*Math.cos(a),c.y+r*Math.sin(a)];}),minZ:0,maxZ:3}))],
   open(id,owner,side=1){const d=byId.get(id);if(!d||d.status!=='closed'||!Number.isSafeInteger(owner)||owner<1||![1,-1].includes(side))return false;const checked=checkDoorSweep({leaves:d.assembly.sweep(0,1,side),obstacles:obstacles(d)});if(!checked.clear){d.blocked=true;return false;}const poses=Array.from({length:129},(_,i)=>d.assembly.mesh(i/128,side)),count=poses[0].leafColliders.length;
    d.reservation=Array.from({length:count},(_,j)=>{const vertices=poses.flatMap(m=>m.leafColliders[j].points),r=rect({points:vertices});return{minX:r.minX-.03,maxX:r.maxX+.03,minY:r.minY-.03,maxY:r.maxY+.03};});d.side=side;d.actionId=owner;d.status='opening';d.blocked=false;d.target.availability='busy';sync();revision++;return true;},
