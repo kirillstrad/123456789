@@ -15,7 +15,14 @@ function prepareExecutionFixture(){
  for(let i=0;i<3;i++){
   const eventStart=d.events().length;
   if(!d.attack('light',target.x,target.y))throw Error('Fixture attack rejected: '+JSON.stringify(details()));
-  d.advance(.45);d.place(hero.x,hero.y,target.x,target.y);d.advance(.1);d.place(hero.x,hero.y,parked.x,parked.y);d.advance(.5);
+  // Synchronize with strike progress/events, not historical wall-clock delays.
+  // Current light contact is after 50%; keep the enemy parked until then.
+  for(let tick=0;tick<600&&d.state().action&&d.state().action.progress<.5;tick++)d.advance(1/60);
+  d.place(hero.x,hero.y,target.x,target.y);
+  for(let tick=0;tick<600&&d.state().action&&!d.events().slice(eventStart).some(e=>e.type==='hit');tick++)d.advance(1/60);
+  d.place(hero.x,hero.y,parked.x,parked.y);
+  for(let tick=0;tick<600&&d.state().action;tick++)d.advance(1/60);
+  if(d.state().action)throw Error('Fixture strike '+(i+1)+' failed: recovery timeout '+JSON.stringify(details()));
   const s=d.state(),hits=d.events().slice(eventStart).filter(e=>e.type==='hit');trace.push({strike:i+1,expectedHp:expectedHp[i],actualHp:s.enemy.hp,hits,hero:{x:s.x,y:s.y},action:s.action});
   if(hits.length!==1||hits[0].amount!==18||s.enemy.hp!==expectedHp[i])throw Error('Fixture strike '+(i+1)+' failed: '+JSON.stringify(details()));
  }

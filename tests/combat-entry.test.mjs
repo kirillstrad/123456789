@@ -40,19 +40,23 @@ test('combat entry: sweep and hit reaction capture the previously rendered feet'
   }
 });
 
-test('combat entry: rejected LH and queued LL preserve entry; next strike gets a fresh id',()=>{
+test('combat entry: queued LL and LH preserve entry until a fresh next strike',()=>{
+ for(const kind of ['light','heavy']){
   const w=make();assert.equal(w.attack({kind:'light',aim:null}),true);
   for(let n=0;n<180&&w.current.action&&w.current.action.progress<.65;n++)w.step(dt);
   assert.ok(w.current.action);
   const entry=w.current.combatEntry,id=w.current.action.id;
-  assert.equal(w.attack({kind:'heavy',aim:null}),false);
+  assert.equal(w.attack({kind,aim:null}),true);
   assert.equal(w.current.combatEntry,entry);assert.equal(w.current.action.id,id);
-  assert.equal(w.attack({kind:'light',aim:null}),true);assert.equal(w.current.combatEntry,entry);
+  assert.equal(w.attack({kind:'light',aim:null}),false);
+  assert.equal(w.attack({kind:'heavy',aim:null}),false);
   for(let n=0;n<180&&w.current.action&&w.current.action.id===id;n++)w.step(dt);
   assert.ok(w.current.action);assert.ok(w.current.combatEntry);
-  assert.notEqual(w.current.action.id,id);assert.equal(w.current.action.kind,'light');
-  assert.equal(w.current.action.stage,1);assert.equal(w.current.action.clip,'light2');
+  assert.notEqual(w.current.action.id,id);assert.equal(w.current.action.kind,kind);
+  assert.equal(w.current.action.stage,1);assert.equal(w.current.action.clip,kind+'2');
+  assert.equal(w.current.action.previousClip,'light1');
   assert.equal(w.current.combatEntry.actionId,w.current.action.id);
+ }
 });
 
 test('combat entry: movement cancel clears bridge and locomotion support returns',()=>{

@@ -1,3 +1,4 @@
+import {comboEdgeStyle} from './combo-edge.js';
 import {sampleInteraction} from './interaction.js';
 import {COMBAT} from '../combat/config.js';
 import {strikeProgress,blendEntry} from './strike-presentation.js';
@@ -19,9 +20,10 @@ export function combatHero(s:CombatSnapshot&{interactionAnimation?:InteractionAn
  const append=(fragment:Vec3[]|null,c:string,w:number)=>{if(!fragment)return;const edge=fragment.map(transform);parts.push({kind:1,v:edge,c,w,hero:true,d:edge.reduce((d,v)=>d+v[0]+v[1]+v[2]*.006,0)/edge.length+.006});};
  const push=(kind:0|1,v:Vec3[],c:string|number[],w=1)=>{const points=v.map(transform);parts.push({kind,v:points,c:appearance.material(v,c,kind),w,hero:true,d:points.reduce((d,v)=>d+v[0]+v[1]+v[2]*.006,0)/points.length+(kind===1?.005:0)});append(appearance.accent(v,c,kind),HERO_ACCENT_COLOR,1);append(appearance.glint(v,c,kind),HERO_GLINT_COLOR,.75);};
  const renderTime=dead?t*2.5:execution?s.execution!.elapsed:s.time,lamp=module.emit(rig,renderTime,{poly:(v,c)=>push(0,v,c),line:(v,c,w)=>push(1,v,c,w)},execution||dead?{cloth:0,chains:[0,0,0,0]}:combatSecondary(s,secondary),lampBeat(dead?0:s.lamp,renderTime));
- if(s.comboEdgeActive&&!dead&&!dash&&!execution&&s.action){
+ const edgeStyle=comboEdgeStyle(s);
+ if(edgeStyle){
   const edge=rig.grip.map((coordinate,i)=>coordinate+.24*(rig.tip[i]-coordinate)) as Vec3;
-  append([edge,rig.tip],'#ff4460',1.8);
+  append([edge,rig.tip],edgeStyle.color,edgeStyle.width);
  }
  return{parts:dash?[...parts.map(p=>({...p,alpha:dashVisual(dash).visibility})),...ashDashParts(s)]:parts,lamp:transform(lamp),tip:transform(rig.tip),clip:execution?'execution':dash?'ash-dash':clip};
 }

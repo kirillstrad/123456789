@@ -1,3 +1,4 @@
+import {installManifest} from '../ui/manifest.js';
 import {installAttackInput} from './attack-input.js';
 import {createGalleryInteraction} from '../interaction/gallery-interaction.js';
 import {createGalleryApproach} from '../interaction/gallery-approach.js';
@@ -43,6 +44,7 @@ const ritualBonfire=createRitualBonfire(world,doorScene.map);
 const dashHud={ready:false,at:-Infinity};
 let mode='menu',selected=0,menuPage=false,time=0,last=0,drawAt=0,simLast=null,acc=0,paused=false,frozen=false,endTime=0,aimPoint=null,camera={x:8,y:12},view={zoom:1,dx:0,dy:0},renderCount=0,fireAt=-1,coneBoost=0;
 let manualAdvance=false;
+let manifest=null;
 let galleryScene=null,galleryCamera=null,galleryReturn=null,galleryTimings=null,galleryTime=0,galleryPlayer=null;
 const interactionContext=()=>mode==='gallery'?(galleryPlayer?'gallery-walk':'gallery-preview'):mode;
 const targeting=installFrameTargeting(cv,{context:interactionContext,resolve:id=>mode==='gallery'?galleryScene?.getTarget(id):(env.targets??[]).find(t=>t.id===id),canRequest:()=>interactionInputAllowed({mode:interactionContext(),actor:mode==='gallery'?galleryPlayer?.snapshot():world.current,frozen,hidden:document.hidden,queued:commands.length>0})});
@@ -55,7 +57,7 @@ function advanceWorld(seconds){
  try{for(let i=0;i<Math.round(seconds*60);i++)stepWorld(1/60);}finally{manualAdvance=previous;simLast=null;acc=0;}
  return true;
 }
-function resetWorld(){targeting.clear();combatDoor.cancel('reset');doorScene.reset();world.reset();ritualBonfire.reset();dashHud.ready=false;dashHud.at=-Infinity;effects.reset();fireHintLayer.clear();view={zoom:1,dx:0,dy:0};}
+function resetWorld(){targeting.clear();manifest?.reset();combatDoor.cancel('reset');doorScene.reset();world.reset();ritualBonfire.reset();dashHud.ready=false;dashHud.at=-Infinity;effects.reset();fireHintLayer.clear();view={zoom:1,dx:0,dy:0};}
 const fire=canvas(192,165),fg=fire.getContext('2d',{willReadFrequently:true}),fireASCII=new ASCII(out);
 const basePr=(x,y,z,cx=camera.x,cy=camera.y)=>[504+((x-cx)-(y-cy))*65*.76,430+((x-cx)+(y-cy))*65*.43-z*65*.87];
 const pr=(x,y,z,cx=camera.x,cy=camera.y)=>screenPoint(projectExecution(basePr(x,y,z,cx,cy),view),W);
@@ -64,6 +66,7 @@ const color=c=>Array.isArray(c)?`rgb(${c.map(v=>Math.round(Math.max(0,Math.min(2
 function part(ctx,p,s,isMask){if(p.alpha===0)return;const previousAlpha=ctx.globalAlpha;ctx.globalAlpha=Math.max(0,Math.min(1,p.alpha??1));ctx.fillStyle=isMask?(p.hero?'#fff':'#000'):color(p.c);ctx.strokeStyle=ctx.fillStyle;ctx.lineWidth=(p.w||1)*(s.visualZoom??1);ctx.lineCap='round';ctx.lineJoin='round';if(p.kind===3){const q=pr(...p.v[0],s.cameraX,s.cameraY);ctx.font=`${(p.size??10)*(s.visualZoom??1)}px monospace`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(p.text,...q);ctx.globalAlpha=previousAlpha;return;}if(p.kind===2){const q=pr(...p.v[0],s.cameraX,s.cameraY),r=(p.r||0)*65/94*(s.visualZoom??1);ctx.beginPath();ctx.ellipse(q[0],q[1],r,r*.85,0,0,7);ctx.fill();ctx.globalAlpha=previousAlpha;return;}ctx.beginPath();p.v.forEach((v,i)=>{const q=pr(...v,s.cameraX,s.cameraY);i?ctx.lineTo(...q):ctx.moveTo(...q);});if(p.kind===1)ctx.stroke();else{ctx.closePath();ctx.fill();if(p.s){ctx.strokeStyle=isMask?ctx.fillStyle:color(p.s);ctx.stroke();}}ctx.globalAlpha=previousAlpha;}
 const smooth=x=>{x=Math.max(0,Math.min(1,x));return x*x*(3-2*x);};
 function render(s=world.snapshot(),galleryFrame=null){
+ if(!galleryFrame)manifest?.update(s);
  const rite=galleryFrame?null:ritualBonfire.frame();
  const ritualArt=galleryFrame?null:ritualBonfire.art(s,ritualInputAllowed()&&!targeting.current());
  if(!galleryFrame){
@@ -105,6 +108,7 @@ function render(s=world.snapshot(),galleryFrame=null){
        dashHud, s, world.dashReady(), DASH.cooldown,
      );
 
+ if(!galleryFrame)manifest?.paint(frame,COLS,frameRows);
  const lightingMs = performance.now() - t;
  const glyphAt = performance.now();
 
@@ -135,6 +139,7 @@ function render(s=world.snapshot(),galleryFrame=null){
  }
 
  out.restore();
+ if(!galleryFrame)manifest?.text(out,COLS,frameRows,frameHeight);
  renderCount++;
  renderCount++;
  return{geometryMs,lightingMs,glyphMs:performance.now()-glyphAt,cpuMs:performance.now()-start,lampLight:{...lampProfile,radiusPixels:radius},coneBoost,sparkFlashGain:sparkFlash.gain,fireHintParts:parts.filter(p=>p.fireHint).length,actionHint:parts.find(p=>p.actionLabel)?.text??null,heroBackdropCells,dashVisibility:dashEffect.visibility,dashFlare:dashEffect.flare,executionCamera:{...view},executionParticles:galleryFrame?0:effects.particles.length,gallery:galleryFrame?{objects:galleryFrame.stats.objects,visibleObjects:galleryFrame.stats.visibleObjects,floorParts:galleryFrame.floorParts.length,objectParts:galleryFrame.parts.length,lights:galleryFrame.lights.length,heroParts:hero.parts.length,heroClip:hero.clip??null}:undefined};
@@ -178,5 +183,10 @@ installAttackInput({
  aim:()=>unpr(aimPoint),
 });
 installViewport(cv,m=>{targeting.clear();W=m.width;COLS=m.cols;cv.width=W;cv.height=m.height;scene.width=mask.width=W;fireHintLayer.resize(W,H);aimPoint=null;commands.length=0;keys.clear();simLast=null;acc=0;drawAt=0;fireAt=-1;});
+manifest=typeof installManifest==='function'?installManifest({
+ canvas:cv,
+ dimensions:()=>({cols:COLS,rows:Math.round(ROWS*864/H)}),
+ active:()=>mode==='game'&&!frozen&&!document.hidden&&world.current.phase==='playing',
+}):null;
 installDesktop(start,pause);
 requestAnimationFrame(tick);

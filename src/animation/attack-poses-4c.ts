@@ -32,7 +32,7 @@ return smooth(Math.pow(Math.max(0,Math.min(1,u)),exponent));
 }
 export function sampleAttack4C(module:HeroModule,action:ActionView,t=action.progress):Pose{
 const timing=attackTiming(action.kind);
-const profile=profiles[action.clip];if(!profile)throw Error('Unknown 4C clip '+action.clip);t=Math.max(0,Math.min(1,t));const entry=profile.entry?end(profiles[profile.entry]):resting,exit=end(profile),keys:readonly (readonly [number,Vector])[]=[[0,entry],[timing.prep,profile.prep],[timing.ready,profile.ready],[timing.contact,profile.contact],[timing.follow,profile.follow],[1,exit]];
+const profile=profiles[action.clip];if(!profile)throw Error('Unknown 4C clip '+action.clip);t=Math.max(0,Math.min(1,t));const prior=action.previousClip===undefined?profile.entry:action.previousClip,entry=prior&&profiles[prior]?end(profiles[prior]):resting,exit=end(profile),keys:readonly (readonly [number,Vector])[]=[[0,entry],[timing.prep,profile.prep],[timing.ready,profile.ready],[timing.contact,profile.contact],[timing.follow,profile.follow],[1,exit]];
 let i=1;while(i<keys.length-1&&t>keys[i][0])i++;const a=keys[i-1],b=keys[i],u=(t-a[0])/(b[0]-a[0]),v=a[1].map((n,j)=>n+(b[1][j]-n)*channelWeight(action.clip,i,j,u)),p=module.sample('breath',0,0);
 p.id=action.clip;p.root=[0,0,0];p.gait=null;p.breath=0;p.right=[v[0],v[1],v[2]];p.az=v[3];p.down=v[4];p.lean=v[5];p.twist=v[6];p.head=v[7];return p;
 }
