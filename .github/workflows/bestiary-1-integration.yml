@@ -1,8 +1,7 @@
-name: Bestiary 1 combined verification
+name: Bestiary 1-3 and Ash and Iron verification
 on:
   push:
     branches: [bestiary-patch-1]
-    paths: ['tools/complete-bestiary-1.mjs', 'tools/fix-bestiary-hit-phase.mjs', 'patches/bestiary-patch-1.apply.mjs', 'src/**', 'tests/**', '.github/workflows/bestiary-1-integration.yml']
   workflow_dispatch:
 permissions:
   contents: write
@@ -24,18 +23,14 @@ jobs:
           cache: npm
       - run: npm ci
       - id: migration
-        run: node tools/complete-bestiary-1.mjs && node tools/fix-bestiary-hit-phase.mjs
+        run: node tools/complete-bestiary-1.mjs && node tools/fix-bestiary-hit-phase.mjs && node tools/apply-bestiary-3.mjs && node tools/apply-ash-iron-hero.mjs
       - id: build
         run: npm run build
       - id: unit
-        run: node --test tests/combat-entry.test.mjs tests/enemy-health-group.test.mjs tests/bestiary-1.test.mjs tests/light-ignition-controller.test.mjs tests/enemy-health-connected.test.mjs tests/enemy-health-hardening.test.mjs tests/levels-v1.test.mjs tests/gallery-door-app-lifecycle.test.mjs
-      - id: browser_setup
-        continue-on-error: true
-        run: npx playwright install --with-deps chromium
+        run: node --test tests/combat-entry.test.mjs tests/bestiary-3-core.test.mjs tests/bestiary-3-integration.test.mjs tests/ash-iron-palette.test.mjs tests/hero-appearance.test.mjs tests/enemy-health-group.test.mjs
       - id: browser
-        if: steps.browser_setup.outcome == 'success'
         continue-on-error: true
-        run: node tools/enemy-health-browser-check.mjs
+        run: npx playwright install --with-deps chromium && node tools/enemy-health-browser-check.mjs
       - id: regression
         continue-on-error: true
         run: node tools/run-hp-regressions.mjs
@@ -45,13 +40,13 @@ jobs:
           node --input-type=module -e "import fs from 'node:fs';const p='docs/bestiary-1-applied.json',a=JSON.parse(fs.readFileSync(p,'utf8'));a.verified=true;fs.writeFileSync(p,JSON.stringify(a,null,2));"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A src tests tools/enemy-health-browser-check.mjs docs/bestiary-patch-1-wip.md docs/bestiary-1-applied.json
+          git add -A src tests tools/enemy-health-browser-check.mjs tools/fix-bestiary-hit-phase.mjs docs/bestiary-patch-1-wip.md docs/bestiary-1-applied.json
           git add -f runtime PLAY.html docs/typecheck.json
           if ! git diff --cached --quiet; then
-            git commit -m 'Apply verified first bestiary patch and rebuild portable game'
+            git commit -m 'Apply verified melee undead and Ash and Iron materials'
             git push origin HEAD:bestiary-patch-1
           fi
-      - name: Persist actual combined verification status
+      - name: Persist combined verification
         if: always()
         env:
           MIGRATION: ${{ steps.migration.outcome }}
@@ -61,26 +56,25 @@ jobs:
           REGRESSION: ${{ steps.regression.outcome }}
           INTEGRATION: ${{ steps.integration.outcome }}
         run: |
-          node --input-type=module -e "import fs from 'node:fs';import{execFileSync}from'node:child_process';const checks=Object.fromEntries(['MIGRATION','BUILD','UNIT','BROWSER','REGRESSION','INTEGRATION'].map(k=>[k.toLowerCase(),process.env[k]||'not-run'])),passed=Object.values(checks).every(v=>v==='success'),report={status:passed?'automated-checks-passed':'incomplete-or-failed',checks,inputCommit:process.env.GITHUB_SHA,testedSourceCommit:passed?execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim():null,workflowRun:process.env.GITHUB_RUN_ID,humanVisualAcceptance:false};fs.mkdirSync('docs',{recursive:true});for(const p of ['docs/bestiary-1-verification.json','docs/enemy-health-verification.json'])fs.writeFileSync(p,JSON.stringify(report,null,2));"
+          node --input-type=module -e "import fs from 'node:fs';import{execFileSync}from'node:child_process';const checks=Object.fromEntries(['MIGRATION','BUILD','UNIT','BROWSER','REGRESSION','INTEGRATION'].map(k=>[k.toLowerCase(),process.env[k]||'not-run'])),passed=Object.values(checks).every(v=>v==='success'),report={scope:'patches-1-2-3-and-ash-iron',status:passed?'automated-checks-passed':'incomplete-or-failed',checks,inputCommit:process.env.GITHUB_SHA,testedSourceCommit:passed?execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim():null,workflowRun:process.env.GITHUB_RUN_ID,humanVisualAcceptance:false};fs.mkdirSync('docs',{recursive:true});for(const p of ['docs/bestiary-1-verification.json','docs/enemy-health-verification.json','docs/bestiary-3-verification.json'])fs.writeFileSync(p,JSON.stringify(report,null,2));"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add docs/bestiary-1-verification.json docs/enemy-health-verification.json docs/enemy-health-regression-failures.json
+          git add docs/bestiary-1-verification.json docs/enemy-health-verification.json docs/bestiary-3-verification.json docs/enemy-health-regression-failures.json
           if ! git diff --cached --quiet; then
-            git commit -m 'Record combined bestiary and enemy HP verification'
+            git commit -m 'Record combined bestiary and palette verification'
             git push origin HEAD:bestiary-patch-1
           fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: bestiary-1-build-and-evidence
+          name: bestiary-3-build-and-evidence
           path: |
             PLAY.html
             docs/typecheck.json
-            docs/bestiary-1-verification.json
-            docs/enemy-health-verification.json
+            docs/bestiary-3-verification.json
             docs/enemy-health-regression-failures.json
             docs/enemy-health-regression.log
             docs/enemy-health-browser/
-      - name: Require all checks to pass
+      - name: Require all checks
         if: always()
-        run: node --input-type=module -e "import fs from 'node:fs';const p='docs/bestiary-1-verification.json';if(!fs.existsSync(p)||JSON.parse(fs.readFileSync(p,'utf8')).status!=='automated-checks-passed')process.exit(1);"
+        run: node --input-type=module -e "import fs from 'node:fs';const p='docs/bestiary-3-verification.json';if(!fs.existsSync(p)||JSON.parse(fs.readFileSync(p,'utf8')).status!=='automated-checks-passed')process.exit(1);"
