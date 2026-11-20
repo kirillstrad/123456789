@@ -2,7 +2,7 @@ name: Bestiary 1 combined verification
 on:
   push:
     branches: [bestiary-patch-1]
-    paths: ['tools/complete-bestiary-1.mjs', 'patches/bestiary-patch-1.apply.mjs', 'src/**', 'tests/**', '.github/workflows/bestiary-1-integration.yml']
+    paths: ['tools/complete-bestiary-1.mjs', 'tools/fix-bestiary-hit-phase.mjs', 'patches/bestiary-patch-1.apply.mjs', 'src/**', 'tests/**', '.github/workflows/bestiary-1-integration.yml']
   workflow_dispatch:
 permissions:
   contents: write
@@ -24,11 +24,11 @@ jobs:
           cache: npm
       - run: npm ci
       - id: migration
-        run: node tools/complete-bestiary-1.mjs
+        run: node tools/complete-bestiary-1.mjs && node tools/fix-bestiary-hit-phase.mjs
       - id: build
         run: npm run build
       - id: unit
-        run: node --test tests/bestiary-1.test.mjs tests/light-ignition-controller.test.mjs tests/enemy-health-connected.test.mjs tests/enemy-health-hardening.test.mjs tests/levels-v1.test.mjs tests/gallery-door-app-lifecycle.test.mjs
+        run: node --test tests/combat-entry.test.mjs tests/enemy-health-group.test.mjs tests/bestiary-1.test.mjs tests/light-ignition-controller.test.mjs tests/enemy-health-connected.test.mjs tests/enemy-health-hardening.test.mjs tests/levels-v1.test.mjs tests/gallery-door-app-lifecycle.test.mjs
       - id: browser_setup
         continue-on-error: true
         run: npx playwright install --with-deps chromium
