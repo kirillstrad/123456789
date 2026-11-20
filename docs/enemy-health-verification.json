@@ -1,0 +1,13 @@
+{
+  "status": "incomplete-or-failed",
+  "checks": {
+    "build": "success",
+    "unit": "success",
+    "integration": "success",
+    "browser": "success",
+    "regression": "failure"
+  },
+  "testedSourceCommit": "8c52fd06faf44d98af656549b2c1c56976df451e",
+  "workflowRun": "44734516302",
+  "humanVisualAcceptance": false
+}
