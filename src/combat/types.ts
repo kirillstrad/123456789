@@ -9,7 +9,7 @@ export type AttackKind='light'|'heavy';
 export interface AttackCommand{kind:AttackKind;aim:Point|null}
 export interface Strike{id:number;kind:AttackKind;stage:number;elapsed:number;duration:number;fx:number;fy:number;hitIds:Set<number>}
 export interface ActionView{id:number;kind:AttackKind;stage:number;progress:number;fx:number;fy:number;clip:string;previousClip?:string|null;animation4C?:boolean;continuation?:AttackKind|null}
-export interface Enemy{archetype?:string;name?:string;category?:string;maxHp?:number;radius?:number;id:number;x:number;y:number;fx:number;fy:number;hp:number;mode:'wait'|'chase'|'windup'|'recover'|'stagger'|'dead';timer:number;cooldown:number;walkDistance:number;hitFired:boolean;charred?:boolean;golemAttack?:string;golemAttackIndex?:number;deathElapsed?:number}
+export interface Enemy{archetype?:string;name?:string;category?:string;maxHp?:number;radius?:number;id:number;x:number;y:number;fx:number;fy:number;hp:number;mode:'wait'|'chase'|'windup'|'recover'|'stagger'|'dead';timer:number;cooldown:number;walkDistance:number;hitFired:boolean;charred?:boolean;visualDeathAt?:number;golemAttack?:string;golemAttackIndex?:number;deathElapsed?:number}
 export interface Particle{x:number;y:number;z:number;vx:number;vy:number;vz:number;life:number;maxLife:number;glow:boolean;glyph:string}
 export interface Cone{x:number;y:number;fx:number;fy:number;life:number;maxLife:number}
 export interface CombatFootEntry{clip:string;actionId:number|null;feet:Vec3[]}

@@ -31,7 +31,7 @@ export function stageGolem(s,boss,map,solid,occupy){
  for(let i=0;i<=n;i++){const x=s.x+(goal.x-s.x)*i/n,y=s.y+(goal.y-s.y)*i/n;if(solid(x,y,map,.24)||!occupy(s,x,y))return null;}
  return goal;
 }
-const transient=new Set('x y fx fy time walkDistance moving motion footContacts combatEntry dash dashCooldown execution interaction cameraX cameraY phase action sweepProgress enemy enemies particles cone arrows hitReaction deathTime note bossEncounter'.split(' '));
+const transient=new Set('x y fx fy time walkDistance moving motion footContacts combatEntry dash dashCooldown execution interaction cameraX cameraY phase action sweepProgress enemy enemies particles cone arrows hitReaction deathTime note bossEncounter golemAligning'.split(' '));
 export function captureGolemLoadout(s){
  if(!Number.isFinite(s?.lamp)||s.lamp<=0||s.phase==='dead')throw Error('Enter GOLEM TRIAL with a living hero');
  const result={};for(const [k,v] of Object.entries(s))if(!transient.has(k))result[k]=structuredClone(v);

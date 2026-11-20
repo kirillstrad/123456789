@@ -1,7 +1,7 @@
 // Provisional tuning, not final balance.
 export const MELEE_UNDEAD=Object.freeze(Object.fromEntries(Object.entries({
  'ossuary-guard':{name:'Ossuary Guard',maxHp:80,damage:14,radius:.38,speed:.62,windup:.95,recover:1.1,reach:1.4,cooldown:1.65,stagger:.45,arc:85},
- gravebearer:{name:'Gravebearer',maxHp:96,damage:20,radius:.4,speed:.48,windup:1.45,recover:1.6,reach:2.1,cooldown:2.2,stagger:.55,arc:160},
+ gravebearer:{name:'Coffin Bearer',maxHp:96,damage:20,radius:.4,speed:.48,windup:1.45,recover:1.6,reach:2.1,cooldown:2.2,stagger:.55,arc:160},
  'bloated-remnant':{name:'Bloated Remnant',maxHp:110,damage:16,radius:.54,speed:.42,windup:1.1,recover:1.35,reach:1.35,cooldown:1.8,stagger:.55,arc:110},
  ashbound:{name:'Ashbound',maxHp:32,damage:7,radius:.28,speed:1.18,windup:.48,recover:.85,reach:1.05,cooldown:1.15,stagger:.4,arc:70}
 }).map(([id,p])=>[id,Object.freeze({id,category:'undead',...p})])));

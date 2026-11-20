@@ -1,3 +1,4 @@
+import {updateGolemMotion} from '../animation/golem-motion.js';
 // Provisional balance. There are no health-dependent combat phases.
 export const CORPSE_GOLEM = Object.freeze({
   id:'corpse-golem', name:'Corpse Golem', category:'undead', boss:true,
@@ -72,7 +73,7 @@ export function golemExecutionPresentation(e){
     regrip:ramp(t,4.8,5.2),pull:ramp(t,5.2,6.1),back:f.withdraw,
     cameraZoom:1+.09*focus,cameraShake:0};
 }
-export function stepCorpseGolem({enemy:e,dt,player,map,damage,solid,blocked,allowAttack=true}){
+function stepCorpseGolemCore({enemy:e,dt,player,map,damage,solid,blocked,allowAttack=true}){
   if(e.archetype!=='corpse-golem')return false;
   if(e.hp<=0||e.mode==='dead'||!Number.isFinite(dt)||dt<=0)return true;
   e.cooldown=Math.max(0,e.cooldown-dt);
@@ -123,4 +124,12 @@ export function stepCorpseGolem({enemy:e,dt,player,map,damage,solid,blocked,allo
   }
   if(d>1.3&&d<10)move(e.fx,e.fy,Math.min(CORPSE_GOLEM.speed*dt,d-1.3));
   return true;
+}
+
+// GOLEM_MOTION_WRAPPER_V4
+export function stepCorpseGolem(args){
+ const e=args.enemy,before={x:e.x,y:e.y};
+ const handled=stepCorpseGolemCore(args);
+ if(handled&&e.archetype==='corpse-golem'&&e.hp>0&&e.mode!=='dead'&&Number.isFinite(args.dt)&&args.dt>0)updateGolemMotion(e,args.dt,before);
+ return handled;
 }
