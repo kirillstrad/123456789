@@ -1,0 +1,11 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {createEnemyHealthModel} from '../src/ui/enemy-health.js';
+import {createHealthHitIndex,healthVisibleIds,createEnemyHealthRuntime} from '../src/app/enemy-health-runtime.js';
+const enemies=[{id:1,name:'Bonebound',hp:18,maxHp:36},{id:2,name:'Guard',hp:40,maxHp:54}];
+test('hover uses authoritative HP and wins over another hit',()=>{const m=createEnemyHealthModel(),v=m.update({time:1,enemies,visibleIds:[1,2],hoverId:1,hits:[{type:'hit',time:1,targetId:2}]});assert.equal(v.target.hp,18);assert.equal(v.target.fraction,.5);});
+test('repeated events expire and hidden targets disappear',()=>{const m=createEnemyHealthModel(),hits=[{type:'hit',time:1,targetId:1}];assert.ok(m.update({time:1,enemies,visibleIds:[1],hits}).target);assert.equal(m.update({time:3.1,enemies,visibleIds:[1],hits}).target,null);assert.equal(m.update({time:4,enemies,visibleIds:[],hoverId:1}).target,null);});
+const quad=()=>({kind:0,v:[[1,1,0],[9,1,0],[9,9,0],[1,9,0]]});
+const viewport={width:10,height:10},project=(x,y)=>[x,y];
+test('wall occlusion and lit cells gate selection',()=>{const a=quad(),wall=quad(),args={groups:[{id:1,parts:[a]}],project,zoom:1,viewport};assert.equal(createHealthHitIndex({...args,parts:[a,wall]}).pick([5,5]),null);const i=createHealthHitIndex({...args,parts:[a]}),data=new Uint8Array(400);assert.equal(healthVisibleIds(i,{data,cols:10,rows:10},viewport).size,0);data.fill(100);assert.ok(healthVisibleIds(i,{data,cols:10,rows:10},viewport).has(1));});
+test('runtime uses the same identity for cursor and health panel',()=>{const a=quad(),runtime=createEnemyHealthRuntime();runtime.update({parts:[a],groups:[{id:1,parts:[a]}],project,zoom:1,viewport,cells:{data:new Uint8Array(400).fill(100),cols:10,rows:10},pointer:[5,5],state:{time:1,enemies},events:[],enabled:true});assert.equal(runtime.hoverId(),1);assert.equal(runtime.snapshot().target.hp,18);runtime.reset();assert.equal(runtime.hoverId(),null);});
+test('boss requires an explicit room owner and blocking UI hides it',()=>{const m=createEnemyHealthModel();assert.ok(m.update({time:1,enemies,bossId:2,inBossRoom:true}).boss);assert.equal(m.update({time:2,enemies,bossId:2,inBossRoom:false}).boss,null);assert.equal(m.update({time:3,enemies,bossId:2,inBossRoom:true,enabled:false}).boss,null);});

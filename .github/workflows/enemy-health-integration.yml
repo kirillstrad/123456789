@@ -1,0 +1,50 @@
+name: Enemy HP integration
+on:
+  push:
+    branches: [bestiary-patch-1]
+    paths:
+      - '.github/workflows/enemy-health-integration.yml'
+      - 'src/ui/enemy-health.js'
+      - 'src/app/enemy-health-runtime.js'
+      - 'tools/connect-enemy-health.mjs'
+      - 'tests/enemy-health-connected.test.mjs'
+permissions:
+  contents: write
+concurrency:
+  group: enemy-health-integration-bestiary-patch-1
+  cancel-in-progress: false
+jobs:
+  connect:
+    if: github.repository == 'kirillstrad/123456789' && github.ref == 'refs/heads/bestiary-patch-1'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: bestiary-patch-1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node tools/connect-enemy-health.mjs
+      - run: node --check src/app/main.js && node --check src/app/frame-targeting.js
+      - run: npm run build
+      - run: node --test tests/enemy-health-connected.test.mjs
+      - name: Commit validated source integration to this branch only
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/app/main.js src/app/frame-targeting.js patches/bestiary-patch-1.apply.mjs
+          if ! git diff --cached --quiet; then
+            git commit -m 'Connect enemy HP panels to main renderer and cursor'
+            git push origin HEAD:bestiary-patch-1
+          fi
+      - name: Full regression suite (failure does not undo the integration commit)
+        run: npm test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: enemy-health-build
+          path: |
+            PLAY.html
+            docs/typecheck.json
