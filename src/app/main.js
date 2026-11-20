@@ -1,4 +1,5 @@
-import {installManifest} from '../ui/manifest.js';
+import {installManifest} from '../ui/relic.js';
+import {createRelicWorld} from '../interaction/relic-world.js';
 import {installAttackInput} from './attack-input.js';
 import {createGalleryInteraction} from '../interaction/gallery-interaction.js';
 import {createGalleryApproach} from '../interaction/gallery-approach.js';
@@ -45,19 +46,25 @@ const dashHud={ready:false,at:-Infinity};
 let mode='menu',selected=0,menuPage=false,time=0,last=0,drawAt=0,simLast=null,acc=0,paused=false,frozen=false,endTime=0,aimPoint=null,camera={x:8,y:12},view={zoom:1,dx:0,dy:0},renderCount=0,fireAt=-1,coneBoost=0;
 let manualAdvance=false;
 let manifest=null;
+const relicWorld=typeof createRelicWorld==='function'?createRelicWorld({
+ map:doorScene.map,
+ openDialogue:value=>window.__ASH_MANIFEST__?.openDialogue(value),
+ openReading:value=>window.__ASH_MANIFEST__?.openReading(value),
+ setObjective:value=>window.__ASH_MANIFEST__?.setObjective(value),
+}):null;
 let galleryScene=null,galleryCamera=null,galleryReturn=null,galleryTimings=null,galleryTime=0,galleryPlayer=null;
 const interactionContext=()=>mode==='gallery'?(galleryPlayer?'gallery-walk':'gallery-preview'):mode;
-const targeting=installFrameTargeting(cv,{context:interactionContext,resolve:id=>mode==='gallery'?galleryScene?.getTarget(id):(env.targets??[]).find(t=>t.id===id),canRequest:()=>interactionInputAllowed({mode:interactionContext(),actor:mode==='gallery'?galleryPlayer?.snapshot():world.current,frozen,hidden:document.hidden,queued:commands.length>0})});
+const targeting=installFrameTargeting(cv,{context:interactionContext,resolve:id=>mode==='gallery'?galleryScene?.getTarget(id):(env.targets??[]).find(t=>t.id===id),canRequest:()=>!manifest?.blocking()&&interactionInputAllowed({mode:interactionContext(),actor:mode==='gallery'?galleryPlayer?.snapshot():world.current,frozen,hidden:document.hidden,queued:commands.length>0})});
 const combatDoor=createCombatDoorController({world,scene:doorScene,targeting,active:()=>mode==='game'&&(!frozen||manualAdvance)});
-function stepWorld(dt,input){combatDoor.step(dt,input);ritualBonfire.step();effects.step(dt,world.current,world.events);}
+function stepWorld(dt,input){if(manifest?.blocking())return;combatDoor.step(dt,input);ritualBonfire.step();effects.step(dt,world.current,world.events);}
 function advanceWorld(seconds){
  if(!Number.isFinite(seconds)||seconds<0||seconds>120)throw Error('Invalid manual advance duration');
- if(mode!=='game'||document.hidden)return false;
+ if(mode!=='game'||document.hidden||manifest?.blocking())return false;
  const previous=manualAdvance;manualAdvance=true;
  try{for(let i=0;i<Math.round(seconds*60);i++)stepWorld(1/60);}finally{manualAdvance=previous;simLast=null;acc=0;}
  return true;
 }
-function resetWorld(){targeting.clear();manifest?.reset();combatDoor.cancel('reset');doorScene.reset();world.reset();ritualBonfire.reset();dashHud.ready=false;dashHud.at=-Infinity;effects.reset();fireHintLayer.clear();view={zoom:1,dx:0,dy:0};}
+function resetWorld(){targeting.clear();relicWorld?.reset();manifest?.reset();combatDoor.cancel('reset');doorScene.reset();world.reset();ritualBonfire.reset();dashHud.ready=false;dashHud.at=-Infinity;effects.reset();fireHintLayer.clear();view={zoom:1,dx:0,dy:0};}
 const fire=canvas(192,165),fg=fire.getContext('2d',{willReadFrequently:true}),fireASCII=new ASCII(out);
 const basePr=(x,y,z,cx=camera.x,cy=camera.y)=>[504+((x-cx)-(y-cy))*65*.76,430+((x-cx)+(y-cy))*65*.43-z*65*.87];
 const pr=(x,y,z,cx=camera.x,cy=camera.y)=>screenPoint(projectExecution(basePr(x,y,z,cx,cy),view),W);
@@ -66,7 +73,7 @@ const color=c=>Array.isArray(c)?`rgb(${c.map(v=>Math.round(Math.max(0,Math.min(2
 function part(ctx,p,s,isMask){if(p.alpha===0)return;const previousAlpha=ctx.globalAlpha;ctx.globalAlpha=Math.max(0,Math.min(1,p.alpha??1));ctx.fillStyle=isMask?(p.hero?'#fff':'#000'):color(p.c);ctx.strokeStyle=ctx.fillStyle;ctx.lineWidth=(p.w||1)*(s.visualZoom??1);ctx.lineCap='round';ctx.lineJoin='round';if(p.kind===3){const q=pr(...p.v[0],s.cameraX,s.cameraY);ctx.font=`${(p.size??10)*(s.visualZoom??1)}px monospace`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(p.text,...q);ctx.globalAlpha=previousAlpha;return;}if(p.kind===2){const q=pr(...p.v[0],s.cameraX,s.cameraY),r=(p.r||0)*65/94*(s.visualZoom??1);ctx.beginPath();ctx.ellipse(q[0],q[1],r,r*.85,0,0,7);ctx.fill();ctx.globalAlpha=previousAlpha;return;}ctx.beginPath();p.v.forEach((v,i)=>{const q=pr(...v,s.cameraX,s.cameraY);i?ctx.lineTo(...q):ctx.moveTo(...q);});if(p.kind===1)ctx.stroke();else{ctx.closePath();ctx.fill();if(p.s){ctx.strokeStyle=isMask?ctx.fillStyle:color(p.s);ctx.stroke();}}ctx.globalAlpha=previousAlpha;}
 const smooth=x=>{x=Math.max(0,Math.min(1,x));return x*x*(3-2*x);};
 function render(s=world.snapshot(),galleryFrame=null){
- if(!galleryFrame)manifest?.update(s);
+ if(!galleryFrame){manifest?.advance(performance.now());manifest?.update(s);}
  const rite=galleryFrame?null:ritualBonfire.frame();
  const ritualArt=galleryFrame?null:ritualBonfire.art(s,ritualInputAllowed()&&!targeting.current());
  if(!galleryFrame){
@@ -80,6 +87,7 @@ function render(s=world.snapshot(),galleryFrame=null){
  const focus=basePr(v.focusX,v.focusY,v.focusZ,s.cameraX,s.cameraY);
  camera={x:s.cameraX,y:s.cameraY};view={zoom:v.zoom,dx:(504-focus[0])*(v.zoom-1)+v.weight*(504-focus[0])*.3+v.shakeX,dy:(430-focus[1])*(v.zoom-1)+v.weight*(430-focus[1])*.3+v.shakeY};
  const drawState={...s,visualZoom:view.zoom},galleryDraw=galleryFrame?galleryRenderLayers(galleryFrame):null,parts=galleryDraw?[...galleryDraw.objects,...hero.parts].sort((a,b)=>a.d-b.d):[...env.parts,...enemyParts(s.enemy,s),...hero.parts,...visual.parts,...(ritualArt?.parts??[])].sort((a,b)=>a.d-b.d);
+ if(!galleryFrame&&relicWorld){parts.push(...relicWorld.parts(s));parts.sort((a,b)=>a.d-b.d);}
  targeting.frame({parts,targets:galleryFrame?.targets??env.targets??[],project:pr,zoom:view.zoom,active:(mode==='gallery'&&!galleryPlayer)||((mode==='game'||mode==='gallery')&&s.phase==='playing')});
  const lamp=pr(...hero.lamp),lampProfile=lampLighting(s.lamp,galleryFrame&&!galleryPlayer?'playing':s.phase),radius=146*65/94*1.2*view.zoom*lampProfile.radiusScale,power=lampProfile.power;
  if(!galleryFrame){
@@ -145,7 +153,7 @@ function render(s=world.snapshot(),galleryFrame=null){
  return{geometryMs,lightingMs,glyphMs:performance.now()-glyphAt,cpuMs:performance.now()-start,lampLight:{...lampProfile,radiusPixels:radius},coneBoost,sparkFlashGain:sparkFlash.gain,fireHintParts:parts.filter(p=>p.fireHint).length,actionHint:parts.find(p=>p.actionLabel)?.text??null,heroBackdropCells,dashVisibility:dashEffect.visibility,dashFlare:dashEffect.flare,executionCamera:{...view},executionParticles:galleryFrame?0:effects.particles.length,gallery:galleryFrame?{objects:galleryFrame.stats.objects,visibleObjects:galleryFrame.stats.visibleObjects,floorParts:galleryFrame.floorParts.length,objectParts:galleryFrame.parts.length,lights:galleryFrame.lights.length,heroParts:hero.parts.length,heroClip:hero.clip??null}:undefined};
 }
 function renderGallery(){if(!galleryScene||mode!=='gallery')throw Error('Gallery preview is not open');const walking=galleryPlayer?.snapshot();if(walking)galleryCamera={x:walking.cameraX,y:walking.cameraY};const frame=galleryScene.getFrame(galleryCamera,galleryRenderRange(W,H)),s=walking??{...world.snapshot(),cameraX:galleryCamera.x,cameraY:galleryCamera.y,time:galleryTime,lamp:100,particles:[],cone:null,dash:null};galleryTimings=render(s,frame);$('status').textContent=galleryPlayer?'OBJECT GALLERY / WALK TEST / COLLISIONS ON':'OBJECT GALLERY / RENDER PREVIEW';return galleryTimings;}
-function openGallery(){if(mode==='gallery')return galleryScene.stats();combatDoor.cancel('gallery-open');targeting.clear();const next=createGalleryScene();galleryReturn={mode,camera:{...camera},view:{...view}};galleryScene=next;galleryCamera=next.getSpawn();galleryTime=0;galleryTimings=null;mode='gallery';keys.clear();commands.length=0;aimPoint=null;simLast=null;acc=0;drawAt=0;cv.focus();try{renderGallery();}catch(error){closeGallery();throw error;}return next.stats();}
+function openGallery(){if(mode==='gallery')return galleryScene.stats();manifest?.dismiss();combatDoor.cancel('gallery-open');targeting.clear();const next=createGalleryScene();galleryReturn={mode,camera:{...camera},view:{...view}};galleryScene=next;galleryCamera=next.getSpawn();galleryTime=0;galleryTimings=null;mode='gallery';keys.clear();commands.length=0;aimPoint=null;simLast=null;acc=0;drawAt=0;cv.focus();try{renderGallery();}catch(error){closeGallery();throw error;}return next.stats();}
 function closeGallery(){if(mode!=='gallery')return;targeting.clear();galleryPlayer?.dispose?.();galleryPlayer=null;galleryScene.dispose();galleryScene=null;galleryCamera=null;galleryTimings=null;mode=galleryReturn.mode;camera=galleryReturn.camera;view=galleryReturn.view;galleryReturn=null;keys.clear();commands.length=0;aimPoint=null;simLast=null;acc=0;drawAt=0;$('status').textContent=world.current.note;cv.focus();}
 function gallerySetCamera(x,y){if(mode!=='gallery'||![x,y].every(Number.isFinite))throw Error('Invalid gallery camera');if(galleryPlayer){galleryPlayer.dispose?.();targeting.clear();}galleryPlayer=null;keys.clear();acc=0;simLast=null;const b=galleryScene.getBounds();galleryCamera={x:Math.max(b.minX,Math.min(b.maxX,x)),y:Math.max(b.minY,Math.min(b.maxY,y))};return renderGallery();}
 function walkGallery(){targeting.clear();galleryPlayer?.dispose?.();openGallery();galleryPlayer=createGalleryInteraction(createGalleryApproach(createGalleryPlayer(world.snapshot(),galleryScene.getSpawn(),galleryScene.getBounds(),{...galleryMotion,contacts:advanceWorldFootContacts,colliders:galleryScene.getColliders()}),galleryScene,targeting,{allowed:()=>mode==='gallery'&&!document.hidden&&!document.activeElement?.isContentEditable&&!document.activeElement?.closest?.('input,select,textarea,button,[contenteditable]'),manualHeld:()=>['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].some(k=>keys.has(k))}),galleryScene,targeting,{context:interactionContext});galleryCamera=galleryScene.getSpawn();keys.clear();commands.length=0;simLast=null;acc=0;drawAt=0;return renderGallery();}
@@ -155,11 +163,12 @@ function drawMenu(){out.fillStyle='#000';out.fillRect(0,0,W,864);if(time-fireAt>
 function start(){targeting.clear();if(mode==='gallery')closeGallery();resetWorld();mode='game';selected=0;menuPage=false;paused=false;frozen=false;endTime=0;keys.clear();commands.length=0;simLast=null;acc=0;report.frames=[];camera={x:8,y:12};$('freeze').textContent='FREEZE FRAME';cv.focus();}
 function resume(){targeting.clear();if(mode==='gallery')closeGallery();mode='game';paused=false;keys.clear();commands.length=0;simLast=null;acc=0;cv.focus();}
 function home(){targeting.clear();if(mode==='gallery')closeGallery();resetWorld();mode='menu';selected=0;menuPage=false;keys.clear();commands.length=0;}
-function pause(){if(mode!=='game')return;combatDoor.cancel('pause');targeting.clear();mode='pause';selected=0;keys.clear();commands.length=0;simLast=null;acc=0;}
+function pause(){if(mode!=='game')return;manifest?.dismiss();combatDoor.cancel('pause');targeting.clear();mode='pause';selected=0;keys.clear();commands.length=0;simLast=null;acc=0;}
 const point=e=>{const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*864/r.height};};
-const ritualInputAllowed=()=>interactionInputAllowed({mode:interactionContext(),actor:world.current,frozen,hidden:document.hidden,queued:commands.length>0});
+const ritualInputAllowed=()=>!manifest?.blocking()&&interactionInputAllowed({mode:interactionContext(),actor:world.current,frozen,hidden:document.hidden,queued:commands.length>0});
 window.addEventListener('keydown',event=>{
  if(event.code!=='KeyF'||event.repeat||event.defaultPrevented||mode!=='game'||event.target?.isContentEditable||event.target?.closest?.('input,select,textarea,button,[contenteditable]'))return;
+ if(ritualInputAllowed()&&!targeting.current()&&relicWorld?.press(world.current)){event.preventDefault();event.stopImmediatePropagation();return;}
  if(!ritualInputAllowed()||targeting.current()||!ritualBonfire.press())return;
  event.preventDefault();
  event.stopImmediatePropagation();
@@ -172,13 +181,13 @@ function getReport(){const a=report.frames.map(f=>f.frameMs).sort((a,b)=>a-b),me
 $('report').onclick=()=>save(new Blob([JSON.stringify(getReport(),null,2)],{type:'application/json'}),'ash-iron-4a-report.json');$('export').onclick=()=>cv.toBlob(b=>b&&save(b,'ash-iron-4a-frame.png'));
 window.addEventListener('error',e=>report.errors.push(e.message));window.addEventListener('unhandledrejection',e=>report.errors.push(String(e.reason)));
 function tick(now){const real=last?Math.min(.1,(now-last)/1000):0;last=now;if(document.hidden){requestAnimationFrame(tick);return;}if(mode==='gallery'){galleryTime+=real;if(galleryPlayer){if(simLast!==null)acc+=Math.max(0,Math.min(.1,(now-simLast)/1000));let steps=0;const input=movementInput(keys);while(acc+1e-10>=1/60&&steps<6){galleryPlayer.step(1/60,input);acc-=1/60;steps++;}simLast=now;}else{simLast=null;acc=0;}if(now-drawAt>=33){renderGallery();drawAt=now;}requestAnimationFrame(tick);return;}if(mode!=='game'){if(!$('fireFreeze').checked)time+=real*(+$('flow').value/100);if(now-drawAt>33){drawMenu();drawAt=now;}requestAnimationFrame(tick);return;}
-const updateAt=performance.now();if(!frozen){if(commands.length)combatDoor.cancel('combat-command');for(const c of commands.splice(0))c.kind==='dash'?world.dash(c.direction):c.kind==='sweep'?world.sweep(c.aim):world.attack(c);if(simLast!==null)acc+=Math.max(0,Math.min(.1,(now-simLast)/1000));const {x,y}=movementInput(keys);let steps=0;while(acc+1e-10>=1/60&&steps<6){stepWorld(1/60,{x,y,aim:unpr(aimPoint)});acc-=1/60;steps++;}}simLast=now;const updateMs=performance.now()-updateAt;
-if(now-drawAt>=33){const frameMs=drawAt?now-drawAt:0,t=render(world.snapshot(frozen?1:Math.max(0,acc*60)));if(!frozen&&frameMs>0&&frameMs<1000){report.frames.push({frameMs,updateMs,...t});if(report.frames.length>1800)report.frames.shift();}drawAt=now;if(renderCount%15===0){const r=getReport();$('perfText').textContent=`CANVAS2D / ${COLS} x 140\nFPS ${r.summary.fps?.toFixed(2)??'--'} / P95 ${r.summary.p95Ms?.toFixed(2)??'--'} ms\nCPU ${t.cpuMs.toFixed(2)} ms / GPU NOT MEASURED\nERRORS ${report.errors.length}`;}$('status').textContent=world.current.note;}
+const updateAt=performance.now();if(!frozen&&!manifest?.blocking()){if(commands.length)combatDoor.cancel('combat-command');for(const c of commands.splice(0))c.kind==='dash'?world.dash(c.direction):c.kind==='sweep'?world.sweep(c.aim):world.attack(c);if(simLast!==null)acc+=Math.max(0,Math.min(.1,(now-simLast)/1000));const {x,y}=movementInput(keys);let steps=0;while(acc+1e-10>=1/60&&steps<6){stepWorld(1/60,{x,y,aim:unpr(aimPoint)});acc-=1/60;steps++;}}else{keys.clear();commands.length=0;acc=0;}simLast=now;const updateMs=performance.now()-updateAt;
+if(now-drawAt>=33){const frameMs=drawAt?now-drawAt:0,t=render(world.snapshot(frozen||manifest?.blocking()?1:Math.max(0,acc*60)));if(!frozen&&frameMs>0&&frameMs<1000){report.frames.push({frameMs,updateMs,...t});if(report.frames.length>1800)report.frames.shift();}drawAt=now;if(renderCount%15===0){const r=getReport();$('perfText').textContent=`CANVAS2D / ${COLS} x 140\nFPS ${r.summary.fps?.toFixed(2)??'--'} / P95 ${r.summary.p95Ms?.toFixed(2)??'--'} ms\nCPU ${t.cpuMs.toFixed(2)} ms / GPU NOT MEASURED\nERRORS ${report.errors.length}`;}$('status').textContent=world.current.note;}
 if(world.current.phase!=='playing'&&!frozen){endTime+=real;if(endTime>(world.current.phase==='dead'?2.7:1.5)){targeting.clear();mode=world.current.phase;selected=0;keys.clear();commands.length=0;}}requestAnimationFrame(tick);}
 window.__ASH_ITERATION_2__=Object.freeze({build:report.build,start,pause,resume,home,viewport:()=>({width:W,height:864,cols:COLS,rows:ROWS}),project:(x,y,z=0)=>pr(x,y,z),unproject:(x,y)=>unpr({x,y}),state:()=>combatDoor.decorate(world.snapshot()),combatDoor:()=>({scene:doorScene.snapshot(),...combatDoor.snapshot()}),events:()=>world.events.slice(),report:getReport,mode:()=>mode,menuTime:()=>time,target:()=>targeting.current(),intent:()=>targeting.intent(),render:()=>mode==='gallery'?renderGallery():render(),coneBoost:()=>coneBoost,freeze:()=>{frozen=true;combatDoor.cancel('freeze');keys.clear();simLast=null;acc=0;},advance:advanceWorld,place:(x,y,ex,ey)=>{Object.assign(world.current,{x,y,cameraX:x,cameraY:y});Object.assign(world.previous,{x,y,cameraX:x,cameraY:y});camera={x,y};if(ex!==undefined)Object.assign(world.current.enemy,{x:ex,y:ey});},damage:n=>world.damage(n),dash:(x,y)=>world.dash({x,y}),attack:(kind,x,y)=>world.attack({kind,aim:{x,y}}),execute:()=>world.execute(),executionAvailable:()=>world.executionAvailable(),executionEffects:()=>effects.snapshot(),executionOptions:()=>({...executionOptions})});
-installExecutionInput({world,keys,commands,isActive:()=>mode==='game'&&!frozen,focus:()=>cv.focus()});
+installExecutionInput({world,keys,commands,isActive:()=>mode==='game'&&!frozen&&!manifest?.blocking(),focus:()=>cv.focus()});
 installAttackInput({
- active:()=>mode==='game'&&!frozen&&!document.hidden&&world.current.phase==='playing'&&!world.current.dash,
+ active:()=>mode==='game'&&!frozen&&!manifest?.blocking()&&!document.hidden&&world.current.phase==='playing'&&!world.current.dash,
  commands,
  aim:()=>unpr(aimPoint),
 });
@@ -186,6 +195,8 @@ installViewport(cv,m=>{targeting.clear();W=m.width;COLS=m.cols;cv.width=W;cv.hei
 manifest=typeof installManifest==='function'?installManifest({
  canvas:cv,
  dimensions:()=>({cols:COLS,rows:Math.round(ROWS*864/H)}),
+ onModalChange:blocked=>{targeting.clear();combatDoor.cancel('relic-modal');keys.clear();commands.length=0;acc=0;simLast=null;aimPoint=null;if(!blocked)relicWorld?.cancel();},
+ onChoice:event=>relicWorld?.choose(event),
  active:()=>mode==='game'&&!frozen&&!document.hidden&&world.current.phase==='playing',
 }):null;
 installDesktop(start,pause);
