@@ -1,16 +1,16 @@
 {
   "scope": "patches-1-2-3-and-ash-iron",
-  "status": "incomplete-or-failed",
+  "status": "automated-checks-passed",
   "checks": {
     "migration": "success",
     "build": "success",
-    "unit": "failure",
-    "browser": "skipped",
-    "regression": "skipped",
-    "integration": "skipped"
+    "unit": "success",
+    "browser": "success",
+    "regression": "success",
+    "integration": "success"
   },
-  "inputCommit": "09e015cfbe93a46e4d4963aec603730d5e873b06",
-  "testedSourceCommit": null,
-  "workflowRun": "44752888846",
+  "inputCommit": "88d8fd7eecaed7f2e0d49195533db0f6add46724",
+  "testedSourceCommit": "958ca75b056589bda2c2d80d843fbbdc37356921",
+  "workflowRun": "44756420591",
   "humanVisualAcceptance": false
 }
