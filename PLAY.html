@@ -2301,6 +2301,186 @@ exports.SPARKS = Object.freeze({ arcDegrees: 160, reach: 5.3, coneDuration: 2.5,
 exports.MENU_PROFILE = Object.freeze({ flow: .32, power: .86, density: 192, ascii: true, dim: true, frozen: false });
 
 },
+"combat/corpse-golem.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.GOLEM_FINISHER = exports.GOLEM_ATTACKS = exports.CORPSE_GOLEM = void 0;
+exports.golemExecutionWeak = golemExecutionWeak;
+exports.canFinishGolem = canFinishGolem;
+exports.beginGolemExecution = beginGolemExecution;
+exports.advanceGolemExecution = advanceGolemExecution;
+exports.golemFinisherFrame = golemFinisherFrame;
+exports.golemExecutionPresentation = golemExecutionPresentation;
+exports.stepCorpseGolem = stepCorpseGolem;
+// Provisional balance. There are no health-dependent combat phases.
+exports.CORPSE_GOLEM = Object.freeze({
+    id: 'corpse-golem', name: 'Corpse Golem', category: 'undead', boss: true,
+    maxHp: 600, damage: 20, radius: .85, speed: .5, windup: 1.25,
+    recover: 1.5, reach: 2.45, cooldown: 1.2, stagger: .45,
+});
+exports.GOLEM_ATTACKS = Object.freeze({
+    slam: Object.freeze({ windup: 1.25, recover: 1.5, reach: 2.45, arc: 75, damage: 22 }),
+    sweep: Object.freeze({ windup: 1.45, recover: 1.7, reach: 2.7, arc: 170, damage: 18 }),
+    press: Object.freeze({ windup: 1.05, recover: 1.55, reach: 1.65, arc: 95, damage: 16 }),
+});
+exports.GOLEM_FINISHER = Object.freeze({
+    weakFraction: .05, reach: 1.5, duration: 6.8, down: 1, pin: 2.6,
+    release: 2.85, offer: 3.25, extract: 4.8, regrip: 5.2, pull: 6.1,
+});
+const clamp = x => Math.max(0, Math.min(1, x));
+const ramp = (t, a, b) => {
+    const x = clamp((t - a) / (b - a));
+    return x * x * x * (x * (x * 6 - 15) + 10);
+};
+const finisherTime = e => Number.isFinite(e?.elapsed)
+    ? Math.max(0, Math.min(exports.GOLEM_FINISHER.duration, e.elapsed)) : 0;
+function golemExecutionWeak(e) {
+    return e?.archetype === 'corpse-golem' && Number.isFinite(e.hp)
+        && Number.isFinite(e.maxHp) && e.maxHp > 0 && e.hp > 0
+        && e.hp <= e.maxHp * exports.GOLEM_FINISHER.weakFraction;
+}
+function canFinishGolem(hero, boss, lineBlocked = false) {
+    if (!golemExecutionWeak(boss) || hero?.phase !== 'playing' || hero.busy
+        || lineBlocked || !Number.isFinite(hero.lamp) || hero.lamp <= 0
+        || ![hero.x, hero.y, hero.fx, hero.fy, boss.x, boss.y].every(Number.isFinite))
+        return false;
+    const dx = boss.x - hero.x, dy = boss.y - hero.y, d = Math.hypot(dx, dy), n = Math.hypot(hero.fx, hero.fy);
+    return d <= exports.GOLEM_FINISHER.reach && n > 1e-8
+        && (d < 1e-8 || (dx * hero.fx + dy * hero.fy) / (d * n) >= .5);
+}
+function beginGolemExecution(hero, boss, lineBlocked = false) {
+    if (!canFinishGolem(hero, boss, lineBlocked))
+        return null;
+    const dx = boss.x - hero.x, dy = boss.y - hero.y, d = Math.hypot(dx, dy), n = Math.hypot(hero.fx, hero.fy);
+    return { kind: 'corpse-golem', targetId: boss.id, elapsed: 0, phase: 'approach',
+        extracted: false, heroX: hero.x, heroY: hero.y, targetX: boss.x, targetY: boss.y,
+        fx: d > 1e-8 ? dx / d : hero.fx / n, fy: d > 1e-8 ? dy / d : hero.fy / n };
+}
+const thresholds = Object.freeze([
+    [1, 'impact'], [2.6, 'pierced'], [2.85, 'hand-released'], [3.25, 'lamp-offered'],
+    [4.8, 'extracted'], [5.2, 'regripped'], [6.1, 'blade-pulled'], [6.8, 'finished'],
+].map(entry => Object.freeze(entry)));
+function advanceGolemExecution(input, dt, heroAlive = true) {
+    const state = { ...input }, events = [];
+    if (!Number.isFinite(dt) || dt <= 0 || state.phase === 'done' || state.phase === 'cancelled')
+        return { state, events };
+    if (!heroAlive) {
+        state.phase = 'cancelled';
+        events.push('cancelled');
+        return { state, events };
+    }
+    state.elapsed = Math.min(exports.GOLEM_FINISHER.duration, input.elapsed + dt);
+    for (const [time, event] of thresholds) {
+        if (input.elapsed < time && state.elapsed >= time) {
+            if (event === 'extracted') {
+                if (state.extracted)
+                    continue;
+                state.extracted = true;
+            }
+            events.push(event);
+        }
+    }
+    const t = state.elapsed;
+    state.phase = t < 1 ? 'approach' : t < 2.6 ? 'pin' : t < 2.85 ? 'release' : t < 3.25 ? 'offer' :
+        t < 4.8 ? 'drain' : t < 5.2 ? 'regrip' : t < 6.1 ? 'pull' : t < 6.8 ? 'return' : 'done';
+    return { state, events };
+}
+function golemFinisherFrame(e) {
+    const t = finisherTime(e);
+    return { kneel: ramp(t, 0, 1), open: ramp(t, 1, 2.6),
+        offer: ramp(t, 2.85, 3.25) * (1 - ramp(t, 4.8, 5.2)),
+        burn: ramp(t, 3.25, 4.8), fall: ramp(t, 4.8, 5.8), withdraw: ramp(t, 6.1, 6.8) };
+}
+function golemExecutionPresentation(e) {
+    const t = finisherTime(e), f = golemFinisherFrame(e), focus = ramp(t, 0, .8) * (1 - ramp(t, 6.1, 6.8));
+    return { pin: f.kneel, release: f.open, offer: f.offer, char: f.burn,
+        regrip: ramp(t, 4.8, 5.2), pull: ramp(t, 5.2, 6.1), back: f.withdraw,
+        cameraZoom: 1 + .09 * focus, cameraShake: 0 };
+}
+function stepCorpseGolem({ enemy: e, dt, player, map, damage, solid, blocked, allowAttack = true }) {
+    if (e.archetype !== 'corpse-golem')
+        return false;
+    if (e.hp <= 0 || e.mode === 'dead' || !Number.isFinite(dt) || dt <= 0)
+        return true;
+    e.cooldown = Math.max(0, e.cooldown - dt);
+    const before = e.timer;
+    e.timer += dt;
+    const dx = player.x - e.x, dy = player.y - e.y, d = Math.hypot(dx, dy);
+    if (e.mode === 'stagger') {
+        if (e.timer >= exports.CORPSE_GOLEM.stagger) {
+            e.mode = 'chase';
+            e.timer = 0;
+        }
+        return true;
+    }
+    function move(fx, fy, distance) {
+        const count = Math.max(1, Math.ceil(distance / .06)), step = distance / count;
+        for (let i = 0; i < count; i++) {
+            const x = e.x, y = e.y, X = x + fx * step, Y = y + fy * step, clear = exports.CORPSE_GOLEM.radius + .24 + .03;
+            if (!solid(X, e.y, map, exports.CORPSE_GOLEM.radius) && Math.hypot(X - player.x, e.y - player.y) >= clear)
+                e.x = X;
+            if (!solid(e.x, Y, map, exports.CORPSE_GOLEM.radius) && Math.hypot(e.x - player.x, Y - player.y) >= clear)
+                e.y = Y;
+            e.walkDistance += Math.hypot(e.x - x, e.y - y);
+        }
+    }
+    if (e.mode === 'windup') {
+        const a = exports.GOLEM_ATTACKS[e.golemAttack] ?? exports.GOLEM_ATTACKS.slam;
+        if (e.golemAttack === 'press') {
+            const elapsed = Math.max(0, Math.min(e.timer, .95) - Math.max(before, .45));
+            if (elapsed > 0)
+                move(e.fx, e.fy, elapsed * 1.6);
+        }
+        if (!e.hitFired && before < a.windup && e.timer >= a.windup) {
+            e.hitFired = true;
+            const X = player.x - e.x, Y = player.y - e.y, D = Math.hypot(X, Y);
+            if (D <= a.reach && (D < 1e-8 || (X * e.fx + Y * e.fy) / D >= Math.cos(a.arc * Math.PI / 360))
+                && !blocked(e, player, map))
+                damage(a.damage);
+            e.mode = 'recover';
+            e.timer = 0;
+            e.cooldown = exports.CORPSE_GOLEM.cooldown;
+        }
+        return true;
+    }
+    if (e.mode === 'recover') {
+        const a = exports.GOLEM_ATTACKS[e.golemAttack] ?? exports.GOLEM_ATTACKS.slam;
+        if (e.timer >= a.recover) {
+            e.mode = 'chase';
+            e.timer = 0;
+        }
+        return true;
+    }
+    if (e.mode === 'wait') {
+        if (d < 8) {
+            e.mode = 'chase';
+            e.timer = 0;
+        }
+        return true;
+    }
+    if (e.mode !== 'chase')
+        return true;
+    if (d > 1e-8) {
+        e.fx = dx / d;
+        e.fy = dy / d;
+    }
+    const names = ['slam', 'sweep', 'press'], index = Number.isSafeInteger(e.golemAttackIndex)
+        && e.golemAttackIndex >= 0 ? e.golemAttackIndex : 0, name = names[index % 3], a = exports.GOLEM_ATTACKS[name];
+    const startReach = a.reach + (name === 'press' ? .8 : 0) - .1;
+    if (allowAttack && e.cooldown <= 0 && d <= startReach && !blocked(e, player, map)) {
+        e.golemAttack = name;
+        e.golemAttackIndex = index + 1;
+        e.mode = 'windup';
+        e.timer = 0;
+        e.hitFired = false;
+        return true;
+    }
+    if (d > 1.3 && d < 10)
+        move(e.fx, e.fy, Math.min(exports.CORPSE_GOLEM.speed * dt, d - 1.3));
+    return true;
+}
+
+},
 "combat/enemy-roster.js":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -5044,6 +5224,73 @@ class CombatWorld {
     }
 }
 exports.CombatWorld = CombatWorld;
+
+},
+"game/golem-arena.js":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.GOLEM_BOUNDS = void 0;
+exports.golemArenaMap = golemArenaMap;
+exports.createGolemArena = createGolemArena;
+exports.GOLEM_BOUNDS = Object.freeze({ minX: 2.4, maxX: 13.6, minY: 2.4, maxY: 19.6 });
+function golemArenaMap() {
+    return { bounds: { ...exports.GOLEM_BOUNDS }, circles: [], rects: [
+            { minX: 2, maxX: 2.4, minY: 2, maxY: 20 },
+            { minX: 13.6, maxX: 14, minY: 2, maxY: 20 },
+            { minX: 2, maxX: 14, minY: 2, maxY: 2.4 },
+            { minX: 2, maxX: 14, minY: 19.6, maxY: 20 },
+            { minX: 2.4, maxX: 6.8, minY: 14.5, maxY: 14.75 },
+            { minX: 9.2, maxX: 13.6, minY: 14.5, maxY: 14.75 },
+        ] };
+}
+function createGolemArena(map, bossId) {
+    if (!Array.isArray(map?.rects) || !Number.isSafeInteger(bossId))
+        throw Error('Invalid golem arena owner');
+    const rects = map.rects;
+    if (map.rects !== rects || Object.isFrozen(rects))
+        throw Error('Arena requires stable mutable collision rectangles');
+    let status = 'waiting', inRoom = false;
+    const gate = { minX: 6.8, maxX: 9.2, minY: 14.5, maxY: 14.75, golemGate: true };
+    function sync() {
+        const i = map.rects.indexOf(gate), locked = status === 'fighting' || status === 'failed';
+        if (locked && i < 0) {
+            map.rects.push(gate);
+            map.golemRevision = (map.golemRevision ?? 0) + 1;
+        }
+        if (!locked && i >= 0) {
+            map.rects.splice(i, 1);
+            map.golemRevision = (map.golemRevision ?? 0) + 1;
+        }
+    }
+    const snapshot = () => ({ bossId, status, inRoom, active: status === 'fighting',
+        locked: status === 'fighting' || status === 'failed' });
+    return Object.freeze({
+        snapshot,
+        reset() { status = 'waiting'; inRoom = false; sync(); },
+        update(hero, boss) {
+            if (map.rects !== rects)
+                throw Error('Arena collision owner changed');
+            if (!boss || boss.id !== bossId)
+                throw Error('Golem arena lost its boss');
+            if (!hero || ![hero.x, hero.y, hero.lamp, boss.hp].every(Number.isFinite))
+                throw Error('Invalid arena state');
+            inRoom = hero.x >= 2.65 && hero.x <= 13.35 && hero.y >= 2.65 && hero.y <= 14.25;
+            if (status === 'fighting' && (hero.phase === 'dead' || hero.lamp <= 0))
+                status = 'failed';
+            if (status === 'waiting' && inRoom && hero.y <= 13.8 && hero.lamp > 0 && hero.phase === 'playing' && boss.hp > 0)
+                status = 'fighting';
+            if (status === 'fighting' && boss.hp <= 0 && !hero.execution && hero.lamp > 0 && hero.phase !== 'dead')
+                status = 'won';
+            sync();
+            if ((status === 'fighting' || status === 'failed') && hero.phase !== 'dead') {
+                hero.x = Math.max(2.65, Math.min(13.35, hero.x));
+                hero.y = Math.max(2.65, Math.min(14.25, hero.y));
+                inRoom = true;
+            }
+            return snapshot();
+        },
+    });
+}
 
 },
 "game/interaction-room-layout.js":function(require,module,exports){
