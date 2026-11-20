@@ -1,0 +1,12 @@
+{
+  "exitCode": 1,
+  "signal": null,
+  "error": null,
+  "totalFailures": 1,
+  "failures": [
+    {
+      "test": "not ok 989 - main simulation gate freezes world and drops prequeued commands while modal",
+      "context": "  ---\n  duration_ms: 30.037816\n  type: 'test'\n  location: '/home/runner/work/123456789/123456789/tests/relic-system.test.mjs:116:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    The expression evaluated to a falsy value:\n    \n      assert(source.includes('targeting.clear();relicWorld?.reset();manifest?.reset();'))\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: true\n  actual: false\n  operator: '=='\n  stack: |-\n    TestContext.<anonymous> (file:///home/runner/work/123456789/123456789/tests/relic-system.test.mjs:120:79)\n    async Test.run (node:internal/test_runner/test:1054:7)\n    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)"
+    }
+  ]
+}

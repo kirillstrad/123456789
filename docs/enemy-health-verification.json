@@ -7,7 +7,7 @@
     "browser": "success",
     "regression": "failure"
   },
-  "testedSourceCommit": "8c52fd06faf44d98af656549b2c1c56976df451e",
-  "workflowRun": "44734516302",
+  "testedSourceCommit": "a9f019c495d4463bd549316afd93ee98d2bf9eca",
+  "workflowRun": "44735537545",
   "humanVisualAcceptance": false
 }
