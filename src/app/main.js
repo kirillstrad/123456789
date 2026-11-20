@@ -72,7 +72,7 @@ function advanceWorld(seconds){
  try{for(let i=0;i<Math.round(seconds*60);i++)stepWorld(1/60);}finally{manualAdvance=previous;simLast=null;acc=0;}
  return true;
 }
-function resetWorld(){targeting.clear();enemyHealth.reset();relicWorld?.reset();manifest?.reset();combatDoor.cancel('reset');doorScene.reset();world.reset();applyLevelSpawn(world,selectedLevelId);ritualBonfire.reset();dashHud.ready=false;dashHud.at=-Infinity;effects.reset();fireHintLayer.clear();view={zoom:1,dx:0,dy:0};}
+function resetWorld(){targeting.clear();relicWorld?.reset();manifest?.reset();enemyHealth.reset();combatDoor.cancel('reset');doorScene.reset();world.reset();applyLevelSpawn(world,selectedLevelId);ritualBonfire.reset();dashHud.ready=false;dashHud.at=-Infinity;effects.reset();fireHintLayer.clear();view={zoom:1,dx:0,dy:0};}
 const fire=canvas(192,165),fg=fire.getContext('2d',{willReadFrequently:true}),fireASCII=new ASCII(out);
 const basePr=(x,y,z,cx=camera.x,cy=camera.y)=>[504+((x-cx)-(y-cy))*65*.76,430+((x-cx)+(y-cy))*65*.43-z*65*.87];
 const pr=(x,y,z,cx=camera.x,cy=camera.y)=>screenPoint(projectExecution(basePr(x,y,z,cx,cy),view),W);
