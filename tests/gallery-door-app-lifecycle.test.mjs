@@ -26,6 +26,7 @@ assert.ok(angle);
 function harness(){
  const context=vm.createContext({structuredClone,window:{},document:{hidden:false,activeElement:null}});
  const seed=`
+ const manifest={dismiss(){}};
  let mode='game',camera={x:3,y:4},view={zoom:1.2,dx:5,dy:6};
  let galleryScene=null,galleryCamera=null,galleryReturn=null,galleryTimings=null,galleryTime=0,galleryPlayer=null;
  let aimPoint={x:1,y:2},simLast=10,acc=.2,drawAt=20;

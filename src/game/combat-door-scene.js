@@ -1,4 +1,5 @@
 import {doorAssembly} from '../gallery/models/articulated-door.js';
+import {createNaveInterior} from '../interior/nave-interior.js';
 import {checkDoorSweep} from '../interaction/door-sweep.js';
 import {ROOM_DOORS,ROOM_WORLD_BOUNDS,ROOM_ROUTE_BOUNDS} from './interaction-room-layout.js';
 export const COMBAT_DOORS=ROOM_DOORS;
@@ -6,6 +7,7 @@ const rect=c=>({minX:Math.min(...c.points.map(p=>p[0])),maxX:Math.max(...c.point
 const polygon=r=>({kind:'polygon',points:[[r.minX,r.minY],[r.maxX,r.minY],[r.maxX,r.maxY],[r.minX,r.maxY]],minZ:0,maxZ:3});
 export function createCombatDoorScene(base,definitions=COMBAT_DOORS){
  if(!base||!Array.isArray(base.circles)||!Array.isArray(base.rects)||!Array.isArray(definitions)||!definitions.length)throw Error('Invalid combat map');
+ const interior=definitions===COMBAT_DOORS?createNaveInterior({circles:base.circles,rects:base.rects}):null;
  let revision=0,actors=()=>[];const seen=new Set();
  const doors=definitions.map(d=>{
   if(!d||typeof d.id!=='string'||!d.id||seen.has(d.id)||![d.x,d.y,d.yaw??0].every(Number.isFinite)||(d.yaw??0)%90)throw Error('Invalid door definition');seen.add(d.id);
@@ -16,6 +18,7 @@ export function createCombatDoorScene(base,definitions=COMBAT_DOORS){
  });
  const byId=new Map(doors.map(d=>[d.target.id,d])),matches=base.rects.filter(r=>r.minX===7.15&&r.maxX===8.85&&r.minY===2.52&&r.maxY===3.08);if(matches.length!==1)throw Error('Nave gate collider changed; review integration');
  const staticRects=base.rects.filter(r=>r!==matches[0]).map(r=>({...r})),map={circles:base.circles.map(c=>({...c})),rects:[],bounds:{...ROOM_WORLD_BOUNDS}};
+ if(interior)staticRects.push(...interior.rects);
  const physical=d=>[...d.mesh.frameColliders,...d.mesh.leafColliders].filter(c=>c.minZ<2.2&&c.maxZ>0);
  function obstacles(d){return[...staticRects.map(polygon),...map.circles.map(c=>({kind:'circle',center:[c.x,c.y],radius:c.r,minZ:0,maxZ:3})),...doors.filter(o=>o!==d).flatMap(physical),...actors().map(a=>({kind:'circle',center:[a.x,a.y],radius:a.radius??.24,minZ:0,maxZ:a.height??2.2}))];}
  function sync(){map.rects.splice(0,map.rects.length,...staticRects,...doors.flatMap(d=>d.status==='opening'?[...d.closed.frameColliders.map(rect),...d.reservation]:physical(d).map(rect)));}
@@ -24,6 +27,7 @@ export function createCombatDoorScene(base,definitions=COMBAT_DOORS){
  function publish(d){d.mesh=d.assembly.mesh(d.progress,d.side);d.target.parts.splice(d.closed.frameParts.length,d.target.parts.length-d.closed.frameParts.length,...d.mesh.leafParts);}
  sync();
  return Object.freeze({map,targets:doors.map(d=>d.target),get parts(){return doors.flatMap(d=>d.target.parts);},
+  interior,
   setActors(provider){if(typeof provider!=='function')throw Error('Invalid door actor provider');actors=provider;},highlight(id){for(const d of doors)shade(d,id);},
   getTarget:id=>byId.get(id)?.target??null,facePoint:id=>{const d=byId.get(id),p=d?.assembly.world([0,0,0]);return p?{x:p[0],y:p[1]}:null;},
   approachCandidates(id,actor){const d=byId.get(id);if(!d)return[];const dot=(actor.x-d.transform.x)*d.normal.x+(actor.y-d.transform.y)*d.normal.y,side=dot<0?-1:1;return[{side,goal:d.goal(side)},{side:-side,goal:d.goal(-side)}];},
