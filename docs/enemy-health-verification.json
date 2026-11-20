@@ -1,16 +1,13 @@
 {
-  "scope": "patches-1-2-3-4-and-visual-ember",
   "status": "automated-checks-passed",
   "checks": {
-    "migration": "success",
     "build": "success",
     "unit": "success",
+    "integration": "success",
     "browser": "success",
-    "regression": "success",
-    "integration": "success"
+    "regression": "success"
   },
-  "inputCommit": "b31cf44a0d6f51734122829106326132efa30b28",
-  "testedSourceCommit": "e579c3bd9db5b84782fe1f6585f6c4b597c8d518",
-  "workflowRun": "44791296526",
+  "testedSourceCommit": "90b1222991520e891857bffbffd7556826dfdf5e",
+  "workflowRun": "44800251751",
   "humanVisualAcceptance": false
 }
