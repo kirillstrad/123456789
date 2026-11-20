@@ -1,3 +1,6 @@
+// GOLEM_TRIAL_APP_V1
+import {captureGolemLoadout,restoreGolemLoadout} from '../game/golem-trial-state.js';
+import {paintGolemTrialHud} from '../ui/golem-trial-hud.js';
 // VISUAL_EMBER_ASCII_V1
 import {shadeAmberCell} from '../render/amber-cell.js';
 import {arrowParts} from '../render/marrow-archer.js';
@@ -57,6 +60,7 @@ const enemyHealth=createEnemyHealthRuntime({diagnosticsTarget:window});
 let mode='menu',selected=0,menuPage=false,time=0,last=0,drawAt=0,simLast=null,acc=0,paused=false,frozen=false,endTime=0,aimPoint=null,camera={x:8,y:12},view={zoom:1,dx:0,dy:0},renderCount=0,fireAt=-1,coneBoost=0;
 let manualAdvance=false;
 let selectedLevelId='test-chamber';
+let golemCheckpoint=null;
 let manifest=null;
 let relicWorld=typeof createRelicWorld==='function'?createRelicWorld({
  map:doorScene.map,
@@ -76,7 +80,7 @@ function advanceWorld(seconds){
  try{for(let i=0;i<Math.round(seconds*60);i++)stepWorld(1/60);}finally{manualAdvance=previous;simLast=null;acc=0;}
  return true;
 }
-function resetWorld(){targeting.clear();relicWorld?.reset();manifest?.reset();enemyHealth.reset();combatDoor.cancel('reset');doorScene.reset();world.reset();applyLevelSpawn(world,selectedLevelId);ritualBonfire.reset();dashHud.ready=false;dashHud.at=-Infinity;effects.reset();fireHintLayer.clear();view={zoom:1,dx:0,dy:0};}
+function resetWorld(){targeting.clear();relicWorld?.reset();manifest?.reset();enemyHealth.reset();combatDoor.cancel('reset');doorScene.reset();world.reset();applyLevelSpawn(world,selectedLevelId);if(selectedLevelId==='golem-trial'&&golemCheckpoint){restoreGolemLoadout(world.current,golemCheckpoint);world.previous=world.snapshot();}ritualBonfire.reset();dashHud.ready=false;dashHud.at=-Infinity;effects.reset();fireHintLayer.clear();view={zoom:1,dx:0,dy:0};}
 const fire=canvas(192,165),fg=fire.getContext('2d',{willReadFrequently:true}),fireASCII=new ASCII(out);
 const basePr=(x,y,z,cx=camera.x,cy=camera.y)=>[504+((x-cx)-(y-cy))*65*.76,430+((x-cx)+(y-cy))*65*.43-z*65*.87];
 const pr=(x,y,z,cx=camera.x,cy=camera.y)=>screenPoint(projectExecution(basePr(x,y,z,cx,cy),view),W);
@@ -86,8 +90,8 @@ function part(ctx,p,s,isMask){if(p.alpha===0)return;const previousAlpha=ctx.glob
 const smooth=x=>{x=Math.max(0,Math.min(1,x));return x*x*(3-2*x);};
 function render(s=world.snapshot(),galleryFrame=null){
  if(!galleryFrame){manifest?.advance(performance.now());manifest?.update(s);}
- const rite=galleryFrame?null:ritualBonfire.frame();
- const ritualArt=galleryFrame?null:ritualBonfire.art(s,ritualInputAllowed()&&!targeting.current());
+ const rite=galleryFrame||selectedLevelId==='golem-trial'?null:ritualBonfire.frame();
+ const ritualArt=galleryFrame||selectedLevelId==='golem-trial'?null:ritualBonfire.art(s,ritualInputAllowed()&&!targeting.current());
  if(!galleryFrame){
   s=combatDoor.decorate(s);
   s={...s,interactionAnimation:rite??s.interactionAnimation,comboEdgeActive:s.phase==='playing'&&world.actions.canContinue()};
@@ -100,7 +104,7 @@ function render(s=world.snapshot(),galleryFrame=null){
  camera={x:s.cameraX,y:s.cameraY};view={zoom:v.zoom,dx:(504-focus[0])*(v.zoom-1)+v.weight*(504-focus[0])*.3+v.shakeX,dy:(430-focus[1])*(v.zoom-1)+v.weight*(430-focus[1])*.3+v.shakeY};
  const enemyGroups=galleryFrame?[]:enemyHealth.geometry(s,enemyParts);
  const drawState={...s,visualZoom:view.zoom},galleryDraw=galleryFrame?galleryRenderLayers(galleryFrame):null,parts=galleryDraw?[...galleryDraw.objects,...hero.parts].sort((a,b)=>a.d-b.d):[...env.parts,...enemyGroups.flatMap(g=>g.parts),...arrowParts(s.arrows??[]),...hero.parts,...visual.parts,...(ritualArt?.parts??[])].sort((a,b)=>a.d-b.d);
- if(!galleryFrame&&relicWorld){parts.push(...relicWorld.parts(s));parts.sort((a,b)=>a.d-b.d);}
+ if(!galleryFrame&&relicWorld&&selectedLevelId!=='golem-trial'){parts.push(...relicWorld.parts(s));parts.sort((a,b)=>a.d-b.d);}
  targeting.frame({parts,targets:galleryFrame?.targets??env.targets??[],project:pr,zoom:view.zoom,active:(mode==='gallery'&&!galleryPlayer)||((mode==='game'||mode==='gallery')&&s.phase==='playing')});
  const lamp=pr(...hero.lamp),lampProfile=lampLighting(s.lamp,galleryFrame&&!galleryPlayer?'playing':s.phase),radius=146*65/94*1.2*view.zoom*lampProfile.radiusScale,power=lampProfile.power;
  if(!galleryFrame){
@@ -162,6 +166,7 @@ function render(s=world.snapshot(),galleryFrame=null){
 
  out.restore();
  if(!galleryFrame&&mode==='game'&&!manifest?.blocking())enemyHealth.paint(out,{width:W,height:H});
+ if(!galleryFrame&&selectedLevelId==='golem-trial')paintGolemTrialHud(out,s,{width:W,enabled:mode==='game'&&!manifest?.blocking()&&!document.hidden,available:world.executionAvailable()});
  if(!galleryFrame)manifest?.text(out,COLS,frameRows,frameHeight);
  renderCount++;
  renderCount++;
@@ -179,11 +184,11 @@ function rebuildSelectedLevel(){
  manifest?.dismiss();combatDoor.cancel('level-change');targeting.clear();
  doorScene=next.doorScene;env=next.env;worldReference.replace(nextWorld);enemyHealth.reset();
  fireLighting=findCombatLights(doorScene);ritualBonfire=createRitualBonfire(world,doorScene.map);
- relicWorld=createRelicWorld({map:doorScene.map,openDialogue:value=>window.__ASH_MANIFEST__?.openDialogue(value),openReading:value=>window.__ASH_MANIFEST__?.openReading(value),setObjective:value=>window.__ASH_MANIFEST__?.setObjective(value)});
+ relicWorld=selectedLevelId==='golem-trial'?null:createRelicWorld({map:doorScene.map,openDialogue:value=>window.__ASH_MANIFEST__?.openDialogue(value),openReading:value=>window.__ASH_MANIFEST__?.openReading(value),setObjective:value=>window.__ASH_MANIFEST__?.setObjective(value)});
  combatDoor=createCombatDoorController({world,scene:doorScene,targeting,active:()=>mode==='game'&&(!frozen||manualAdvance)});
  keys.clear();commands.length=0;aimPoint=null;simLast=null;acc=0;drawAt=0;
 }
-function launchLevel(id){gameLevel(id);const previous=selectedLevelId;selectedLevelId=id;try{start();}catch(error){selectedLevelId=previous;throw error;}return {id:selectedLevelId};}
+function launchLevel(id){gameLevel(id);const previous=selectedLevelId,oldCheckpoint=golemCheckpoint;if(id==='golem-trial'&&previous!=='golem-trial')golemCheckpoint=captureGolemLoadout(world.current);selectedLevelId=id;try{start();}catch(error){selectedLevelId=previous;golemCheckpoint=oldCheckpoint;throw error;}return {id:selectedLevelId};}
 window.__ASH_LEVELS__=Object.freeze({list:()=>GAME_LEVELS.map(l=>({...l})),current:()=>({...gameLevel(selectedLevelId)}),start:launchLevel,menu:()=>window.__ASH_THRONE__?.levels?.()});
 function startBoneboundTrial(){return launchLevel('bonebound-trial');}
 window.__ASH_BESTIARY__=Object.freeze({startTrial:startBoneboundTrial});
@@ -194,7 +199,7 @@ function resume(){targeting.clear();if(mode==='gallery')closeGallery();mode='gam
 function home(){targeting.clear();if(mode==='gallery')closeGallery();resetWorld();mode='menu';selected=0;menuPage=false;keys.clear();commands.length=0;}
 function pause(){if(mode!=='game')return;enemyHealth.reset();manifest?.dismiss();combatDoor.cancel('pause');targeting.clear();mode='pause';selected=0;keys.clear();commands.length=0;simLast=null;acc=0;}
 const point=e=>{const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*864/r.height};};
-const ritualInputAllowed=()=>!manifest?.blocking()&&interactionInputAllowed({mode:interactionContext(),actor:world.current,frozen,hidden:document.hidden,queued:commands.length>0});
+const ritualInputAllowed=()=>selectedLevelId!=='golem-trial'&&!manifest?.blocking()&&interactionInputAllowed({mode:interactionContext(),actor:world.current,frozen,hidden:document.hidden,queued:commands.length>0});
 window.addEventListener('keydown',event=>{
  if(event.code!=='KeyF'||event.repeat||event.defaultPrevented||mode!=='game'||event.target?.isContentEditable||event.target?.closest?.('input,select,textarea,button,[contenteditable]'))return;
  if(ritualInputAllowed()&&!targeting.current()&&relicWorld?.press(world.current)){event.preventDefault();event.stopImmediatePropagation();return;}
@@ -204,7 +209,7 @@ window.addEventListener('keydown',event=>{
 },true);
 window.addEventListener('keydown',e=>{if(e.target?.isContentEditable||e.target?.closest?.('input,select,textarea,button,[contenteditable]'))return;if(mode==='gallery'){if(e.code==='Escape'){closeGallery();e.preventDefault();}else if(galleryPlayer&&['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)){galleryPlayer.cancelApproach('manual');keys.add(e.code);e.preventDefault();}return;}if(mode!=='game'){if(e.code==='Escape'&&menuPage){menuPage=false;e.preventDefault();return;}if(e.code==='Escape'&&mode==='pause'){resume();e.preventDefault();return;}if(e.code==='ArrowDown'||e.code==='ArrowUp'){selected=(selected+(e.code==='ArrowDown'?1:items().length-1))%items().length;e.preventDefault();}if(e.code==='Enter'&&!e.repeat){if(menuPage)menuPage=false;else items()[selected][1]();e.preventDefault();}return;}if(e.code==='Escape'){pause();e.preventDefault();return;}if(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)){keys.add(e.code);e.preventDefault();}if((e.code==='ShiftLeft'||e.code==='ShiftRight')&&!e.repeat&&!frozen&&!world.current.dash){if(commands.length<8)commands.push({kind:'dash',direction:movementInput(keys)});e.preventDefault();return;}if(e.code==='KeyE'&&!e.repeat&&!frozen&&!world.current.dash){commands.push({kind:'sweep',aim:unpr(aimPoint)});e.preventDefault();}});
 window.addEventListener('keyup',e=>keys.delete(e.code));window.addEventListener('blur',()=>{keys.clear();combatDoor.cancel('blur');});cv.addEventListener('pointermove',e=>{aimPoint=point(e);if(mode!=='game'&&mode!=='gallery'&&!menuPage){const i=Math.round((aimPoint.y-414)/49);if(i>=0&&i<items().length&&aimPoint.x>220&&aimPoint.x<788)selected=i;}});cv.addEventListener('pointerleave',()=>aimPoint=null);cv.addEventListener('pointerdown',e=>{cv.focus();if(mode==='gallery')return;const p=point(e);if(mode!=='game'){if(e.button!==0)return;if(menuPage){menuPage=false;return;}const i=Math.round((p.y-414)/49);if(i>=0&&i<items().length&&p.x>220&&p.x<788)items()[i][1]();return;}if(frozen||world.current.dash||p.y>=720)return;e.preventDefault();const kind=e.button===0?'light':e.button===2?'heavy':e.button===1?'sweep':null;if(kind&&commands.length<8)commands.push({kind,aim:unpr(p)});});cv.addEventListener('contextmenu',e=>e.preventDefault());cv.addEventListener('auxclick',e=>e.preventDefault());document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();simLast=null;});
-$('menuButton').onclick=()=>mode==='gallery'?closeGallery():mode==='pause'?resume():pause();$('restart').onclick=start;$('bestiaryTrial').onclick=startBoneboundTrial;$('undeadTrial').onclick=()=>launchLevel('undead-trial');$('archerTrial').onclick=()=>launchLevel('archer-trial');$('freeze').onclick=()=>{if(mode!=='game')return;frozen=!frozen;combatDoor.cancel('freeze');keys.clear();commands.length=0;simLast=null;acc=0;$('freeze').textContent=frozen?'RESUME':'FREEZE FRAME';cv.focus();};$('perfToggle').onclick=()=>$('perf').hidden=!$('perf').hidden;$('settingsClose').onclick=()=>$('settings').hidden=true;
+$('menuButton').onclick=()=>mode==='gallery'?closeGallery():mode==='pause'?resume():pause();$('restart').onclick=start;$('bestiaryTrial').onclick=startBoneboundTrial;$('undeadTrial').onclick=()=>launchLevel('undead-trial');$('archerTrial').onclick=()=>launchLevel('archer-trial');const golemButton=document.createElement('button');golemButton.id='golemTrial';golemButton.textContent='GOLEM TRIAL';golemButton.onclick=()=>launchLevel('golem-trial');$('archerTrial').after(golemButton);$('freeze').onclick=()=>{if(mode!=='game')return;frozen=!frozen;combatDoor.cancel('freeze');keys.clear();commands.length=0;simLast=null;acc=0;$('freeze').textContent=frozen?'RESUME':'FREEZE FRAME';cv.focus();};$('perfToggle').onclick=()=>$('perf').hidden=!$('perf').hidden;$('settingsClose').onclick=()=>$('settings').hidden=true;
 function save(blob,name){const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);}
 function getReport(){const a=report.frames.map(f=>f.frameMs).sort((a,b)=>a-b),mean=a.reduce((n,x)=>n+x,0)/Math.max(1,a.length);return{...report,gallery:mode==='gallery'?{stage:galleryPlayer?'walk-test':'render-preview',...galleryScene.stats(),camera:{...galleryCamera},player:galleryPlayer?.snapshot()??null,timings:galleryTimings}:null,summary:{samples:a.length,meanMs:mean,fps:mean?1000/mean:null,p95Ms:a[Math.floor((a.length-1)*.95)]??null},state:combatDoor.decorate(world.snapshot()),combatDoor:{scene:doorScene.snapshot(),...combatDoor.snapshot()},interactionTarget:targeting.current(),interactionIntent:targeting.intent(),interactionApproach:galleryPlayer?.approach()??null,interactionSession:galleryPlayer?.interaction()??null,interactionEvents:galleryPlayer?.interactionEvents()??[],lampLight:lampLighting(world.current.lamp,world.current.phase),events:world.events,executionEffects:effects.snapshot(),executionOptions:{...executionOptions},viewport:window.__ASH_VIEWPORT__?.metrics(),notes:['Only LAMP represents hero life. There is no separate HEALTH pool or bar.','Canvas2D cell lighting is not pixel-identical to the old WebGL pass.','Target 30 FPS is not a hardware performance guarantee.','F6 camera / F7 shake / F8 blood. Partial iteration-4 preview; source commit identifies content.']};}
 $('report').onclick=()=>save(new Blob([JSON.stringify(getReport(),null,2)],{type:'application/json'}),'ash-iron-4a-report.json');$('export').onclick=()=>cv.toBlob(b=>b&&save(b,'ash-iron-4a-frame.png'));
