@@ -1,10 +1,18 @@
+import { LAMP_LIFE, lampAfterDamage, lampCostPreview } from '../combat/lamp-life.js';
+import { canExecute, beginExecution, advanceExecution, executionLampAfterExtraction, executionTargetWeak } from '../combat/execution.js';
+import { planDash, advanceDash, dashInvulnerable } from '../combat/ash-dash.js';
+import { selectStrikeTargets } from '../combat/mechanics-4c.js';
+import { enemyDefinition, makeBestiaryEnemy } from '../combat/bestiary.js';
+import { enemiesOf, aliveEnemies, enemyRadius, enemyMaxHp, actorCanOccupy, cloneEnemyRoster, stepEnemyGroup } from '../combat/enemy-roster.js';
 import { createMotion, velocity, finishMotion, interpolateMotion } from '../animation/motion.js';
+import { advanceWorldFootContacts, footContactsEnabled, interpolateFootContacts } from '../animation/foot-contact-world.js';
+import { captureCombatFeet, bindCombatEntry, cloneCombatEntry, entryMatches } from '../animation/combat-entry.js';
 import { COMBAT, SPARKS } from '../combat/config.js';
 import { ActionMachine } from '../combat/action-machine.js';
 import { SparkSystem } from '../combat/sparks.js';
 import { makeEnemy, enemyStep } from '../combat/enemy.js';
-import { OBSTACLES, solid, blocked, inArc } from '../combat/geometry.js';
-function initial() { return { x: 8, y: 12, fx: 0, fy: -1, time: 0, walkDistance: 0, moving: false, motion: createMotion(), lamp: 100, cameraX: 8, cameraY: 12, phase: 'playing', action: null, sweepProgress: null, enemy: makeEnemy(), particles: [], cone: null, hitReaction: 0, deathTime: 0, note: 'Approach the warden. LMB light / RMB heavy / E sparks.' }; }
+import { OBSTACLES, solid, blocked } from '../combat/geometry.js';
+function initial() { const enemy = makeEnemy(); return { x: 8, y: 12, fx: 0, fy: -1, time: 0, walkDistance: 0, moving: false, motion: createMotion(), footContacts: null, combatEntry: null, dash: null, dashCooldown: 0, execution: null, interaction: null, lamp: LAMP_LIFE.max, cameraX: 8, cameraY: 12, phase: 'playing', action: null, sweepProgress: null, enemy, enemies: [enemy], particles: [], cone: null, hitReaction: 0, deathTime: 0, note: 'Approach the warden. LMB light / RMB heavy / E sparks.' }; }
 export class CombatWorld {
     current = initial();
     previous = initial();
@@ -13,51 +21,190 @@ export class CombatWorld {
     events = [];
     sweepElapsed = null;
     sweepFired = false;
+    dashSerial = 0;
+    interactionSerial = 0;
     map;
     tipProvider;
     constructor(map = OBSTACLES, tipProvider = null) { this.map = map; this.tipProvider = tipProvider; }
-    reset() { this.current = initial(); this.previous = initial(); this.actions.clear(); this.sparks.clear(); this.events = []; this.sweepElapsed = null; this.sweepFired = false; }
+    reset() { this.current = initial(); this.previous = initial(); this.actions.clear(); this.sparks.clear(); this.events = []; this.sweepElapsed = null; this.sweepFired = false; this.dashSerial = 0; }
     record(event) { this.events.push({ ...event, time: this.current.time }); if (this.events.length > 400)
         this.events.shift(); }
-    move(dx, dy) { const s = this.current, e = s.enemy, ox = s.x, oy = s.y, actorFree = (x, y) => e.hp <= 0 || Math.hypot(x - e.x, y - e.y) > .59; if (!solid(s.x + dx, s.y, this.map) && actorFree(s.x + dx, s.y))
+    move(dx, dy) { const s = this.current, ox = s.x, oy = s.y, actorFree = (x, y) => actorCanOccupy(s, x, y); if (!solid(s.x + dx, s.y, this.map) && actorFree(s.x + dx, s.y))
         s.x += dx; if (!solid(s.x, s.y + dy, this.map) && actorFree(s.x, s.y + dy))
         s.y += dy; const distance = Math.hypot(s.x - ox, s.y - oy); s.walkDistance += distance; return distance; }
-    hooks() { return { position: () => this.current, facing: () => ({ x: this.current.fx, y: this.current.fy }), lunge: (dx, dy) => { this.move(dx, dy); }, hit: a => { const s = this.current, e = s.enemy; if (e.hp <= 0 || a.hitIds.has(e.id) || !inArc(s, e, { x: a.fx, y: a.fy }, COMBAT.reach, COMBAT.arcDegrees) || blocked(s, e, this.map))
-            return; a.hitIds.add(e.id); const amount = a.kind === 'heavy' ? COMBAT.heavyDamage : COMBAT.lightDamage; e.hp = Math.max(0, e.hp - amount); e.mode = e.hp <= 0 ? 'dead' : 'stagger'; e.timer = 0; s.note = e.hp <= 0 ? 'The nave is silent.' : a.kind === 'heavy' ? 'Heavy iron finds its mark.' : 'Iron finds its mark.'; this.record({ type: 'hit', amount, attackId: a.id, targetId: e.id }); this.sparks.spawn([e.x, e.y, .5], a.kind === 'heavy' ? 12 : 6, 1.3); if (e.hp <= 0) {
+    hooks() { return { position: () => this.current, facing: () => ({ x: this.current.fx, y: this.current.fy }), lunge: (dx, dy) => { this.move(dx, dy); }, hit: a => { const s = this.current; let struck = false; for (const e of selectStrikeTargets(s, { x: a.fx, y: a.fy }, a.kind, enemiesOf(s), this.map, a.hitIds)) {
+            struck = true;
+            a.hitIds.add(e.id);
+            const amount = a.kind === 'heavy' ? COMBAT.heavyDamage : COMBAT.lightDamage;
+            e.hp = Math.max(0, e.hp - amount);
+            e.mode = e.hp <= 0 ? 'dead' : 'stagger';
+            e.timer = 0;
+            this.record({ type: 'hit', amount, attackId: a.id, targetId: e.id });
+            this.sparks.spawn([e.x, e.y, .5], a.kind === 'heavy' ? 12 : 6, 1.3);
+            if (e.hp <= 0)
+                this.record({ type: 'enemy-dead', targetId: e.id });
+        } if (struck && !aliveEnemies(s).length) {
             s.phase = 'won';
-            this.record({ type: 'enemy-dead', targetId: e.id });
+            s.note = 'The nave is silent.';
         } } }; }
-    attack(command) { if (this.current.phase !== 'playing' || this.sweepElapsed !== null)
-        return false; const started = this.actions.started, ok = this.actions.request(command, this.hooks()); if (this.actions.started !== started)
-        this.record({ type: 'strike-start', attackId: this.actions.current?.id }); this.sync(); return ok; }
-    sweep(aim = null) { const s = this.current; if (s.phase !== 'playing' || this.actions.current || this.sweepElapsed !== null)
-        return false; if (aim) {
+    setEncounter(enemies) { const s = this.current; if (s.phase !== 'playing' || !Number.isFinite(s.lamp) || s.lamp <= 0)
+        throw Error('Actor is not alive'); if (s.interaction || s.execution || s.dash || this.actions.current || this.sweepElapsed !== null)
+        throw Error('Encounter busy'); if (!enemies.length)
+        throw Error('Empty encounter'); const ids = new Set(); for (const e of enemies) {
+        enemyDefinition(e.archetype);
+        if (!Number.isSafeInteger(e.id) || e.id < 0 || ids.has(e.id) || ![e.x, e.y, e.hp, enemyMaxHp(e), enemyRadius(e)].every(Number.isFinite) || e.hp <= 0 || e.hp > enemyMaxHp(e) || enemyRadius(e) <= 0)
+            throw Error('Invalid enemy');
+        if (solid(e.x, e.y, this.map, enemyRadius(e)) || Math.hypot(e.x - s.x, e.y - s.y) < enemyRadius(e) + .24)
+            throw Error('Blocked spawn');
+        ids.add(e.id);
+    } for (let i = 0; i < enemies.length; i++)
+        for (let j = i + 1; j < enemies.length; j++)
+            if (Math.hypot(enemies[i].x - enemies[j].x, enemies[i].y - enemies[j].y) < enemyRadius(enemies[i]) + enemyRadius(enemies[j]))
+                throw Error('Overlapping spawns'); const roster = enemies.map(e => ({ ...e })); this.sparks.clear(); this.events = []; this.current = { ...s, enemies: roster, enemy: roster[0], phase: 'playing', particles: [], cone: null }; this.previous = this.snapshot(); }
+    startBoneboundTrial() { const chosen = []; for (const [x, y] of [[8.7, 8.1], [7, 8], [10.1, 7.8], [7, 10], [10, 10], [8, 6.5]]) {
+        if (chosen.length === 3)
+            break;
+        const e = makeBestiaryEnemy('bonebound', chosen.length + 1, x, y);
+        if (!solid(e.x, e.y, this.map, enemyRadius(e)) && Math.hypot(e.x - this.current.x, e.y - this.current.y) > 1.5 && chosen.every(o => Math.hypot(o.x - e.x, o.y - e.y) > enemyRadius(o) + enemyRadius(e)))
+            chosen.push(e);
+    } if (chosen.length !== 3)
+        throw Error('No clear trial spawns'); this.setEncounter(chosen); }
+    startUndeadTrial() { const kinds = ['bonebound', 'ossuary-guard', 'gravebearer', 'bloated-remnant', 'ashbound'], positions = [[8.7, 8.1], [7, 8], [10.1, 7.8], [7, 10], [10, 10]]; this.setEncounter(kinds.map((kind, i) => makeBestiaryEnemy(kind, i + 1, positions[i][0], positions[i][1]))); }
+    stepEnemies(dt, excludeId = null, landing = null) { stepEnemyGroup(this.current, dt, this.map, n => this.damage(n), enemyStep, excludeId, landing); }
+    beginInteraction(kind) {
+        const s = this.current;
+        if (!['door', 'ignite', 'campfire'].includes(kind) || s.phase !== 'playing' || !Number.isFinite(s.lamp) || s.lamp <= 0 || s.interaction || s.execution || s.dash || this.actions.current || this.sweepElapsed !== null || s.hitReaction > 0)
+            return null;
+        const id = ++this.interactionSerial;
+        s.interaction = { id, kind, lastEmberUsed: false, costPaid: false, recoveryGranted: 0 };
+        s.moving = false;
+        s.motion = createMotion(s.fx, s.fy);
+        s.footContacts = null;
+        s.combatEntry = null;
+        this.record({ type: 'interaction-start', interactionId: id });
+        this.sync();
+        return id;
+    }
+    previewLampCost(cost) { return this.current.phase === 'playing' ? lampCostPreview(this.current.lamp, cost) : null; }
+    spendInteractionLamp(id, cost) {
+        const s = this.current, i = s.interaction;
+        if (i?.kind === 'ignite')
+            return false;
+        const p = this.previewLampCost(cost);
+        if (s.phase !== 'playing' || !i || i.id !== id || i.costPaid || !p)
+            return false;
+        const before = s.lamp;
+        s.lamp = p.remaining;
+        s.interaction = { ...i, costPaid: true, lastEmberUsed: i.lastEmberUsed || (cost > 0 && s.lamp <= LAMP_LIFE.lastEmber) };
+        s.note = p.warning ?? 'The lamp gives its fire.';
+        this.record({ type: 'lamp-spent', interactionId: id, amount: before - s.lamp });
+        return true;
+    }
+    restoreInteractionLamp(id, total) {
+        const s = this.current, i = s.interaction;
+        if (s.phase !== 'playing' || s.lamp <= 0 || !i || i.id !== id || i.kind !== 'campfire' || !Number.isFinite(total) || total < 0)
+            return false;
+        const granted = Math.min(LAMP_LIFE.max, total), delta = granted - i.recoveryGranted;
+        if (delta <= 0)
+            return false;
+        const before = s.lamp;
+        s.lamp = Math.min(LAMP_LIFE.max, s.lamp + delta);
+        s.interaction = { ...i, recoveryGranted: granted };
+        this.record({ type: 'lamp-restored', interactionId: id, amount: s.lamp - before });
+        return true;
+    }
+    finishInteraction(id) { const s = this.current; if (s.phase !== 'playing' || !s.interaction || s.interaction.id !== id)
+        return false; s.interaction = null; this.record({ type: 'interaction-end', interactionId: id }); this.sync(); return true; }
+    executionTargetReady() { const s = this.current; return s.phase === 'playing' && !s.interaction && !s.execution && enemiesOf(s).some(e => executionTargetWeak({ ...e, maxHp: enemyMaxHp(e) })); }
+    executionTarget() { const s = this.current; return aliveEnemies(s).filter(e => canExecute({ ...s, busy: !!s.interaction || !!s.execution || !!s.dash || !!this.actions.current || this.sweepElapsed !== null || s.hitReaction > 0 }, { ...e, maxHp: enemyMaxHp(e) }, blocked(s, e, this.map))).sort((a, b) => Math.hypot(a.x - s.x, a.y - s.y) - Math.hypot(b.x - s.x, b.y - s.y) || a.id - b.id)[0] ?? null; }
+    executionAvailable() { return this.executionTarget() !== null; }
+    execute() { const s = this.current, target = this.executionTarget(); if (!target)
+        return false; const execution = beginExecution({ ...s, busy: false }, { ...target, maxHp: enemyMaxHp(target) }, blocked(s, target, this.map)); if (!execution)
+        return false; s.execution = execution; target.mode = 'stagger'; target.timer = 0; this.actions.clear(); s.fx = execution.fx; s.fy = execution.fy; s.motion = createMotion(s.fx, s.fy); s.moving = false; s.footContacts = null; s.combatEntry = null; this.record({ type: 'execution-start', targetId: target.id }); this.sync(); return true; }
+    stepExecution(dt) { const s = this.current, entry = s.execution; if (!entry)
+        return; const target = enemiesOf(s).find(e => e.id === entry.targetId); if (!target || (!entry.extracted && (target.hp <= 0 || Math.hypot(target.x - entry.targetX, target.y - entry.targetY) > .05))) {
+        this.record({ type: 'execution-cancelled', targetId: entry.targetId });
+        s.execution = null;
+        if (!aliveEnemies(s).length)
+            s.phase = 'won';
+        this.sync();
+        return;
+    } this.stepEnemies(dt, entry.targetId); if (s.phase !== 'playing') {
+        this.sync();
+        return;
+    } const result = advanceExecution(entry, dt, s.lamp > 0); s.execution = result.state; s.fx = entry.fx; s.fy = entry.fy; for (const event of result.events) {
+        this.record({ type: 'execution-event', targetId: entry.targetId, executionEvent: event });
+        if (event === 'extracted' && s.lamp > 0) {
+            target.hp = 0;
+            target.mode = 'dead';
+            target.charred = true;
+            target.timer = 0;
+            s.lamp = executionLampAfterExtraction(s.lamp);
+            this.record({ type: 'enemy-dead', targetId: entry.targetId });
+        }
+        if (event === 'finished') {
+            this.record({ type: 'execution-end', targetId: entry.targetId });
+            s.execution = null;
+            if (!aliveEnemies(s).length)
+                s.phase = 'won';
+        }
+    } finishMotion(s.motion ??= createMotion(), dt, s.fx, s.fy, false, true); s.cameraX += (s.x - s.cameraX) * Math.min(1, dt * 6); s.cameraY += (s.y - s.cameraY) * Math.min(1, dt * 6); this.sync(); }
+    dashReady() { const s = this.current; return s.phase === 'playing' && !s.interaction && !s.execution && !s.dash && (s.dashCooldown ?? 0) <= 0 && !this.actions.current && this.sweepElapsed === null && s.hitReaction <= 0; }
+    dash(direction) { const s = this.current; if (!this.dashReady())
+        return false; const d = planDash(s, this.map, direction, this.dashSerial + 1); if (!d)
+        return false; this.dashSerial++; const heading = s.motion?.heading ?? Math.atan2(s.fy, s.fx); s.dash = d; s.motion = createMotion(Math.cos(heading), Math.sin(heading)); s.fx = d.fx; s.fy = d.fy; s.moving = false; s.footContacts = null; s.combatEntry = null; s.note = 'Smoke carries the ember.'; return true; }
+    attack(command) { if (this.current.phase !== 'playing' || this.current.interaction || this.current.execution || this.sweepElapsed !== null || this.current.dash)
+        return false; const feet = captureCombatFeet(this.current), started = this.actions.started, ok = this.actions.request(command, this.hooks()); if (this.actions.started !== started)
+        this.record({ type: 'strike-start', attackId: this.actions.current?.id }); this.sync(); if (this.actions.started !== started)
+        this.current.combatEntry = bindCombatEntry(feet, this.current); return ok; }
+    sweep(aim = null) { const s = this.current; if (s.phase !== 'playing' || s.interaction || s.execution || s.dash || this.actions.current || this.sweepElapsed !== null)
+        return false; const feet = captureCombatFeet(s); if (aim) {
         const dx = aim.x - s.x, dy = aim.y - s.y, d = Math.hypot(dx, dy);
         if (d > .01) {
             s.fx = dx / d;
             s.fy = dy / d;
         }
-    } this.sweepElapsed = 0; this.sweepFired = false; s.sweepProgress = 0; s.note = 'Steel across stone. Read the room in sparks.'; return true; }
-    damage(n) { const s = this.current; if (s.phase !== 'playing' || n <= 0)
-        return; s.lamp = Math.max(0, s.lamp - n); if (!this.actions.current && this.sweepElapsed === null)
+    } this.sweepElapsed = 0; this.sweepFired = false; s.sweepProgress = 0; s.footContacts = null; s.combatEntry = bindCombatEntry(feet, s); s.note = 'Steel across stone. Read the room in sparks.'; return true; }
+    damage(n) { const s = this.current; if (s.phase !== 'playing' || !Number.isFinite(n) || n <= 0 || dashInvulnerable(s.dash))
+        return; const reaction = !this.actions.current && this.sweepElapsed === null && !s.dash && !s.execution && !s.interaction, feet = reaction ? captureCombatFeet(s) : null; const result = lampAfterDamage(s.lamp, n, !!s.interaction, s.interaction?.lastEmberUsed ?? false); s.lamp = result.life; if (result.usedGrace && s.interaction)
+        s.interaction = { ...s.interaction, lastEmberUsed: true }; if (reaction)
         s.hitReaction = .65; this.record({ type: 'damage', amount: n }); s.note = 'The lamp falters.'; if (s.lamp === 0) {
         s.phase = 'dead';
         s.deathTime = 0;
+        s.hitReaction = 0;
+        s.moving = false;
+        s.footContacts = null;
+        s.combatEntry = null;
+        if (s.interaction) {
+            this.record({ type: 'interaction-cancelled', interactionId: s.interaction.id });
+            s.interaction = null;
+        }
         this.actions.clear();
         this.sweepElapsed = null;
         s.sweepProgress = null;
+        s.dash = null;
+        s.dashCooldown = 0;
+        if (s.execution) {
+            s.execution = { ...s.execution, phase: 'cancelled' };
+            this.record({ type: 'execution-cancelled', targetId: s.execution.targetId });
+        }
         s.note = 'The flame has gone out.';
         this.record({ type: 'hero-dead' });
-    } this.sync(); }
+    } this.sync(); if (reaction && s.phase !== 'dead')
+        s.combatEntry = bindCombatEntry(feet, s); }
     sync() { const s = this.current; s.action = this.actions.view(); if (s.action) {
         s.fx = s.action.fx;
         s.fy = s.action.fy;
-    } s.particles = this.sparks.particles; s.cone = this.sparks.cone; }
+    } s.particles = this.sparks.particles; s.cone = this.sparks.cone; if (s.interaction || s.execution || s.dash || !footContactsEnabled(s))
+        s.footContacts = null; if (s.interaction || s.execution || s.dash || !entryMatches(s))
+        s.combatEntry = null; }
     step(dt, input = { x: 0, y: 0 }) {
         if (!Number.isFinite(dt) || dt <= 0)
             return;
         this.previous = this.snapshot();
         const s = this.current;
+        if (!s.dash)
+            s.dashCooldown = Math.max(0, (s.dashCooldown ?? 0) - dt);
         s.time += dt;
         s.hitReaction = Math.max(0, s.hitReaction - dt);
         s.moving = false;
@@ -65,6 +212,28 @@ export class CombatWorld {
         if (s.phase === 'dead') {
             s.deathTime += dt;
             finishMotion(s.motion ??= createMotion(), dt, s.fx, s.fy, false, false, true);
+            this.sync();
+            return;
+        }
+        if (s.interaction) {
+            finishMotion(s.motion ??= createMotion(), dt, s.fx, s.fy, false, true);
+            this.stepEnemies(dt);
+            s.cameraX += (s.x - s.cameraX) * Math.min(1, dt * 6);
+            s.cameraY += (s.y - s.cameraY) * Math.min(1, dt * 6);
+            this.sync();
+            return;
+        }
+        if (s.execution) {
+            this.stepExecution(dt);
+            return;
+        }
+        if (s.dash) {
+            const reservation = { ...s.dash };
+            advanceDash(s, this.map, dt);
+            finishMotion(s.motion ??= createMotion(), dt, s.fx, s.fy, false, true);
+            this.stepEnemies(dt, null, { x: reservation.startX + reservation.fx * reservation.distance, y: reservation.startY + reservation.fy * reservation.distance });
+            s.cameraX += (s.x - s.cameraX) * Math.min(1, dt * 6);
+            s.cameraY += (s.y - s.cameraY) * Math.min(1, dt * 6);
             this.sync();
             return;
         }
@@ -112,15 +281,18 @@ export class CombatWorld {
         if (this.actions.started !== oldStarted)
             this.record({ type: 'strike-start', attackId: this.actions.current?.id });
         this.sync();
+        if (this.actions.started !== oldStarted)
+            s.combatEntry = bindCombatEntry(captureCombatFeet(this.previous), s);
         finishMotion(s.motion ??= createMotion(), dt, s.fx, s.fy, s.moving, !!s.action || s.sweepProgress !== null);
         if (this.tipProvider)
-            this.sparks.stone(this.tipProvider(s), s.time, { x: s.fx, y: s.fy }, this.sweepElapsed !== null);
+            this.sparks.stone(this.tipProvider(s), s.time, { x: s.fx, y: s.fy }, this.sweepElapsed !== null, s.moving && !s.action && s.sweepProgress === null);
         if (s.phase === 'playing')
-            enemyStep(s.enemy, dt, s, this.map, n => this.damage(n));
+            this.stepEnemies(dt);
         s.cameraX += (s.x - s.cameraX) * Math.min(1, dt * 6);
         s.cameraY += (s.y - s.cameraY) * Math.min(1, dt * 6);
         this.sync();
+        s.footContacts = advanceWorldFootContacts(s, dt);
     }
     snapshot(alpha = 1) { const s = this.current, p = this.previous, t = Math.max(0, Math.min(1, alpha)), m = (a, b) => a + (b - a) * t, action = s.action ? { ...s.action } : null; if (action && p.action?.id === action.id)
-        action.progress = m(p.action.progress, action.progress); return { ...s, motion: interpolateMotion(p.motion, s.motion, t), x: m(p.x, s.x), y: m(p.y, s.y), time: m(p.time, s.time), walkDistance: m(p.walkDistance, s.walkDistance), cameraX: m(p.cameraX, s.cameraX), cameraY: m(p.cameraY, s.cameraY), enemy: { ...s.enemy, x: m(p.enemy.x, s.enemy.x), y: m(p.enemy.y, s.enemy.y) }, action, particles: s.particles.map(p => ({ ...p })), cone: s.cone ? { ...s.cone } : null }; }
+        action.progress = m(p.action.progress, action.progress); const enemies = cloneEnemyRoster(p, s, t); return { ...s, interaction: s.interaction ? { ...s.interaction } : null, execution: s.execution ? { ...s.execution, elapsed: p.execution?.targetId === s.execution.targetId && p.execution.elapsed <= s.execution.elapsed && p.execution.phase !== 'cancelled' && s.execution.phase !== 'cancelled' ? m(p.execution.elapsed, s.execution.elapsed) : s.execution.elapsed } : null, motion: interpolateMotion(p.motion, s.motion, t), footContacts: interpolateFootContacts(p.footContacts, s.footContacts, t), combatEntry: cloneCombatEntry(s.combatEntry), dash: s.dash ? { ...s.dash, elapsed: p.dash?.id === s.dash.id ? m(p.dash.elapsed, s.dash.elapsed) : s.dash.elapsed } : null, x: m(p.x, s.x), y: m(p.y, s.y), time: m(p.time, s.time), walkDistance: m(p.walkDistance, s.walkDistance), cameraX: m(p.cameraX, s.cameraX), cameraY: m(p.cameraY, s.cameraY), enemies, enemy: enemies.find(e => e.id === s.enemy.id) ?? { ...s.enemy }, action, particles: s.particles.map(p => ({ ...p })), cone: s.cone ? { ...s.cone } : null }; }
 }

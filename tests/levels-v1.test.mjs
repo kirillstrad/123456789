@@ -7,8 +7,8 @@ import {GAME_LEVELS,gameLevel,applyLevelSpawn} from '../src/levels/registry.js';
 import {createWorldReference} from '../src/levels/world-reference.js';
 import {ASHEN_ROOMS,ASHEN_DOORS,ASHEN_LIGHTS,ASHEN_PROPS,ashenWalkable,createAshenPlan} from '../src/levels/ashen-layout.js';
 
-test('only two playable levels are advertised, not unimplemented concepts',()=>{
- assert.deepEqual(GAME_LEVELS.map(l=>l.id),['test-chamber','ashen-nave']);assert(Object.isFrozen(GAME_LEVELS[0]));assert.throws(()=>gameLevel('crypt'));
+test('legacy levels and the implemented trial are advertised',()=>{
+ assert.deepEqual(GAME_LEVELS.map(l=>l.id),['test-chamber','ashen-nave','bonebound-trial','undead-trial']);assert(Object.isFrozen(GAME_LEVELS[0]));assert.throws(()=>gameLevel('crypt'));
 });
 test('test chamber spawn is unchanged and ashen spawn seeds both interpolation states',()=>{
  const state=()=>({x:99,y:98,cameraX:99,cameraY:98,enemy:{x:1,y:1},motion:{heading:1}}),w={current:state(),previous:state()};applyLevelSpawn(w,'test-chamber');assert.equal(w.current.x,99);applyLevelSpawn(w,'ashen-nave');

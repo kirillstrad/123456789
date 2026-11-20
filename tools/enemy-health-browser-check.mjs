@@ -19,6 +19,25 @@ try{
  });
  await run('pause and restart remove stale target ownership',async()=>{await page.evaluate(()=>window.__ASH_ITERATION_2__.pause());assert.equal((await state()).target,null);await fresh();assert.equal((await state()).target,null);});
  await run('real relic modal suppresses HP',async()=>{const opened=await page.evaluate(()=>{const a=window.__ASH_ITERATION_2__;a.start();a.place(8,12,100,100);const ok=window.__ASH_MANIFEST__.openReading({id:'hp-check',title:'HP CHECK',text:'Blocking panel test.',transition:'instant'});a.render();return ok;});assert.equal(opened,true);assert.equal((await state()).target,null);assert.equal((await state()).hoverId,null);await page.screenshot({path:dir+'/modal.png'});});
+ await run('Bonebound trial and restart preserve three distinct undead',async()=>{await page.locator('#bestiaryTrial').click();await page.locator('#game').scrollIntoViewIfNeeded();await page.evaluate(()=>{const a=window.__ASH_ITERATION_2__;a.freeze();a.render();});let s=await page.evaluate(()=>window.__ASH_ITERATION_2__.state());assert.equal(s.enemies.length,3);assert.equal(new Set(s.enemies.map(e=>e.id)).size,3);assert.ok(s.enemies.every(e=>e.archetype==='bonebound'&&e.hp===36));await page.screenshot({path:dir+'/bonebound-trial.png'});await page.locator('#restart').click();s=await page.evaluate(()=>window.__ASH_ITERATION_2__.state());assert.equal(s.enemies.length,3);assert.ok(s.enemies.every(e=>e.hp===36));});
+ await run('group pointer switches real HP ownership and pause clears it',async()=>{
+  await page.evaluate(()=>{const a=window.__ASH_ITERATION_2__;a.freeze();a.render();});
+  const found=new Set();
+  for(const p of (await state()).candidates){
+   const q=await page.evaluate(p=>{const c=document.getElementById('game'),r=c.getBoundingClientRect();return{x:r.left+p[0]*r.width/c.width,y:r.top+p[1]*r.height/c.height};},p);
+   await page.mouse.move(q.x,q.y);await page.evaluate(()=>window.__ASH_ITERATION_2__.render());
+   const hp=await state();if(hp.hoverId===null)continue;assert.ok(hp.target,'hovered enemy must have an HP panel');
+   const enemies=await page.evaluate(()=>window.__ASH_ITERATION_2__.state().enemies),enemy=enemies.find(e=>e.id===hp.target.id);
+   assert.ok(enemy);assert.equal(hp.hoverId,enemy.id);assert.equal(hp.target.hp,enemy.hp);assert.equal(hp.target.maxHp,36);found.add(enemy.id);if(found.size>=2)break;
+  }
+  assert.ok(found.size>=2,'normal pointer must select at least two distinct Bonebound instances');await page.screenshot({path:dir+'/group-hover.png'});
+  await page.evaluate(()=>{const a=window.__ASH_ITERATION_2__;a.pause();a.render();});assert.equal((await state()).target,null);assert.equal((await state()).hoverId,null);
+ });
+ await run('mixed melee trial exposes five archetypes and survives restart',async()=>{
+ await page.locator('#undeadTrial').click();await page.evaluate(()=>{const a=window.__ASH_ITERATION_2__;a.freeze();a.render();});
+ const check=async()=>{const s=await page.evaluate(()=>window.__ASH_ITERATION_2__.state());assert.equal(s.enemies.length,5);assert.deepEqual(s.enemies.map(e=>e.archetype),['bonebound','ossuary-guard','gravebearer','bloated-remnant','ashbound']);assert.ok(s.enemies.every(e=>e.hp===e.maxHp&&e.hp>0));};
+ await check();await page.screenshot({path:dir+'/mixed-undead.png'});await page.locator('#restart').click();await check();
+ });
  assert.deepEqual(report.errors,[]);report.ok=true;
 }catch(error){report.ok=false;report.failure=String(error.stack??error);if(page)await page.screenshot({path:dir+'/failure.png'}).catch(()=>{});process.exitCode=1;
 }finally{await fs.writeFile(dir+'/report.json',JSON.stringify(report,null,2));await browser?.close();server.kill();}

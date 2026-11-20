@@ -16,7 +16,7 @@ if(!browser.includes(marker)){
   for(const p of (await state()).candidates){
    const q=await page.evaluate(p=>{const c=document.getElementById('game'),r=c.getBoundingClientRect();return{x:r.left+p[0]*r.width/c.width,y:r.top+p[1]*r.height/c.height};},p);
    await page.mouse.move(q.x,q.y);await page.evaluate(()=>window.__ASH_ITERATION_2__.render());
-   const hp=await state();if(!hp.target)continue;
+   const hp=await state();if(hp.hoverId===null)continue;assert.ok(hp.target,'hovered enemy must have an HP panel');
    const enemies=await page.evaluate(()=>window.__ASH_ITERATION_2__.state().enemies),enemy=enemies.find(e=>e.id===hp.target.id);
    assert.ok(enemy);assert.equal(hp.hoverId,enemy.id);assert.equal(hp.target.hp,enemy.hp);assert.equal(hp.target.maxHp,36);found.add(enemy.id);if(found.size>=2)break;
   }

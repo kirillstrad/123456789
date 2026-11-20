@@ -1,0 +1,45 @@
+import {installIronCursor} from './iron-cursor.js';
+import {proximityFeedback} from '../render/interaction-proximity.js';
+import {createInteractionIntent} from '../interaction/intent.js';
+import {containsTargetPoint,canvasTargetPointer,pickInteractionTarget} from '../interaction/targeting.js';
+function hitArea(part,p,project,zoom){
+ if((part.alpha??1)<=0)return null;const v=part.v.map(q=>project(...q));
+ if(part.kind===0)return containsTargetPoint(v,p)?v:null;
+ let hit=false,r=0;
+ if(part.kind===2){r=(part.r||0)*65/94*zoom;hit=r>0&&((p[0]-v[0][0])/r)**2+((p[1]-v[0][1])/(r*.85))**2<=1;}
+ if(part.kind===1){r=(part.w||1)*zoom/2;for(let i=1;i<v.length;i++){const a=v[i-1],b=v[i],dx=b[0]-a[0],dy=b[1]-a[1],n=dx*dx+dy*dy,t=n?Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/n)):0;if(Math.hypot(p[0]-a[0]-t*dx,p[1]-a[1]-t*dy)<=r)hit=true;}}
+ if(!hit)return null;const xs=v.map(q=>q[0]),ys=v.map(q=>q[1]),x=Math.min(...xs)-r,y=Math.min(...ys)-r,X=Math.max(...xs)+r,Y=Math.max(...ys)+r;return[[x,y],[X,y],[X,Y],[x,Y]];
+}
+export function pickFrameTarget({parts,targets,point,project,zoom=1,viewport}){
+ if(!point||!targets.length||!Number.isFinite(zoom)||zoom<=0)return null;const owners=new Map(),ids=new Set(),duplicates=new Set();
+ for(const t of targets){if(ids.has(t.id))duplicates.add(t.id);ids.add(t.id);for(const p of t.parts)owners.set(p,t);}
+ for(let i=parts.length-1;i>=0;i--){const p=parts[i];if(p.interactionVapor)continue;const area=hitArea(p,point,project,zoom);if(!area)continue;const t=owners.get(p.interactionSource??p);if(!t||duplicates.has(t.id))return null;
+  const selected=pickInteractionTarget([{...t,hitArea:area,depth:p.d}],point,viewport);if(!selected)return null;
+  // Keep the validated generic descriptor. Restore only authored presentation
+  // metadata from the actual visible mesh owner, never from a different target.
+  const metadata={parts:t.parts};for(const key of ['modelId','contactPoint','emissionPoints','facePoint','activation','row'])if(t[key]!==undefined)metadata[key]=t[key];
+  return Object.freeze({...selected,...metadata});
+ }
+ return null;
+}
+export function installFrameTargeting(canvas,{canRequest=()=>false,resolve=()=>null,context=()=>'',enemyTarget=null}={}){
+ let pointer=null,selected=null,lastFrame=null,held=false,disposed=false;const pending=createInteractionIntent(),original=canvas.style.cursor,doc=canvas.ownerDocument,win=doc?.defaultView;
+ const cursor=installIronCursor(canvas,{read(){
+  const api=win?.__ASH_ITERATION_2__,mode=context(),s=api?.state?.(),gallery=mode.startsWith('gallery')?win?.__ASH_GALLERY__:null,session=gallery?.interaction?.();let enemy=false;
+  if(mode==='game'&&s?.phase==='playing'&&s.enemy?.hp>0&&lastFrame?.project&&pointer){const p=canvasTargetPointer(pointer,canvas),q=lastFrame.project(s.enemy.x,s.enemy.y,.9),z=lastFrame.zoom??1;enemy=!!p&&((p[0]-q[0])/(20*z))**2+((p[1]-q[1])/(38*z))**2<=1;}
+  if(typeof enemyTarget==='function')enemy=mode==='game'&&enemyTarget()!==null;
+  return{mode,target:selected,allowed:canRequest(),busy:!!s?.interaction||!!pending.current()||!!session,enemy,progress:session?.progress??s?.interactionAnimation?.progress??0};
+ }});
+ const leave=()=>{pointer=null;selected=null;canvas.style.cursor=original;},clear=()=>{leave();lastFrame=null;held=false;pending.clear();},move=e=>{pointer={clientX:e.clientX,clientY:e.clientY};},visibility=()=>{if(doc.hidden)clear();};
+ const reconcile=()=>{const i=pending.current();return i?pending.reconcile(resolve(i.targetId),context(),canRequest()):null;};
+ const pick=()=>lastFrame?pickFrameTarget({...lastFrame,point:canvasTargetPointer(pointer,canvas),viewport:{width:canvas.width,height:720}}):null;
+ function keydown(e){
+  if(e.code!=='KeyF'||e.repeat||held||e.defaultPrevented||e.ctrlKey||e.altKey||e.metaKey||e.target?.isContentEditable||e.target?.closest?.('input,select,textarea,button,[contenteditable]'))return;
+  held=true;reconcile();if(disposed||!lastFrame?.active||!canRequest()||pending.current())return;
+  selected=pick();if(!selected)return;const live=resolve(selected.id),drawn=lastFrame.targets.find(t=>t.id===selected.id);
+  if(!live||live.parts!==drawn?.parts)return;if(pending.request(live,context()))e.preventDefault();
+ }
+ const keyup=e=>{if(e.code==='KeyF')held=false;};
+ canvas.addEventListener('pointermove',move);canvas.addEventListener('pointerleave',leave);win?.addEventListener('blur',clear);doc?.addEventListener('visibilitychange',visibility);win?.addEventListener('keydown',keydown);win?.addEventListener('keyup',keyup);
+ return Object.freeze({clear,cancelIntent:()=>pending.clear(),current:()=>selected,intent:reconcile,frame(frame){if(disposed)return null;if(!frame.active){clear();return null;}const mode=context(),actor=mode==='gallery-walk'?win?.__ASH_GALLERY__?.player?.():mode==='game'?win?.__ASH_ITERATION_2__?.state?.():null,parts=proximityFeedback({parts:frame.parts,targets:frame.targets,actor,time:actor?.time??0,enabled:!!actor&&canRequest(),reducedMotion:!!win?.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches});frame.parts.splice(0,frame.parts.length,...parts);lastFrame=frame;reconcile();selected=pick();canvas.style.cursor=selected?'pointer':original;return selected;},dispose(){if(disposed)return;disposed=true;cursor?.dispose();clear();canvas.removeEventListener('pointermove',move);canvas.removeEventListener('pointerleave',leave);win?.removeEventListener('blur',clear);doc?.removeEventListener('visibilitychange',visibility);win?.removeEventListener('keydown',keydown);win?.removeEventListener('keyup',keyup);}});
+}

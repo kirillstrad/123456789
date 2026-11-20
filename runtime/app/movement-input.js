@@ -1,0 +1,1 @@
+export function movementInput(keys){const has=(...a)=>a.some(k=>keys.has(k)),sx=+has('KeyD','ArrowRight')-+has('KeyA','ArrowLeft'),sy=+has('KeyS','ArrowDown')-+has('KeyW','ArrowUp');return {x:(sx+sy)*Math.SQRT1_2,y:(sy-sx)*Math.SQRT1_2};}
