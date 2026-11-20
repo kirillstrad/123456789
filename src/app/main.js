@@ -1,3 +1,6 @@
+import {gameLevel,GAME_LEVELS,applyLevelSpawn} from '../levels/registry.js';
+import {createWorldReference} from '../levels/world-reference.js';
+import {buildLevelScene} from '../levels/runtime.js';
 import {installManifest} from '../ui/relic.js';
 import {createRelicWorld} from '../interaction/relic-world.js';
 import {installAttackInput} from './attack-input.js';
@@ -39,14 +42,17 @@ const $=s=>document.getElementById(s),cv=$('game'),out=cv.getContext('2d',{willR
 const canvas=(w,h)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c;},scene=canvas(W,H),mask=canvas(W,H),sg=scene.getContext('2d',{willReadFrequently:true}),mg=mask.getContext('2d',{willReadFrequently:true});
 const ascii=new ASCII(out),maskReader=new ASCII(out),uiASCII=new ASCII(out,1008),ui=makeUI(out,(src,cols,rows,y,h,mono)=>{out.save();out.translate((W-1008)/2,0);uiASCII.paint(src,cols,rows,y,h,mono);out.restore();});
 const fireHintLayer=createFireHintLayer(canvas(W,H));
-const doorScene=createCombatDoorScene(OBSTACLES),env=createCombatDoorEnvironment(doorScene),world=new CombatWorld(doorScene.map,s=>combatHero(s).tip),effects=new ExecutionEffects(),executionOptions=installExecutionOptions(),keys=new Set(),commands=[],report={build:'ASH_IRON_ITERATION_4A',errors:[],frames:[],backend:'Canvas2D / ASCII cell lighting',gpuTime:null};
-const fireLighting=findCombatLights(doorScene);
-const ritualBonfire=createRitualBonfire(world,doorScene.map);
+let doorScene=createCombatDoorScene(OBSTACLES),env=createCombatDoorEnvironment(doorScene);
+const worldReference=createWorldReference(new CombatWorld(doorScene.map,s=>combatHero(s).tip)),world=worldReference.proxy;
+const effects=new ExecutionEffects(),executionOptions=installExecutionOptions(),keys=new Set(),commands=[],report={build:'ASH_IRON_ITERATION_4A',errors:[],frames:[],backend:'Canvas2D / ASCII cell lighting',gpuTime:null};
+let fireLighting=findCombatLights(doorScene);
+let ritualBonfire=createRitualBonfire(world,doorScene.map);
 const dashHud={ready:false,at:-Infinity};
 let mode='menu',selected=0,menuPage=false,time=0,last=0,drawAt=0,simLast=null,acc=0,paused=false,frozen=false,endTime=0,aimPoint=null,camera={x:8,y:12},view={zoom:1,dx:0,dy:0},renderCount=0,fireAt=-1,coneBoost=0;
 let manualAdvance=false;
+let selectedLevelId='test-chamber';
 let manifest=null;
-const relicWorld=typeof createRelicWorld==='function'?createRelicWorld({
+let relicWorld=typeof createRelicWorld==='function'?createRelicWorld({
  map:doorScene.map,
  openDialogue:value=>window.__ASH_MANIFEST__?.openDialogue(value),
  openReading:value=>window.__ASH_MANIFEST__?.openReading(value),
@@ -55,8 +61,8 @@ const relicWorld=typeof createRelicWorld==='function'?createRelicWorld({
 let galleryScene=null,galleryCamera=null,galleryReturn=null,galleryTimings=null,galleryTime=0,galleryPlayer=null;
 const interactionContext=()=>mode==='gallery'?(galleryPlayer?'gallery-walk':'gallery-preview'):mode;
 const targeting=installFrameTargeting(cv,{context:interactionContext,resolve:id=>mode==='gallery'?galleryScene?.getTarget(id):(env.targets??[]).find(t=>t.id===id),canRequest:()=>!manifest?.blocking()&&interactionInputAllowed({mode:interactionContext(),actor:mode==='gallery'?galleryPlayer?.snapshot():world.current,frozen,hidden:document.hidden,queued:commands.length>0})});
-const combatDoor=createCombatDoorController({world,scene:doorScene,targeting,active:()=>mode==='game'&&(!frozen||manualAdvance)});
-function stepWorld(dt,input){if(manifest?.blocking())return;combatDoor.step(dt,input);ritualBonfire.step();effects.step(dt,world.current,world.events);}
+let combatDoor=createCombatDoorController({world,scene:doorScene,targeting,active:()=>mode==='game'&&(!frozen||manualAdvance)});
+function stepWorld(dt,input){if(manifest?.blocking())return;combatDoor.step(dt,input);ritualBonfire.step();env.step?.(dt);effects.step(dt,world.current,world.events);}
 function advanceWorld(seconds){
  if(!Number.isFinite(seconds)||seconds<0||seconds>120)throw Error('Invalid manual advance duration');
  if(mode!=='game'||document.hidden||manifest?.blocking())return false;
@@ -64,7 +70,7 @@ function advanceWorld(seconds){
  try{for(let i=0;i<Math.round(seconds*60);i++)stepWorld(1/60);}finally{manualAdvance=previous;simLast=null;acc=0;}
  return true;
 }
-function resetWorld(){targeting.clear();relicWorld?.reset();manifest?.reset();combatDoor.cancel('reset');doorScene.reset();world.reset();ritualBonfire.reset();dashHud.ready=false;dashHud.at=-Infinity;effects.reset();fireHintLayer.clear();view={zoom:1,dx:0,dy:0};}
+function resetWorld(){targeting.clear();relicWorld?.reset();manifest?.reset();combatDoor.cancel('reset');doorScene.reset();world.reset();applyLevelSpawn(world,selectedLevelId);ritualBonfire.reset();dashHud.ready=false;dashHud.at=-Infinity;effects.reset();fireHintLayer.clear();view={zoom:1,dx:0,dy:0};}
 const fire=canvas(192,165),fg=fire.getContext('2d',{willReadFrequently:true}),fireASCII=new ASCII(out);
 const basePr=(x,y,z,cx=camera.x,cy=camera.y)=>[504+((x-cx)-(y-cy))*65*.76,430+((x-cx)+(y-cy))*65*.43-z*65*.87];
 const pr=(x,y,z,cx=camera.x,cy=camera.y)=>screenPoint(projectExecution(basePr(x,y,z,cx,cy),view),W);
@@ -158,9 +164,21 @@ function closeGallery(){if(mode!=='gallery')return;targeting.clear();galleryPlay
 function gallerySetCamera(x,y){if(mode!=='gallery'||![x,y].every(Number.isFinite))throw Error('Invalid gallery camera');if(galleryPlayer){galleryPlayer.dispose?.();targeting.clear();}galleryPlayer=null;keys.clear();acc=0;simLast=null;const b=galleryScene.getBounds();galleryCamera={x:Math.max(b.minX,Math.min(b.maxX,x)),y:Math.max(b.minY,Math.min(b.maxY,y))};return renderGallery();}
 function walkGallery(){targeting.clear();galleryPlayer?.dispose?.();openGallery();galleryPlayer=createGalleryInteraction(createGalleryApproach(createGalleryPlayer(world.snapshot(),galleryScene.getSpawn(),galleryScene.getBounds(),{...galleryMotion,contacts:advanceWorldFootContacts,colliders:galleryScene.getColliders()}),galleryScene,targeting,{allowed:()=>mode==='gallery'&&!document.hidden&&!document.activeElement?.isContentEditable&&!document.activeElement?.closest?.('input,select,textarea,button,[contenteditable]'),manualHeld:()=>['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].some(k=>keys.has(k))}),galleryScene,targeting,{context:interactionContext});galleryCamera=galleryScene.getSpawn();keys.clear();commands.length=0;simLast=null;acc=0;drawAt=0;return renderGallery();}
 window.__ASH_GALLERY__=Object.freeze({open:openGallery,walk:walkGallery,player:()=>galleryPlayer?.snapshot()??null,approach:()=>galleryPlayer?.approach()??null,interaction:()=>galleryPlayer?.interaction()??null,interactionEvents:()=>galleryPlayer?.interactionEvents()??[],close:closeGallery,render:renderGallery,setCamera:gallerySetCamera,camera:()=>galleryCamera?{...galleryCamera}:null,stats:()=>galleryScene?galleryScene.stats():null,focus:id=>{if(mode!=='gallery')throw Error('Gallery preview is not open');const e=createGalleryLayout().entries.find(e=>e.id===id);if(!e)throw Error('Unknown gallery object: '+id);return gallerySetCamera(e.x,e.y);}});
+function rebuildSelectedLevel(){
+ const next=buildLevelScene(selectedLevelId,{baseObstacles:OBSTACLES,createDoorScene:createCombatDoorScene,createDoorEnvironment:createCombatDoorEnvironment});
+ const nextWorld=new CombatWorld(next.doorScene.map,s=>combatHero(s).tip);
+ manifest?.dismiss();combatDoor.cancel('level-change');targeting.clear();
+ doorScene=next.doorScene;env=next.env;worldReference.replace(nextWorld);
+ fireLighting=findCombatLights(doorScene);ritualBonfire=createRitualBonfire(world,doorScene.map);
+ relicWorld=createRelicWorld({map:doorScene.map,openDialogue:value=>window.__ASH_MANIFEST__?.openDialogue(value),openReading:value=>window.__ASH_MANIFEST__?.openReading(value),setObjective:value=>window.__ASH_MANIFEST__?.setObjective(value)});
+ combatDoor=createCombatDoorController({world,scene:doorScene,targeting,active:()=>mode==='game'&&(!frozen||manualAdvance)});
+ keys.clear();commands.length=0;aimPoint=null;simLast=null;acc=0;drawAt=0;
+}
+function launchLevel(id){gameLevel(id);const previous=selectedLevelId;selectedLevelId=id;try{start();}catch(error){selectedLevelId=previous;throw error;}return {id:selectedLevelId};}
+window.__ASH_LEVELS__=Object.freeze({list:()=>GAME_LEVELS.map(l=>({...l})),current:()=>({...gameLevel(selectedLevelId)}),start:launchLevel,menu:()=>window.__ASH_THRONE__?.levels?.()});
 function items(){if(DESKTOP)return desktopItems(mode,{start,resume});return mode==='menu'?[['BEGIN DESCENT',start],['THE EMBER CHAMBER',()=>{$('settings').hidden=!$('settings').hidden;}],['THE RITES',()=>menuPage=true]]:mode==='pause'?[['RESUME',resume],['RESTART NAVE',start],['MAIN MENU',home]]:[['RISE AGAIN',start],['MAIN MENU',home]];}
 function drawMenu(){out.fillStyle='#000';out.fillRect(0,0,W,864);if(time-fireAt>.025||fireAt<0){fireAt=time;const a=fg.createImageData(192,165),flow=time,power=+$('power').value/100*($('dim').checked?.6:1),clamp=x=>Math.max(0,Math.min(1,x));for(let y=0;y<165;y++)for(let x=0;x<192;x++){const px=x/192,py=y/165,qx=px*7+Math.sin(py*8-flow*.35)*.8,qy=py*7-flow*.6,v=(Math.sin(qx*1.8+Math.sin(qy*1.5+flow*.11))*Math.sin(qy*1.8)+Math.sin(qx*3.7-qy*.8+flow*.2)*.35+Math.sin((qx+qy)*6+flow*.1)*.13+1.5)/3,etch=1-Math.min(1,Math.abs(Math.sin(v*45+qy*.9))/.5),clear=clamp((Math.hypot((px-.5)*1.05,(py-.55)*1.1)-.18)/.3),f=clamp((v-.25)*1.4)*(.2+.8*etch)*(.12+.88*clear)*power,k=(y*192+x)*4;a.data[k]=220*f;a.data[k+1]=39*f;a.data[k+2]=32*f;a.data[k+3]=255;}fg.putImageData(a,0,0);fireASCII.paint(fire,Math.round(W/5.25),165,0,864);}else{fireASCII.paint(fire,Math.round(W/5.25),165,0,864);}ui.menu(mode,selected,items().map(i=>i[0]),menuPage);}
-function start(){targeting.clear();if(mode==='gallery')closeGallery();resetWorld();mode='game';selected=0;menuPage=false;paused=false;frozen=false;endTime=0;keys.clear();commands.length=0;simLast=null;acc=0;report.frames=[];camera={x:8,y:12};$('freeze').textContent='FREEZE FRAME';cv.focus();}
+function start(){targeting.clear();if(mode==='gallery')closeGallery();rebuildSelectedLevel();resetWorld();mode='game';selected=0;menuPage=false;paused=false;frozen=false;endTime=0;keys.clear();commands.length=0;simLast=null;acc=0;report.frames=[];camera={x:8,y:12};$('freeze').textContent='FREEZE FRAME';cv.focus();}
 function resume(){targeting.clear();if(mode==='gallery')closeGallery();mode='game';paused=false;keys.clear();commands.length=0;simLast=null;acc=0;cv.focus();}
 function home(){targeting.clear();if(mode==='gallery')closeGallery();resetWorld();mode='menu';selected=0;menuPage=false;keys.clear();commands.length=0;}
 function pause(){if(mode!=='game')return;manifest?.dismiss();combatDoor.cancel('pause');targeting.clear();mode='pause';selected=0;keys.clear();commands.length=0;simLast=null;acc=0;}
