@@ -1,0 +1,16 @@
+{
+  "scope": "patches-1-2-3-4-and-visual-ember",
+  "status": "incomplete-or-failed",
+  "checks": {
+    "migration": "success",
+    "build": "success",
+    "unit": "success",
+    "browser": "success",
+    "regression": "failure",
+    "integration": "skipped"
+  },
+  "inputCommit": "0c7777b1258c1f22eab208c7fde925064a0e5af2",
+  "testedSourceCommit": null,
+  "workflowRun": "44765016065",
+  "humanVisualAcceptance": false
+}

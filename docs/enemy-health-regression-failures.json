@@ -1,7 +1,20 @@
 {
-  "exitCode": 0,
+  "exitCode": 1,
   "signal": null,
   "error": null,
-  "totalFailures": 0,
-  "failures": []
+  "totalFailures": 3,
+  "failures": [
+    {
+      "test": "not ok 52 - common renderer delegates updates and merges accents motion and original light targets",
+      "context": "  ---\n  duration_ms: 16.677107\n  type: 'test'\n  location: '/home/runner/work/123456789/123456789/tests/ashen-visual-dressing.test.mjs:90:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    The expression evaluated to a falsy value:\n    \n      assert(view.lights.includes(lit))\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: true\n  actual: false\n  operator: '=='\n  stack: |-\n    TestContext.<anonymous> (file:///home/runner/work/123456789/123456789/tests/ashen-visual-dressing.test.mjs:93:71)\n    Test.runInAsyncScope (node:async_hooks:214:14)\n    Test.run (node:internal/test_runner/test:1047:25)"
+    },
+    {
+      "test": "not ok 1012 - one persistent cool wisp and wick remain visible without lantern illumination",
+      "context": "  ---\n  duration_ms: 4.411218\n  type: 'test'\n  location: '/home/runner/work/123456789/123456789/tests/package-two-fire-feedback.test.mjs:4:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    The expression evaluated to a falsy value:\n    \n      assert.ok(parts.every(p=>p.fireHint&&p.interactionVapor&&p.alpha>0&&p.c[2]>p.c[0]))\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: true\n  actual: false\n  operator: '=='\n  stack: |-\n    TestContext.<anonymous> (file:///home/runner/work/123456789/123456789/tests/package-two-fire-feedback.test.mjs:4:363)\n    Test.runInAsyncScope (node:async_hooks:214:14)\n    Test.run (node:internal/test_runner/test:1047:25)"
+    },
+    {
+      "test": "not ok 1020 - burning presentation enlarges flames without mutating authored geometry or body references",
+      "context": "  ---\n  duration_ms: 6.75156\n  type: 'test'\n  location: '/home/runner/work/123456789/123456789/tests/package-two-fire-presentation.test.mjs:9:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    The expression evaluated to a falsy value:\n    \n      assert.ok(flames.some(p=>p.kind===2&&p.c[1]===245))\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: true\n  actual: false\n  operator: '=='\n  stack: |-\n    TestContext.<anonymous> (file:///home/runner/work/123456789/123456789/tests/package-two-fire-presentation.test.mjs:9:638)\n    Test.runInAsyncScope (node:async_hooks:214:14)\n    Test.run (node:internal/test_runner/test:1047:25)"
+    }
+  ]
 }
