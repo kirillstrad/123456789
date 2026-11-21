@@ -1,0 +1,72 @@
+name: Last Service verification
+on:
+  push:
+    branches: [bestiary-patch-1]
+    paths: ['src/**', 'tests/**', 'tools/**', 'package*.json', 'tsconfig.json', '.github/workflows/last-service-verification.yml']
+  pull_request:
+    paths: ['src/**', 'tests/**', 'tools/**', 'package*.json', 'tsconfig.json', '.github/workflows/last-service-verification.yml']
+permissions:
+  contents: read
+concurrency:
+  group: last-service-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - id: dependencies
+        continue-on-error: true
+        run: set -o pipefail; npm ci 2>&1 | tee last-service-dependencies.log
+      - id: types
+        if: steps.dependencies.outcome == 'success'
+        continue-on-error: true
+        run: set -o pipefail; npm run typecheck 2>&1 | tee last-service-types.log
+      - id: build
+        if: steps.dependencies.outcome == 'success'
+        continue-on-error: true
+        run: set -o pipefail; npm run build:prologue 2>&1 | tee last-service-build.log
+      - id: unit
+        if: steps.build.outcome == 'success'
+        continue-on-error: true
+        run: set -o pipefail; npm test 2>&1 | tee last-service-unit.log
+      - id: core
+        if: steps.build.outcome == 'success'
+        continue-on-error: true
+        run: set -o pipefail; node tools/verify-last-service-runtime.mjs 2>&1 | tee last-service-core.log
+      - id: chromium
+        if: steps.dependencies.outcome == 'success'
+        continue-on-error: true
+        run: set -o pipefail; npx playwright install --with-deps chromium 2>&1 | tee last-service-chromium.log
+      - id: original_browser
+        if: steps.build.outcome == 'success' && steps.chromium.outcome == 'success'
+        continue-on-error: true
+        run: set -o pipefail; npm run test:browser 2>&1 | tee last-service-original-browser.log
+      - id: prologue_browser
+        if: steps.build.outcome == 'success' && steps.chromium.outcome == 'success'
+        continue-on-error: true
+        run: set -o pipefail; node tools/browser-check-last-service.mjs 2>&1 | tee last-service-prologue-browser.log
+      - name: Record actual outcomes and fail incomplete verification
+        if: always()
+        env:
+          CHECKS: '{"dependencies":"${{ steps.dependencies.outcome }}","types":"${{ steps.types.outcome }}","build":"${{ steps.build.outcome }}","unit":"${{ steps.unit.outcome }}","core":"${{ steps.core.outcome }}","chromium":"${{ steps.chromium.outcome }}","originalBrowser":"${{ steps.original_browser.outcome }}","prologueBrowser":"${{ steps.prologue_browser.outcome }}"}'
+        run: |
+          node --input-type=module -e "import fs from 'node:fs';const checks=JSON.parse(process.env.CHECKS),passed=Object.values(checks).every(x=>x==='success');fs.mkdirSync('docs',{recursive:true});fs.writeFileSync('docs/last-service-verification.json',JSON.stringify({status:passed?'automated-checks-passed':'incomplete-or-failed',testedSourceCommit:process.env.GITHUB_SHA,workflowRun:process.env.GITHUB_RUN_ID,checks,scope:'automated source, scripted core and intro UI checks; not full-route human/visual acceptance',humanVisualAcceptance:false},null,2));if(!passed)process.exit(1);"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: last-service-${{ github.sha }}
+          if-no-files-found: warn
+          path: |
+            LAST_SERVICE.html
+            last-service-*.log
+            docs/last-service-*.json
+            docs/last-service-browser-smoke.png
