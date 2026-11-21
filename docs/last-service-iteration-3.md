@@ -1,0 +1,11 @@
+# Last Service iteration 3 — source candidate, not accepted gameplay
+
+Adds an explicit F interaction at the cleared route threshold, an existing Golem Trial scene reused as the lower chapel, and a separate keeper room after victory and walking back through the reopened gate. Both scene transitions preserve the actual carried loadout/lamp with captureGolemLoadout/restoreGolemLoadout; neither transition refills health. The existing boss rules, arena lock, one phase, normal kill and R finisher are reused without editing CombatWorld or the standalone Golem Trial.
+
+Four authored presentations supplement the original seal inspection: first sparks, sacristy book, golem awakening/hero recoil, last register. Hero presentations sample custom poses; awakening additionally unfolds the rendered golem vertically while simulation is held. These are initial procedural clips, not browser-reviewed animation polish. Book props do not implement physical hand-contact IK. ENTER/SPACE skips a presentation and produces the same callback/state as normal completion. Pause/hidden tab freezes its timeline. Scene-descriptor acceptance metadata remains pending until actual gameplay verification.
+
+F near the sacristy book reads the order; after the boss, F at the keeper lectern animates and reads the final register, marks the objective complete, and freezes completed gameplay. No reward, summon, corpse consumption or new phase is introduced. Retry still restarts the whole route, not a boss checkpoint. Main/menu integration, persistent saves and final balance remain outside this patch.
+
+Build and acceptance: npm run build:prologue; npm test; node tools/browser-check-last-service.mjs; then manual/full-browser route, both boss endings, locked exit, pause/skip, reading, low-lamp transfer, death/retry and original-level regression. The existing browser smoke covers only the introduction/first lesson, not the boss or finale. No complete build, browser run or passing CI is asserted by this file. Pure tests use injected fake worlds for transitions and cannot validate collision or combat integration.
+
+Preparation result: syntax checks passed for six JavaScript/test files; seven isolated story/fake-world tests passed. These results do not imply a successful project build, browser run, boss fight, or visual acceptance.
