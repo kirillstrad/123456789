@@ -2,15 +2,15 @@
   "scope": "patches-1-2-3-4-and-visual-ember",
   "status": "incomplete-or-failed",
   "checks": {
-    "migration": "failure",
-    "build": "skipped",
-    "unit": "skipped",
-    "browser": "skipped",
-    "regression": "skipped",
+    "migration": "success",
+    "build": "success",
+    "unit": "success",
+    "browser": "failure",
+    "regression": "success",
     "integration": "skipped"
   },
-  "inputCommit": "82a92715223db9bb0619d4276672f9715eb12ccc",
+  "inputCommit": "065a8e138470b7d522429394e3487935b1127276",
   "testedSourceCommit": null,
-  "workflowRun": "44889021384",
+  "workflowRun": "44927022003",
   "humanVisualAcceptance": false
 }
