@@ -2,7 +2,8 @@ export const LAST_SERVICE_BOUNDS=Object.freeze({minX:2,maxX:22,minY:-51,maxY:20}
 export const LAST_SERVICE_DOOR='last-service.guardroom';
 export function createLastServiceEntry(createDoorScene,createDoorEnvironment){
  const rects=[{minX:1.6,maxX:2,minY:-51.4,maxY:20.4},{minX:22,maxX:22.4,minY:-51.4,maxY:20.4},{minX:2,maxX:22,minY:-51.4,maxY:-51},{minX:2,maxX:22,minY:20,maxY:20.4},{minX:14,maxX:22,minY:-23,maxY:20},{minX:14,maxX:22,minY:-51,maxY:-39}];
- for(const y of [11.5,1,-10,-22,-33,-41])rects.push({minX:2,maxX:6.8,minY:y-.2,maxY:y+.2},{minX:9.2,maxX:14,minY:y-.2,maxY:y+.2});
+ // The iron leaves need hinge-side clearance throughout the conservative sweep.
+ for(const y of [11.5,1,-10,-22,-33,-41]){const door=y===11.5;rects.push({minX:2,maxX:door?6.65:6.8,minY:y-.2,maxY:y+.2},{minX:door?9.35:9.2,maxX:14,minY:y-.2,maxY:y+.2});}
  rects.push({minX:5.2,maxX:6.2,minY:-14,maxY:-12.8},{minX:9.8,maxX:10.8,minY:-17,maxY:-15.8},{minX:15.8,maxX:16.2,minY:-36,maxY:-26});
  const lights=[{id:'last-service.wicks',modelId:'candlesticks.a',initialStatus:'off',transform:{x:6.3,y:15.1,yaw:0}},...[-6,-18,-28,-38,-47].map((y,i)=>({id:'last-service.candles-'+i,modelId:'simple-candle.a',initialStatus:'off',transform:{x:4,y,yaw:0}}))];
  const doorScene=createDoorScene({circles:[],rects},[{id:LAST_SERVICE_DOOR,modelId:'iron-door.a',x:8,y:11.5,yaw:0}],{bounds:LAST_SERVICE_BOUNDS,routeBounds:LAST_SERVICE_BOUNDS,lights,legacyGate:false});
