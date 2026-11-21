@@ -9,8 +9,8 @@
     "regression": "skipped",
     "integration": "skipped"
   },
-  "inputCommit": "abfab0e459357ed0f6246208d8114a6ed4f46205",
+  "inputCommit": "0c31d57e0359555ed6e1c00697f69f2118099f89",
   "testedSourceCommit": null,
-  "workflowRun": "44883690258",
+  "workflowRun": "44885156551",
   "humanVisualAcceptance": false
 }
