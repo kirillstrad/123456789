@@ -41,7 +41,7 @@ jobs:
       - id: core
         if: steps.build.outcome == 'success'
         continue-on-error: true
-        run: set -o pipefail; node tools/verify-last-service-runtime.mjs 2>&1 | tee last-service-core.log
+        run: set -o pipefail; node tools/run-last-service-core.mjs 2>&1 | tee last-service-core.log
       - id: chromium
         if: steps.dependencies.outcome == 'success'
         continue-on-error: true
