@@ -22,6 +22,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Verify visual migration compatibility
+        run: node --test tests/visual-ember-migration.test.mjs
       - id: migration
         run: node tools/apply-bestiary-4.mjs && node tools/apply-visual-ember.mjs
       - id: build
