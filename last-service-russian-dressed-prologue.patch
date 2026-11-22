@@ -1,0 +1,493 @@
+--- /dev/null
++++ b/src/ui/relic-cyrillic.js
+@@ -0,0 +1,45 @@
++// Seven-row Cyrillic forms matched to the embedded carved Latin alphabet.
++export const relicCyrillic=Object.freeze({
++ 'А':'01110/11011/11011/11111/11011/11011/11011',
++ 'Б':'11111/11000/11000/11110/11011/11011/11110',
++ 'В':'11110/11011/11011/11110/11011/11011/11110',
++ 'Г':'11111/11000/11000/11000/11000/11000/11000',
++ 'Д':'00110/01010/01010/01010/10010/11111/10001',
++ 'Е':'11111/11000/11000/11110/11000/11000/11111',
++ 'Ё':'01010/00000/11111/11000/11110/11000/11111',
++ 'Ж':'10101/10101/01110/00100/01110/10101/10101',
++ 'З':'11110/00011/00011/01110/00011/00011/11110',
++ 'И':'10001/10011/10011/10101/11001/11001/10001',
++ 'Й':'01010/00100/10001/10011/10101/11001/10001',
++ 'К':'11011/11010/11100/11100/11010/11011/11011',
++ 'Л':'00111/01111/01011/01011/11011/11011/11011',
++ 'М':'10001/11011/11111/11011/11011/11011/11011',
++ 'Н':'11011/11011/11011/11111/11011/11011/11011',
++ 'О':'01110/11011/11011/11011/11011/11011/01110',
++ 'П':'11111/11011/11011/11011/11011/11011/11011',
++ 'Р':'11110/11011/11011/11110/11000/11000/11000',
++ 'С':'01111/11000/11000/11000/11000/11000/01111',
++ 'Т':'11111/00100/00100/00100/00100/00100/00100',
++ 'У':'11011/11011/11011/01111/00011/00011/11110',
++ 'Ф':'00100/01110/10101/10101/10101/01110/00100',
++ 'Х':'11011/11011/01010/00100/01010/11011/11011',
++ 'Ц':'10010/10010/10010/10010/10010/11111/00001',
++ 'Ч':'11011/11011/11011/01111/00011/00011/00011',
++ 'Ш':'10101/10101/10101/10101/10101/10101/11111',
++ 'Щ':'10101/10101/10101/10101/10101/11111/00001',
++ 'Ъ':'11100/01100/01100/01110/01011/01011/01110',
++ 'Ы':'10001/10001/10001/11101/10101/10101/11101',
++ 'Ь':'11000/11000/11000/11110/11011/11011/11110',
++ 'Э':'11110/00011/00011/01111/00011/00011/11110',
++ 'Ю':'10010/10101/10101/11101/10101/10101/10010',
++ 'Я':'01111/11011/11011/01111/00111/01011/11011',
++ '—':'00000/00000/00000/11111/00000/00000/00000',
++ '–':'00000/00000/00000/01110/00000/00000/00000',
++ '«':'00000/01010/10100/01010/00000/00000/00000',
++ '»':'00000/01010/00101/01010/00000/00000/00000',
++ '…':'00000/00000/00000/00000/00000/00000/10101',
++ '·':'00000/00000/00000/00100/00000/00000/00000',
++ '%':'11001/11010/00010/00100/01000/01011/10011',
++ '№':'10001/11001/10101/10011/10001/00000/11111',
++ '\u00a0':'00000/00000/00000/00000/00000/00000/00000'
++});
+--- a/src/ui/relic-font.js
++++ b/src/ui/relic-font.js
+@@ -1,3 +1,4 @@
++import {relicCyrillic} from './relic-cyrillic.js';
+ // Original embedded bitmap alphabet: no remote font, OS font or canvas text dependency.
+ const alphabet={
+  A:'01110/11011/11011/11111/11011/11011/11011',B:'11110/11011/11011/11110/11011/11011/11110',
+@@ -29,11 +30,12 @@
+  '<':'00001/00010/00100/01000/00100/00010/00001','=':'00000/00000/11111/00000/11111/00000/00000',
+  ' ':'00000/00000/00000/00000/00000/00000/00000'
+ };
++Object.assign(alphabet,relicCyrillic);
+ export const relicAlphabet=Object.freeze(Object.fromEntries(Object.entries(alphabet).map(([k,v])=>[k,Object.freeze(v.split('/'))])));
+-export const relicMeasure=(text,scale=1)=>String(text).length*6*scale;
++export const relicMeasure=(text,scale=1)=>String(text).normalize('NFC').length*6*scale;
+ export function relicLetters(ctx,text,x,y,scale=1,title=false){
+  const sy=scale*(title?1.25:1);
+- for(const ch of String(text).toUpperCase()){
++ for(const ch of String(text).normalize('NFC').toUpperCase()){
+   const glyph=relicAlphabet[ch]??relicAlphabet['?'];
+   glyph.forEach((row,j)=>{for(let i=0;i<5;i++)if(row[i]==='1'){
+    ctx.fillRect(x+i*scale,y+j*sy,scale*.91,sy*.94);
+@@ -42,3 +44,4 @@
+   x+=6*scale;
+  }
+ }
++export const relicUnsupportedCharacters=text=>[...new Set([...String(text).normalize('NFC').toUpperCase()].filter(c=>!/[\r\n\t]/.test(c)&&!Object.hasOwn(relicAlphabet,c)))];
+--- /dev/null
++++ b/src/ui/last-service-localization.js
+@@ -0,0 +1,23 @@
++import {relicLetters,relicMeasure} from './relic-font.js';
++import {heroHudBounds} from '../app/world-surface.js';
++const names=Object.freeze({bonebound:'Костяной служитель','marrow-archer':'Костяной стрелок',ashbound:'Пепельник','ossuary-guard':'Страж костницы',gravebearer:'Гробоносец','bloated-remnant':'Вздувшийся останок','corpse-golem':'Трупный голем','test-warden':'Смотритель'});
++export const lastServiceEnemyName=enemy=>names[enemy?.archetype]??'Неупокоенный';
++export function lastServiceRoom(s,chapter=null){
++ if(chapter==='keeper')return 'ПОКОИ ХРАНИТЕЛЯ';if(chapter==='boss')return 'НИЖНЯЯ ЧАСОВНЯ';
++ if(s.x>14&&s.y<-23&&s.y>-39)return 'БОКОВАЯ УСЫПАЛЬНИЦА';
++ return s.y>11.5?'ПРИТВОР':s.y>1?'КАРАУЛЬНАЯ':s.y>-22?'ПОГРЕБАЛЬНАЯ ГАЛЕРЕЯ':s.y>-33?'РИЗНИЦА':s.y>-41?'КОСТНИЦА':'ПРЕДДВЕРИЕ ЧАСОВНИ';
++}
++export function paintLastServiceLabels(ctx,s,{width,height,ready,chapter=null,hidden=false}={}){
++ if(hidden)return;
++ const label=(text,x,y,scale=1.2,title=false,center=true)=>{
++  ctx.fillStyle='#050405';relicLetters(ctx,text,x-(center?relicMeasure(text,scale)/2:0)+1,y+1,scale,title);
++  ctx.fillStyle='#d2b991';relicLetters(ctx,text,x-(center?relicMeasure(text,scale)/2:0),y,scale,title);
++ };
++ ctx.save();try{
++  const r=heroHudBounds(width,height),life=Math.ceil(Math.max(0,Math.min(100,s.lamp)));
++  label(lastServiceRoom(s,chapter),18,18,1.05,true,false);
++  label(`ЛАМПА ${life}/100`,r.x+r.width*.15,r.y+r.height*.86,1.1);
++  label(ready?'РЫВОК ГОТОВ':'РЫВОК',r.x+r.width*.85,r.y+r.height*.86,1.1);
++  if(life<=15)label(life<=0?'ОГОНЬ ПОГАС':life<=1?'ПОСЛЕДНИЙ УГОЛЬ':'ОГОНЬ МЕРКНЕТ',width/2,r.y+r.height*.65,1.1);
++ }finally{ctx.restore();}
++}
+--- /dev/null
++++ b/src/levels/last-service-dressing.js
+@@ -0,0 +1,119 @@
++// Authored, deterministic room compositions. Solid furnishings publish matching footprints.
++const STONE=[76,72,65],TRIM=[115,105,86],IRON=[52,53,53],WOOD=[62,45,39],CLOTH=[79,27,31];
++export function buildLastServiceDressing(kind='wing'){
++ if(!['wing','chapel','keeper'].includes(kind))throw Error('Unknown Last Service dressing');
++ const parts=[],rects=[],lights=[],features=[];
++ const part=(type,v,c,w=1,extra={})=>parts.push({kind:type,v,c,w,hero:false,d:v.reduce((n,p)=>n+p[0]+p[1]+p[2]*.006,0)/v.length+(extra.floor?-999900:0),...extra});
++ const line=(v,c=TRIM,w=1,extra={})=>part(1,v,c,w,extra);
++ const face=(v,c,extra={})=>part(0,v,c,1,extra);
++ function box(x,y,z,w,d,h,c=STONE,solid=false){
++  const p=[[x,y,z],[x+w,y,z],[x+w,y+d,z],[x,y+d,z],[x,y,z+h],[x+w,y,z+h],[x+w,y+d,z+h],[x,y+d,z+h]];
++  for(const [indices,gain]of [[[0,1,5,4],.65],[[1,2,6,5],.48],[[2,3,7,6],.8],[[3,0,4,7],.57],[[4,5,6,7],1.1]])face(indices.map(i=>p[i]),c.map(n=>Math.round(n*gain)),{occluder:h>1});
++  if(solid)rects.push({minX:x,maxX:x+w,minY:y,maxY:y+d});
++ }
++ function arch(x,y,half=1.65,height=2.4){
++  features.push({type:'pointed-arch',x,y});
++  for(const side of [-1,1]){
++   box(x+side*half-.11,y-.13,0,.22,.26,height,STONE);
++   box(x+side*half-.21,y-.21,0,.42,.42,.18,TRIM);
++   const v=[];for(let i=0;i<=12;i++){const t=i/12;v.push([x+side*half*(1-t),y,height+1.15*Math.sin(t*Math.PI/2)]);}
++   line(v,TRIM,4,{occluder:true});line(v.map(p=>[p[0],p[1]+.14,p[2]-.08]),IRON,2,{occluder:true});
++  }
++ }
++ function niche(x,y,side){
++  features.push({type:'burial-niche',x,y});
++  face([[x,y-.65,.35],[x,y+.65,.35],[x,y+.65,1.65],[x,y,2.1],[x,y-.65,1.65]],[20,22,24]);
++  line([[x+side*.02,y-.65,.35],[x+side*.02,y-.65,1.65],[x+side*.02,y,2.1],[x+side*.02,y+.65,1.65],[x+side*.02,y+.65,.35]],TRIM,3);
++  box(Math.min(x,x+side*.18),y-.72,.22,.18,1.44,.15,STONE);
++  for(let i=0;i<3;i++)line([[x+side*.04,y-.32,1.35-i*.14],[x+side*.04,y+.32-(i%2)*.16,1.35-i*.14]],[97,89,72],1);
++  for(const d of [-.26,.26])box(Math.min(x,x+side*.1),y+d-.06,.4,.1,.12,.09,[127,115,89]);
++ }
++ function coffin(x,y){
++  features.push({type:'sarcophagus',x,y});
++  box(x-.46,y-1,0,.92,2,.12,STONE,true);box(x-.4,y-.93,.12,.8,1.86,.48,STONE);
++  box(x-.45,y-.98,.6,.9,1.96,.12,TRIM);line([[x,y-.55,.73],[x,y+.55,.73]],IRON,3);line([[x-.22,y-.1,.73],[x+.22,y-.1,.73]],IRON,3);
++ }
++ function bench(x,y,w=1.8){
++  features.push({type:'bench',x,y});
++  box(x-w/2,y-.28,.43,w,.56,.12,WOOD,true);
++  for(const dx of [-w/2+.1,w/2-.2])box(x+dx,y-.2,0,.1,.4,.43,WOOD);
++  box(x-w/2,y+.2,.55,w,.08,.5,WOOD);
++ }
++ function shelf(x,y){
++  features.push({type:'archive',x,y});box(x-.3,y-.8,0,.6,1.6,1.85,WOOD,true);
++  for(const z of [.18,.7,1.22,1.75]){
++   box(x-.33,y-.84,z,.66,1.68,.07,TRIM);
++   if(z<1.7)for(let i=0;i<8;i++)box(x+.23,y-.7+i*.17,z+.07,.1,.11,.28+(i%3)*.04,i%2?CLOTH:[104,87,59]);
++  }
++ }
++ function table(x,y,altar=false){
++  features.push({type:altar?'altar':'writing-table',x,y});const w=altar?2.1:1.7;
++  box(x-w/2,y-.44,.82,w,.88,.15,altar?STONE:WOOD,true);
++  for(const dx of [-w/2+.12,w/2-.24])box(x+dx,y-.32,0,.12,.64,.82,altar?STONE:WOOD);
++  face([[x-.5,y-.32,.98],[x+.5,y-.32,.98],[x+.5,y+.3,.98],[x-.5,y+.3,.98]],[139,121,88]);
++  line([[x,y-.25,.99],[x,y+.24,.99]],IRON,1);
++  if(altar){box(x-.18,y+.15,.98,.36,.25,.2,IRON);line([[x,y+.3,1.2],[x,y+.3,2.05]],TRIM,4);line([[x-.24,y+.3,1.75],[x+.24,y+.3,1.75]],TRIM,3);}
++ }
++ function candle(x,y,z=0,count=3){
++  features.push({type:'votive-candles',x,y});
++  for(let i=0;i<count;i++){
++   const X=x+(i-(count-1)/2)*.12,h=.2+(i%3)*.11;
++   box(X-.026,y-.026,z,.052,.052,h,[161,138,94]);
++   line([[X,y,z+h],[X,y,z+h+.1]],[255,208,120],2);
++   part(2,[[X,y,z+h+.06]],[255,235,187],1,{r:1.7});
++  }
++  lights.push({x,y,z:z+.4,r:55,power:.2,fireWarmth:1});
++ }
++ function rug(x,y,w,d){
++  features.push({type:'processional-cloth',x,y});face([[x-w/2,y-d/2,.012],[x+w/2,y-d/2,.012],[x+w/2,y+d/2,.012],[x-w/2,y+d/2,.012]],CLOTH,{floor:true});
++  for(const side of [-1,1])line([[x+side*(w/2-.08),y-d/2,.014],[x+side*(w/2-.08),y+d/2,.014]],[121,93,62],1,{floor:true});
++ }
++ function floorSeal(x,y,r=.9){
++  const ring=[];for(let i=0;i<=32;i++){const a=i/32*Math.PI*2;ring.push([x+Math.cos(a)*r,y+Math.sin(a)*r,.016]);}
++  line(ring,[124,101,65],1,{floor:true});line([[x-r*.65,y,.018],[x+r*.65,y,.018]],[116,100,76],1,{floor:true});line([[x,y-r*.65,.018],[x,y+r*.65,.018]],[116,100,76],1,{floor:true});
++ }
++ function standards(y){
++  for(const x of [2.55,13.45]){
++   line([[x,y,1.7],[x,y,2.8]],IRON,2,{occluder:true});
++   face([[x-.22,y,2.65],[x+.22,y,2.65],[x+.2,y,1.65],[x,y,1.45],[x-.2,y,1.65]],CLOTH,{occluder:true});
++   line([[x,y-.015,2.4],[x,y-.015,1.85]],TRIM,2,{occluder:true});
++  }
++ }
++ if(kind==='wing'){
++  for(const y of [11.5,1,-10,-22,-33,-41])arch(8,y);
++  // Low approach-side architecture and high far-side niches leave the player readable.
++  for(const y of [16.8,7.4,3.3,-3.5,-8,-13,-18.5,-26.5,-30.5,-35.5,-38,-44,-48])niche(2.1,y,1);
++  for(const y of [16,6,-5.3,-16,-25.5,-36,-45.5]){niche(13.85,y,-1);standards(y);}
++  rug(8,16,2.3,4.5);floorSeal(8,18.4,.75);
++  bench(11.5,15.5);candle(11.5,15.5,.58,5);
++  bench(11.4,7.4);table(11.4,3.2);shelf(3.05,3.1);
++  for(const y of [-4.4,-16.5,-29.5,-36.5,-45.5])coffin(3.1,y);
++  for(const y of [-6,-18,-28,-38,-47])candle(12.8,y,.1,4);
++  floorSeal(8,-7,.8);floorSeal(8,-20,.65);
++  shelf(12.75,-24.5);table(11.3,-29.3);rug(8,-25,2.1,3.7);
++  bench(11.3,-36.6);table(20.3,-26.5);coffin(20.5,-33.6);candle(20.5,-33.6,.75,4);
++  for(const y of [-25,-30,-35.8])niche(21.8,y,-1);
++  rug(8,-46.1,2,6.6);standards(-49.3);floorSeal(8,-49.4,.65);
++ }else if(kind==='chapel'){
++  arch(8,14.625,1.65,2.75);arch(8,3.05,2.4,2.7);
++  table(8,3.7,true);rug(8,10,1.8,6.5);
++  for(const y of [5.2,9,12]){niche(2.52,y,1);niche(13.48,y,-1);}
++  for(const x of [4.6,11.4]){bench(x,12.6,1.5);candle(x,4.5,.25,5);}
++  floorSeal(8,7,1.4);standards(4.1);
++ }else{
++  shelf(3.05,4.5);shelf(3.05,7.5);shelf(12.75,4.5);shelf(12.75,7.5);
++  table(11.25,10.3);bench(11.25,11.3);coffin(3.1,11.5);
++  rug(8,8.5,2.2,6);arch(8,3,2.5,2.3);
++  for(const x of [5.3,10.7])candle(x,6.8,.1,5);floorSeal(8,7,.8);
++ }
++ return {parts,rects,lights,features};
++}
++export function dressingEnvironment(env,dressing){
++ return {get parts(){return[...(env.parts??[]),...dressing.parts];},get lights(){return[...(env.lights??[]),...dressing.lights];},setView(...args){env.setView?.(...args);},step(dt){env.step?.(dt);}};
++}
++export function dressLastServiceScene(scene,kind){
++ const map=scene.doorScene?.map??scene.map;
++ if(!Array.isArray(map?.rects))throw Error('Dressed scene requires a mutable collision map');
++ const dressing=buildLastServiceDressing(kind);map.rects.push(...dressing.rects);
++ return {...scene,env:dressingEnvironment(scene.env,dressing)};
++}
+--- a/src/levels/last-service-entry.js
++++ b/src/levels/last-service-entry.js
+@@ -1,3 +1,4 @@
++import {buildLastServiceDressing,dressingEnvironment} from './last-service-dressing.js';
+ export const LAST_SERVICE_BOUNDS=Object.freeze({minX:2,maxX:22,minY:-51,maxY:20});
+ export const LAST_SERVICE_DOOR='last-service.guardroom';
+ export function createLastServiceEntry(createDoorScene,createDoorEnvironment){
+@@ -6,11 +7,12 @@
+  for(const y of [11.5,1,-10,-22,-33,-41]){const door=y===11.5;rects.push({minX:2,maxX:door?6.65:6.8,minY:y-.2,maxY:y+.2},{minX:door?9.35:9.2,maxX:14,minY:y-.2,maxY:y+.2});}
+  rects.push({minX:5.2,maxX:6.2,minY:-14,maxY:-12.8},{minX:9.8,maxX:10.8,minY:-17,maxY:-15.8},{minX:15.8,maxX:16.2,minY:-36,maxY:-26});
+  const lights=[{id:'last-service.wicks',modelId:'candlesticks.a',initialStatus:'off',transform:{x:6.3,y:15.1,yaw:0}},...[-6,-18,-28,-38,-47].map((y,i)=>({id:'last-service.candles-'+i,modelId:'simple-candle.a',initialStatus:'off',transform:{x:4,y,yaw:0}}))];
++ const dressing=buildLastServiceDressing('wing'),structural=rects.slice();rects.push(...dressing.rects);
+  const doorScene=createDoorScene({circles:[],rects},[{id:LAST_SERVICE_DOOR,modelId:'iron-door.a',x:8,y:11.5,yaw:0}],{bounds:LAST_SERVICE_BOUNDS,routeBounds:LAST_SERVICE_BOUNDS,lights,legacyGate:false});
+  const parts=[],part=(kind,v,c,w=1)=>({kind,v,c,w,hero:false,d:v.reduce((n,p)=>n+p[0]+p[1]+p[2]*.006,0)/v.length});
+- for(let x=2;x<22;x+=.75)for(let y=-51;y<20;y+=.75){if(x>=14&&(y>=-23||y<-39))continue;const X=Math.min(22,x+.75),Y=Math.min(20,y+.75),t=48+((Math.round(x*4)+Math.round(y*4))%3)*4;parts.push(part(0,[[x,y,0],[X,y,0],[X,Y,0],[x,Y,0]],[t,t-4,t-9]));}
+- for(const r of rects){const h=r.minX>=14?.5:2.4;for(const [a,b]of [[[r.minX,r.minY],[r.maxX,r.minY]],[[r.minX,r.minY],[r.minX,r.maxY]]])parts.push(part(0,[[...a,0],[...b,0],[...b,h],[...a,h]],[68,64,57]));}
++ for(let x=2;x<22;x+=.75)for(let y=-51;y<20;y+=.75){if(x>=14&&(y>=-23||y<-39))continue;const X=Math.min(22,x+.75),Y=Math.min(20,y+.75),t=48+((Math.round(x*4)+Math.round(y*4))%3)*4;parts.push(part(0,[[x,y,0],[X,y,0],[X,Y,0],[x,Y,0]],[t,t-4,t-9]));parts[parts.length-1].floor=true;parts[parts.length-1].d-=1000000;}
++ for(const r of structural){const h=r.minX>=14?.5:2.4;for(const [a,b]of [[[r.minX,r.minY],[r.maxX,r.minY]],[[r.minX,r.minY],[r.minX,r.maxY]]]){const p=part(0,[[...a,0],[...b,0],[...b,h],[...a,h]],[68,64,57]);p.occluder=h>1;parts.push(p);}}
+  parts.push(part(1,[[7.1,17,0],[7.1,17,1.3]],[92,85,72],4),part(0,[[6.85,17,1.1],[7.35,17,1.1],[7.35,17,1.5],[6.85,17,1.5]],[102,39,29]));
+  // The second opening around the side partition is a return loop to the shrine.
+- return {doorScene,env:createDoorEnvironment(doorScene,()=>({parts,lights:[]}))};
++ return {doorScene,env:dressingEnvironment(createDoorEnvironment(doorScene,()=>({parts,lights:[]})),dressing)};
+ }
+--- a/src/game/last-service-finale.js
++++ b/src/game/last-service-finale.js
+@@ -1,5 +1,6 @@
++import {dressLastServiceScene} from '../levels/last-service-dressing.js';
+ export function createLastServiceFinale(source,{createWorld,createArena,createKeeper,capture,restore}){
+- const checkpoint=capture(source);let scene=createArena(),world=createWorld(scene.doorScene.map),chapter='boss',done=false;
++ const checkpoint=capture(source);let scene=dressLastServiceScene(createArena(),'chapel'),world=createWorld(scene.doorScene.map),chapter='boss',done=false;
+  world.startGolemTrial();restore(world.current,checkpoint);
+  Object.assign(world.current,{y:14.1,cameraY:14.1});world.previous=world.snapshot();
+  // Enter fully before the presentation starts; this closes the existing gate.
+--- a/src/app/last-service-view.js
++++ b/src/app/last-service-view.js
+@@ -6,25 +6,32 @@
+ import {golemTelegraphs} from '../render/golem-telegraph.js';
+ import {blocked} from '../combat/geometry.js';
+ import {paintGolemTrialHud} from '../ui/golem-trial-hud.js';
+-import {paintHeroOverlayLabels} from '../ui/hero-overlay-labels.js';
++import {composeCombatHud} from '../ui/combat-hud.js';
++import {paintLastServiceLabels,lastServiceEnemyName} from '../ui/last-service-localization.js';
++import {DASH} from '../combat/ash-dash.js';
++import {relicUnsupportedCharacters} from '../ui/relic-font.js';
+ import {lampLighting} from '../render/lamp-light.js';
+ import {ASCII} from '../render/ascii.js';
+ import {createEngineHudPass} from '../ui/engine-hud-pass.js';
+ export function createLastServiceView(cv){
+  const W=1008,H=864,COLS=196,ROWS=168,out=cv.getContext('2d');
+  const canvas=(w,h)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c;};
+- const surface=canvas(W,H),ctx=surface.getContext('2d'),ascii=new ASCII(out),hud=createEngineHudPass(canvas);let camera={x:8,y:18.2};
++ const surface=canvas(W,H),ctx=surface.getContext('2d'),ascii=new ASCII(out),hud=createEngineHudPass(canvas);let camera={x:8,y:18.2},hudFrames=0,hudOwner={},lastHudTime=-1;
++ globalThis.__ASH_LAST_SERVICE_PRESENTATION__=Object.freeze({language:'ru',supportsText:text=>relicUnsupportedCharacters(text).length===0,hudFrames:()=>hudFrames});
+  const project=(x,y,z)=>[W/2+((x-camera.x)-(y-camera.y))*49.4,430+((x-camera.x)+(y-camera.y))*27.95-z*56.55];
+  return {
+  aim(point){if(!point)return null;const a=(point.x-W/2)/49.4,b=(point.y-430)/27.95;return{x:camera.x+(a+b)/2,y:camera.y+(b-a)/2};},
+- paint({s,intro,env,manifest,paused,ready,ritual,map,story=null,extra=[],executionReady=false}){
+-  camera={x:s.cameraX,y:s.cameraY};env.setView?.(s,project);s={...s,visualLights:env.lights};
++ paint({s,intro,env,manifest,paused,ready,ritual,map,story=null,extra=[],executionReady=false,chapter=null}){
++  camera={x:s.cameraX,y:s.cameraY};env.setView?.(s,project);s={...s,visualLights:env.lights,enemies:(s.enemies??[]).map(e=>({...e,name:lastServiceEnemyName(e)}))};
+   const hero=s.phase!=='dead'&&story?storyHero(s,story):intro.intro?sealInspectionHero(s,intro.elapsed):combatHero(s),enemies=s.enemies??[];
+   const particles=s.particles.map(p=>({kind:2,v:[[p.x,p.y,p.z]],r:2,c:[255,160,64],alpha:Math.min(1,p.life*2),d:p.x+p.y+p.z*.006}));
+   const parts=[...env.parts,...enemies.flatMap(e=>awakeningParts(executionEnemyParts(e,s),e.archetype==='corpse-golem'?story:null)),...(map?golemTelegraphs(s,map,blocked):[]),...particles,...arrowParts(s.arrows??[]),...hero.parts,...ritual.parts,...extra,...(ritual.hint?[ritual.hint]:[])].filter(p=>p.hero||p.v.some(v=>Math.abs(v[0]-s.x)<18&&Math.abs(v[1]-s.y)<18)).sort((a,b)=>a.d-b.d);
+   const color=c=>Array.isArray(c)?`rgb(${c.map(v=>Math.round(Math.max(0,Math.min(255,v))))})`:c;
+   ctx.globalAlpha=1;ctx.fillStyle='#020306';ctx.fillRect(0,0,W,H);
+-  for(const p of parts){ctx.globalAlpha=p.alpha??1;ctx.fillStyle=color(p.c);ctx.strokeStyle=ctx.fillStyle;ctx.lineWidth=p.w??1;ctx.lineCap='round';ctx.lineJoin='round';
++  const heroScreen=project(s.x,s.y,1);
++  for(const p of parts){ctx.globalAlpha=p.alpha??1;
++   if(p.occluder||p.wall){const q=p.v.map(v=>project(...v)),xs=q.map(v=>v[0]),ys=q.map(v=>v[1]);if(Math.min(...xs)<heroScreen[0]+24&&Math.max(...xs)>heroScreen[0]-24&&Math.min(...ys)<heroScreen[1]+55&&Math.max(...ys)>heroScreen[1]-45)ctx.globalAlpha*=.2;}
++  ctx.fillStyle=color(p.c);ctx.strokeStyle=ctx.fillStyle;ctx.lineWidth=p.w??1;ctx.lineCap='round';ctx.lineJoin='round';
+    if(p.kind===3){ctx.font=`${p.size??12}px monospace`;ctx.textAlign='center';ctx.fillText(p.text,...project(...p.v[0]));continue;}
+    if(p.kind===2){const q=project(...p.v[0]),r=(p.r??0)*65/94;ctx.beginPath();ctx.ellipse(q[0],q[1],r,r*.85,0,0,7);ctx.fill();continue;}
+    ctx.beginPath();p.v.forEach((v,i)=>{const q=project(...v);if(i)ctx.lineTo(...q);else ctx.moveTo(...q);});if(p.kind===1)ctx.stroke();else{ctx.closePath();ctx.fill();}
+@@ -32,10 +39,12 @@
+   ctx.globalAlpha=1;const data=ascii.read(surface,COLS,ROWS),lamp=project(...hero.lamp),profile=lampLighting(s.lamp,s.phase),radius=170*profile.radiusScale;
+   const lights=[...env.lights,...ritual.lights].map(l=>({p:project(l.x,l.y,l.groundZ??l.z),r:l.r,power:l.power}));
+   for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){const k=(y*COLS+x)*4,px=(x+.5)*W/COLS,py=(y+.5)*H/ROWS;let g=.065+profile.power*Math.exp(-((px-lamp[0])**2+(py-lamp[1])**2)/(2*radius**2));for(const l of lights)g+=l.power*Math.exp(-((px-l.p[0])**2+(py-l.p[1])**2)/(2*l.r*l.r));data[k]*=g;data[k+1]*=g*.94;data[k+2]*=g*.82;}
+-  const target=hud.begin(W,H);paintHeroOverlayLabels(target,s,{width:W,height:H,ready});paintGolemTrialHud(target,s,{width:W,enabled:true,available:executionReady});target.fillStyle='#cdbb9c';target.font='15px monospace';target.textAlign='center';
+-  for(const e of enemies)if(e.archetype!=='corpse-golem'&&e.hp>0&&Math.hypot(e.x-s.x,e.y-s.y)<7){const p=project(e.x,e.y,2);target.fillText(`${e.hp} / ${e.maxHp} HP`,p[0],p[1]);}
+-  if(paused)target.fillText('ПАУЗА — ESC: продолжить',W/2,H/2);else if(story)target.fillText('ENTER / SPACE — пропустить сцену',W/2,800);
+-  hud.compose(data,COLS,ROWS);if(!paused)manifest.paint(data,COLS,ROWS);out.fillStyle='#000';out.fillRect(0,0,W,H);ascii.paint(data,COLS,ROWS,0,H,false,hud.annotations());if(!paused)manifest.text(out,COLS,ROWS,H);
++  if(s.time<lastHudTime)hudOwner={};lastHudTime=s.time;
++  data.set(composeCombatHud(data,COLS,ROWS,ROWS,hudOwner,s,ready,DASH.cooldown));hudFrames++;
++  const target=hud.begin(W,H);paintGolemTrialHud(target,s,{width:W,enabled:true,available:executionReady});target.fillStyle='#cdbb9c';target.font='15px monospace';target.textAlign='center';
++  for(const e of enemies)if(e.archetype!=='corpse-golem'&&e.hp>0&&Math.hypot(e.x-s.x,e.y-s.y)<7){const p=project(e.x,e.y,2);target.fillText(`${e.hp} / ${e.maxHp} ОЗ`,p[0],p[1]);}
++  if(paused)target.fillText('ПАУЗА — ESC: продолжить',W/2,H/2);else if(story)target.fillText('ВВОД / ПРОБЕЛ — пропустить сцену',W/2,728);
++  hud.compose(data,COLS,ROWS);if(!paused)manifest.paint(data,COLS,ROWS);out.fillStyle='#000';out.fillRect(0,0,W,H);ascii.paint(data,COLS,ROWS,0,H,false,hud.annotations());paintLastServiceLabels(out,s,{width:W,height:H,ready,chapter,hidden:manifest.blocking()});if(!paused)manifest.text(out,COLS,ROWS,H);
+  }
+  };
+ }
+--- a/src/game/last-service-story.js
++++ b/src/game/last-service-story.js
+@@ -1,3 +1,4 @@
++import {dressLastServiceScene} from '../levels/last-service-dressing.js';
+ const durations=Object.freeze({'first-spark':2.4,ledger:3,awakening:3.2,register:3});
+ const smooth=x=>{x=Math.max(0,Math.min(1,x));return x*x*(3-2*x);};
+ export function storyWeight(progress){return smooth(progress/.25)*(1-smooth((progress-.72)/.28));}
+@@ -18,8 +19,9 @@
+  const map={bounds:{minX:2,maxX:14,minY:2,maxY:14},circles:[],rects:[{minX:1.6,maxX:2,minY:1.6,maxY:14.4},{minX:14,maxX:14.4,minY:1.6,maxY:14.4},{minX:2,maxX:14,minY:1.6,maxY:2},{minX:2,maxX:14,minY:14,maxY:14.4}]};
+  const part=(kind,v,c,w=1)=>({kind,v,c,w,hero:false,d:v.reduce((n,p)=>n+p[0]+p[1]+p[2]*.006,0)/v.length});
+  const parts=[];for(let x=2;x<14;x+=.75)for(let y=2;y<14;y+=.75)parts.push(part(0,[[x,y,0],[x+.75,y,0],[x+.75,y+.75,0],[x,y+.75,0]],[54,48,41]));
++ for(const p of parts){p.floor=true;p.d-=1000000;}
+  for(const r of map.rects)parts.push(part(0,[[r.minX,r.minY,0],[r.maxX,r.maxY,0],[r.maxX,r.maxY,.6],[r.minX,r.minY,.6]],[76,69,59]));
+- return {map,env:{parts,lights:[{x:8,y:7,z:1.3,r:85,power:.65}]}};
++ return dressLastServiceScene({map,env:{parts,lights:[{x:8,y:7,z:1.3,r:85,power:.65}]}},'keeper');
+ }
+ export function storyBookParts(x,y){
+  const v=[[x-.32,y-.22,1],[x+.32,y-.22,1],[x+.32,y+.22,1],[x-.32,y+.22,1]];
+--- a/src/app/last-service.html
++++ b/src/app/last-service.html
+@@ -1 +1 @@
+-<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ASH / IRON — Последняя служба: итерация 3</title><style>body{margin:0;background:#000;color:#b8a58b;font:14px monospace}main{max-width:1008px;margin:auto}canvas{display:block;width:100%;height:auto;outline:none}button{background:#100e0c;color:#cbb998;border:1px solid #665343;padding:10px;margin:8px}#status{padding:8px}</style><main><canvas id="game" width="1008" height="864" tabindex="0" aria-label="Последняя служба — игровой пролог"></canvas><button id="retry">Повторить маршрут</button><button id="new-game">Начать обучение заново</button><div id="status">Итерация 3: маршрут, голем и последний реестр. Кандидат на проверку.</div></main><script src="./vendor/hero.js"></script><script type="module" src="./app/last-service.js"></script></html>
+\ No newline at end of file
++<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Пепел и железо — Последняя служба</title><style>body{margin:0;background:#000;color:#b8a58b;font:14px Georgia,serif}main{max-width:1008px;margin:auto}canvas{display:block;width:100%;height:auto;outline:none}button{background:#100e0c;color:#cbb998;border:1px solid #665343;padding:10px;margin:8px}#status{padding:8px}</style><main><canvas id="game" width="1008" height="864" tabindex="0" aria-label="Последняя служба — игровой пролог"></canvas><button id="retry">Повторить маршрут</button><button id="new-game">Начать пролог заново</button><div id="status">Последняя служба. WASD — движение; ЛКМ / ПКМ — удары; Shift — рывок; E — искры; F — взаимодействие; R — добивание; Esc — пауза. Ввод — читать дальше.</div></main><script src="./vendor/hero.js"></script><script type="module" src="./app/last-service.js"></script></html>
+\ No newline at end of file
+--- a/tools/browser-check-last-service.mjs
++++ b/tools/browser-check-last-service.mjs
+@@ -2,7 +2,7 @@
+ import path from 'node:path';
+ import {pathToFileURL} from 'node:url';
+ import {chromium} from 'playwright';
+-const report={status:'running',scope:'portable entry, movement dialogue, actual light dialogue and frozen gameplay/input; not full-route visual acceptance',errors:[],humanVisualAcceptance:false};let browser,page;
++const report={status:'running',scope:'portable entry, movement dialogue, actual light dialogue, Russian glyph coverage, HUD invocation and frozen gameplay/input; not full-route visual acceptance',errors:[],humanVisualAcceptance:false};let browser,page;
+ fs.mkdirSync('docs',{recursive:true});
+ try{
+  const file=path.resolve('LAST_SERVICE.html');if(!fs.existsSync(file))throw Error('Run npm run build:prologue first');
+@@ -18,6 +18,12 @@
+  await page.keyboard.press('Digit1');await page.waitForTimeout(500);const after=await page.evaluate(()=>window.__ASH_LAST_SERVICE__.state());
+  if(before.time!==after.time||before.x!==after.x||before.y!==after.y||after.action)throw Error('Dialogue did not freeze gameplay/input');
+  const error=await page.evaluate(()=>window.__ASH_LAST_SERVICE_ERROR__??null);if(error)report.errors.push(error);if(report.errors.length)throw Error('Browser runtime errors');
++ report.presentation=await page.evaluate(()=>{
++  const p=window.__ASH_LAST_SERVICE_PRESENTATION__,d=window.__ASH_MANIFEST__.state().dialogue;
++  const text=d.speaker+' '+d.text;
++  return {language:p?.language,cyrillic:/[А-Яа-яЁё]/.test(text),glyphCoverage:p?.supportsText(text),hudFrames:p?.hudFrames()??0};
++ });
++ if(report.presentation.language!=='ru'||!report.presentation.cyrillic||!report.presentation.glyphCoverage||report.presentation.hudFrames<1)throw Error('Russian glyph coverage or existing HUD integration failed');
+  report.status='intro-dialogue-smoke-passed';
+ }catch(error){report.status='failed';report.errors.push(String(error.stack??error));process.exitCode=1;}
+ finally{
+--- /dev/null
++++ b/tests/last-service-presentation.test.mjs
+@@ -0,0 +1,79 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import fs from 'node:fs';
++import {relicAlphabet,relicLetters,relicUnsupportedCharacters} from '../src/ui/relic-font.js';
++import {buildLastServiceDressing,dressingEnvironment,dressLastServiceScene} from '../src/levels/last-service-dressing.js';
++import {createLastServiceEntry} from '../src/levels/last-service-entry.js';
++import {lastServiceEnemyName,lastServiceRoom,paintLastServiceLabels} from '../src/ui/last-service-localization.js';
++const russian='АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ';
++test('all Russian letters and lowercase variants have embedded glyphs',()=>{
++ assert.deepEqual(relicUnsupportedCharacters(russian+russian.toLowerCase()),[]);
++ for(const c of russian){assert.notEqual(relicAlphabet[c],relicAlphabet['?']);assert.equal(relicAlphabet[c].length,7);for(const row of relicAlphabet[c])assert.match(row,/^[01]{5}$/);}
++ assert.notDeepEqual(relicAlphabet['И'],relicAlphabet['Н']);assert.notDeepEqual(relicAlphabet['Е'],relicAlphabet['Ё']);
++});
++test('Russian punctuation and HUD instructions do not fall back to question marks',()=>{
++ assert.deepEqual(relicUnsupportedCharacters('«Последняя служба» — огонь ещё тлеет… ЛКМ / ПКМ · ЛАМПА 70/100; РЫВОК ГОТОВ!'),[]);
++ assert.deepEqual(relicUnsupportedCharacters('☃'),['☃']);
++});
++test('font drawing uses finite bitmap rectangles for Russian body and gothic headings',()=>{
++ const rects=[],ctx={fillRect:(...a)=>rects.push(a)};
++ relicLetters(ctx,'ПЕЧАТЬ ЦЕЛА',0,0,1.5,true);relicLetters(ctx,'Служба продолжается.',0,30,1.2);
++ assert.ok(rects.length>100);assert.ok(rects.every(a=>a.every(Number.isFinite)&&a[2]>0&&a[3]>0));
++});
++for(const kind of ['wing','chapel','keeper']){
++ test(kind+' has deterministic finite architectural and prop geometry',()=>{
++  const d=buildLastServiceDressing(kind);assert.deepEqual(d,buildLastServiceDressing(kind));
++  assert.ok(d.parts.length>200);assert.ok(d.features.length>=8);assert.ok(d.lights.length>0);
++  for(const p of d.parts){assert.ok(Number.isFinite(p.d));assert.ok(p.v.every(v=>v.length===3&&v.every(Number.isFinite)));}
++  for(const r of d.rects)assert.ok(r.minX<r.maxX&&r.minY<r.maxY);
++  for(const l of d.lights)assert.ok([l.x,l.y,l.z,l.r,l.power].every(Number.isFinite)&&l.r>0&&l.power>0);
++ });
++}
++const hits=(x,y,r,rect)=>x>rect.minX-r&&x<rect.maxX+r&&y>rect.minY-r&&y<rect.maxY+r;
++test('dressing leaves all authored enemy spawns and key interactions free',()=>{
++ const d=buildLastServiceDressing('wing');
++ const points=[[8,5.5,.32],[6.5,-5,.32],[9.5,-5,.32],[8,-15,.32],[8,-20.5,.28],[8,-29.5,.38],[8,-37,.4],[6.5,-46,.32],[9.5,-46,.32],[18.5,-35.5,.54],[5,-24.2,.24],[5,-25,.24],[8,-25,.24],[8,18.2,.24],[8,-49,.24]];
++ for(const [x,y,r]of points)assert.ok(!d.rects.some(rect=>hits(x,y,r,rect)),`Blocked key point ${x},${y}`);
++ const protectedSweep={minX:6.65,maxX:9.35,minY:10.2,maxY:12.8};
++ assert.ok(!d.rects.some(r=>r.minX<protectedSweep.maxX&&r.maxX>protectedSweep.minX&&r.minY<protectedSweep.maxY&&r.maxY>protectedSweep.minY));
++});
++test('entry installs furniture colliders before the door scene owns the map',()=>{
++ let captured;const x=createLastServiceEntry((map,defs,options)=>{captured=map;return{map,defs,options};},()=>({parts:[],lights:[]}));
++ for(const r of buildLastServiceDressing('wing').rects)assert.ok(captured.rects.some(q=>JSON.stringify(q)===JSON.stringify(r)));
++ assert.ok(x.env.parts.length>200);assert.ok(x.env.lights.length>0);
++});
++test('dressing preserves environment delegation and live light identities',()=>{
++ const light={x:1},original={parts:[],lights:[light],step(){this.called=true;},setView(s){this.actor=s;}};
++ const d=buildLastServiceDressing('keeper'),env=dressingEnvironment(original,d);env.step(.1);env.setView('hero');
++ assert.equal(original.called,true);assert.equal(original.actor,'hero');assert.equal(env.lights[0],light);
++ const map={rects:[]},scene=dressLastServiceScene({map,env:original},'keeper');assert.equal(scene.map,map);assert.equal(map.rects.length,d.rects.length);
++});
++test('Russian enemy names and room labels remain presentation-only',()=>{
++ const e={archetype:'corpse-golem',name:'CORPSE GOLEM',hp:600};assert.equal(lastServiceEnemyName(e),'Трупный голем');assert.equal(e.name,'CORPSE GOLEM');
++ assert.equal(lastServiceRoom({x:8,y:18}),'ПРИТВОР');assert.equal(lastServiceRoom({},'keeper'),'ПОКОИ ХРАНИТЕЛЯ');
++ const ctx={save(){},restore(){},fillRect(...a){assert.ok(a.every(Number.isFinite));}};
++ paintLastServiceLabels(ctx,{x:8,y:18,lamp:1},{width:1008,height:864,ready:false});
++});
++test('view invokes the existing HUD with live state and localizes boss presentation',()=>{
++ const source=fs.readFileSync(new URL('../src/app/last-service-view.js',import.meta.url),'utf8').replace(/^import .*;\r?\n/gm,'').replace('export function createLastServiceView','function createLastServiceView');
++ const calls=[],ctx=new Proxy({},{get:(o,k)=>k in o?o[k]:()=>{},set:(o,k,v)=>(o[k]=v,true)}),makeCanvas=()=>({getContext:()=>ctx});
++ const hero=()=>({parts:[],lamp:[8,18,1]});let painted;
++ const deps={arrowParts:()=>[],combatHero:hero,sealInspectionHero:hero,storyHero:hero,awakeningParts:a=>a,executionEnemyParts:()=>[],golemTelegraphs:()=>[],blocked:()=>false,paintGolemTrialHud:(c,s)=>calls.push(['boss',s.enemies[0]?.name]),composeCombatHud:(data,cols,rows,frameRows,skin,s,ready,cooldown)=>{calls.push(['hud',s.lamp,ready,cooldown]);const next=new Uint8ClampedArray(data);next[0]=231;return next;},paintLastServiceLabels:()=>{},lastServiceEnemyName,DASH:{cooldown:1.2},relicUnsupportedCharacters,lampLighting:()=>({power:1,radiusScale:1}),ASCII:class{read(){return new Uint8ClampedArray(196*168*4);}paint(data){painted=data[0];}},createEngineHudPass:()=>({begin:()=>ctx,compose(){},annotations:()=>[]}),document:{createElement:makeCanvas}};
++ const factory=Function(...Object.keys(deps),source+';return createLastServiceView;')(...Object.values(deps));
++ const previous=globalThis.__ASH_LAST_SERVICE_PRESENTATION__;
++ try{const view=factory(makeCanvas());view.paint({s:{x:8,y:18,cameraX:8,cameraY:18,lamp:37,phase:'playing',particles:[],enemies:[{archetype:'corpse-golem',hp:600,maxHp:600,x:8,y:7}]},intro:{intro:false},env:{parts:[],lights:[]},manifest:{blocking:()=>false,paint(){},text(){}},paused:false,ready:true,ritual:{parts:[],lights:[],hint:null},chapter:'boss'});
++ assert.ok(calls.some(c=>c[0]==='hud'&&c[1]===37&&c[2]===true&&c[3]===1.2));assert.ok(calls.some(c=>c[0]==='boss'&&c[1]==='Трупный голем'));assert.equal(painted,231);assert.equal(globalThis.__ASH_LAST_SERVICE_PRESENTATION__.hudFrames(),1);
++ }finally{if(previous===undefined)delete globalThis.__ASH_LAST_SERVICE_PRESENTATION__;else globalThis.__ASH_LAST_SERVICE_PRESENTATION__=previous;}
++});
++
++test('static furnished wing retains connected mandatory route and optional return loop',()=>{
++ let map;createLastServiceEntry(base=>{map={...base,bounds:{minX:2,maxX:22,minY:-51,maxY:20}};return{map};},()=>({parts:[],lights:[]}));
++ const h=.25,nx=81,ny=285,cell=(x,y)=>Math.round((y+51)/h)*nx+Math.round((x-2)/h),queue=[cell(8,18.2)],seen=new Set(queue);
++ for(let k=0;k<queue.length;k++){const id=queue[k],X=id%nx,Y=Math.floor(id/nx);for(const [dx,dy]of [[1,0],[-1,0],[0,1],[0,-1]]){const x=X+dx,y=Y+dy,q=y*nx+x;if(x<0||x>=nx||y<0||y>=ny||seen.has(q)||map.rects.some(r=>hits(2+x*h,-51+y*h,.24,r)))continue;seen.add(q);queue.push(q);}}
++ for(const [x,y]of [[8,4],[8,-15],[5,-25],[18.5,-35.5],[8,-49]])assert.ok(seen.has(cell(x,y)),`Disconnected point ${x},${y}`);
++});
++test('chapel and keeper furnishings preserve boss, execution approach, exit and register',()=>{
++ for(const [kind,points]of [['chapel',[[8,7,.85],[8,8.3,.24],[8,14.1,.24],[8,17,.24]]],['keeper',[[8,7,.24],[8,12,.24]]]]){
++  const d=buildLastServiceDressing(kind);for(const [x,y,r]of points)assert.ok(!d.rects.some(o=>hits(x,y,r,o)),`Blocked ${kind} point ${x},${y}`);
++ }
++});
+--- /dev/null
++++ b/docs/last-service-presentation-update.md
+@@ -0,0 +1,46 @@
++# Last Service: Russian presentation and dressed prologue candidate
++
++## Scope
++One cohesive source patch for the existing prologue. No new combat mechanics,
++encounter order, input bindings or story endings. No changes to main, generated
++runtime files or automated acceptance reports during patch preparation.
++
++- Embedded Russian alphabet (including Yo), punctuation and carved title styling.
++- Existing composeCombatHud wired into Last Service with actual lamp/dash state.
++- Russian lamp/dash captions, enemy display names, room names and HTML shell.
++- Deterministic burial niches, pointed arches, standards, sarcophagi, benches,
++  archive shelves, writing tables, altar, processional cloth and votive lights.
++- Furniture footprints are installed before the door controller owns static
++  geometry. The previously repaired first doorway is not narrowed.
++- Chapel and keeper decoration preserves the collision array object.
++- Tall wall/decor faces become translucent only when projected over the hero.
++- Browser smoke now checks dialogue glyph coverage and HUD invocation; its
++  screenshot remains evidence for manual review, not automatic visual approval.
++
++## Local preparation checks
++13 source-level tests pass, covering Cyrillic/punctuation, bitmap output,
++determinism/finite geometry, key spawns and interactions, the reserved door sweep,
++static route/optional-loop connectivity, environment delegation, localized names,
++and view wiring. View wiring uses injected rendering/combat dependencies; it is
++not a browser render or a test of the entire real HUD compositor. The unchanged
++world-surface helper is tested using its exact repository contents.
++The original font fails the new Russian alphabet coverage test.
++Syntax checks pass for all 10 changed/new JS and MJS files.
++
++## Still required after integration
++npm run typecheck
++npm run build:prologue
++npm test
++node tools/run-last-service-core.mjs
++node tools/browser-check-last-service.mjs
++npm run test:browser
++
++The full build, compiled-core verifier, existing regression suite and Playwright
++have not been executed in this isolated preparation environment. Existing CI
++must confirm those results for the actual committed source SHA. Human visual
++acceptance remains false. Check both directions of the door, combat sight lines,
++optional loop, ritual, normal/finisher boss endings, keeper register, Russian text
++pages, HUD scale and legibility at the actual window size. A successful unit test
++is not proof that the new room compositions are visually accepted.
++
++The old integration workflows and their auto-commit policies are not changed.

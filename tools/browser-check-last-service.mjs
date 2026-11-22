@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {chromium} from 'playwright';
-const report={status:'running',scope:'portable entry, movement dialogue, actual light dialogue and frozen gameplay/input; not full-route visual acceptance',errors:[],humanVisualAcceptance:false};let browser,page;
+const report={status:'running',scope:'portable entry, movement dialogue, actual light dialogue, Russian glyph coverage, HUD invocation and frozen gameplay/input; not full-route visual acceptance',errors:[],humanVisualAcceptance:false};let browser,page;
 fs.mkdirSync('docs',{recursive:true});
 try{
  const file=path.resolve('LAST_SERVICE.html');if(!fs.existsSync(file))throw Error('Run npm run build:prologue first');
@@ -18,6 +18,12 @@ try{
  await page.keyboard.press('Digit1');await page.waitForTimeout(500);const after=await page.evaluate(()=>window.__ASH_LAST_SERVICE__.state());
  if(before.time!==after.time||before.x!==after.x||before.y!==after.y||after.action)throw Error('Dialogue did not freeze gameplay/input');
  const error=await page.evaluate(()=>window.__ASH_LAST_SERVICE_ERROR__??null);if(error)report.errors.push(error);if(report.errors.length)throw Error('Browser runtime errors');
+ report.presentation=await page.evaluate(()=>{
+  const p=window.__ASH_LAST_SERVICE_PRESENTATION__,d=window.__ASH_MANIFEST__.state().dialogue;
+  const text=d.speaker+' '+d.text;
+  return {language:p?.language,cyrillic:/[А-Яа-яЁё]/.test(text),glyphCoverage:p?.supportsText(text),hudFrames:p?.hudFrames()??0};
+ });
+ if(report.presentation.language!=='ru'||!report.presentation.cyrillic||!report.presentation.glyphCoverage||report.presentation.hudFrames<1)throw Error('Russian glyph coverage or existing HUD integration failed');
  report.status='intro-dialogue-smoke-passed';
 }catch(error){report.status='failed';report.errors.push(String(error.stack??error));process.exitCode=1;}
 finally{

@@ -1,3 +1,5 @@
+// LAST_SERVICE_THRESHOLDS_PASS4
+// LAST_SERVICE_INTERIOR_PASS2
 import {createMotion} from '../animation/motion.js';
 import {CombatWorld} from '../game/combat-world.js';
 import {combatHero} from '../animation/combat-hero.js';
@@ -13,18 +15,27 @@ import {findCombatLights} from '../game/combat-light-context.js';
 import {createLastServiceEntry,LAST_SERVICE_DOOR} from '../levels/last-service-entry.js';
 import {createLastServiceSegment} from '../game/last-service-segment.js';
 import {createLastServiceRoute} from '../game/last-service-route.js';
+import {lastServiceChapelStatus} from '../game/last-service-chapel-entry.js';
 import {createLastServiceStory,createKeeperScene,storyBookParts} from '../game/last-service-story.js';
 import {createLastServiceFinale} from '../game/last-service-finale.js';
+import {dressLastServiceScene} from '../levels/last-service-dressing.js';
 import {createLastServiceView} from './last-service-view.js';
 import {installManifest} from '../ui/relic.js';
+import {createLastServiceLoadingScreen} from '../ui/last-service-loading-screen.js';
+import {installLastServiceTestPanel,lastServiceTestEnabled,LAST_SERVICE_TEST_ROOMS} from '../ui/last-service-test-panel.js';
 const cv=document.getElementById('game'),view=createLastServiceView(cv);
 const {doorScene,env}=createLastServiceEntry(createCombatDoorScene,createCombatDoorEnvironment);
 const makeWorld=map=>new CombatWorld(map,s=>combatHero(s).tip);
 const world=makeWorld(doorScene.map),segment=createLastServiceSegment(),route=createLastServiceRoute(segment.tutorial),story=createLastServiceStory(),keys=new Set(),commands=[];
 let paused=false,intent=null,pointer=null,last=null,acc=0,manifest,terminal=false,stopped=false,welcome=true,finale=null,pendingLesson=null,victoryShown=false,keeperShown=false;
+let devRoomMode=false;
 const actor=()=>finale?.world??world;
+const loading=createLastServiceLoadingScreen({captureHero(){
+ const source=actor().snapshot(),s={...source,phase:'playing',lamp:100,action:null,dash:null,execution:null,interaction:null,interactionAnimation:null,sweepProgress:null,hitReaction:0,moving:false,motion:createMotion(0,-1)};
+ return {anchor:{x:s.x,y:s.y},frame:combatHero(s)};
+},onEnter(){clear();controller.cancel('transition');},onClose(){clear();last=null;acc=0;cv.focus();}});
 const clear=()=>{keys.clear();commands.length=0;intent=null;};
-const blocked=()=>paused||document.hidden||segment.snapshot().intro||!!story.snapshot()||finale?.snapshot().done||segment.tutorial.snapshot().blocksWorld||manifest?.blocking();
+const blocked=()=>loading.active()||paused||document.hidden||(!devRoomMode&&segment.snapshot().intro)||!!story.snapshot()||finale?.snapshot().done||(!devRoomMode&&segment.tutorial.snapshot().blocksWorld)||manifest?.blocking();
 const nearestDoor=()=>Math.hypot(world.current.x-8,world.current.y-11.5)<2.5?doorScene.getTarget(LAST_SERVICE_DOOR):null;
 const targeting={intent:()=>intent,current:nearestDoor,cancelIntent:()=>{intent=null;}};
 const controller=createCombatDoorController({world,scene:doorScene,targeting,active:()=>!finale&&!blocked()}),lighting=findCombatLights(doorScene);
@@ -40,7 +51,8 @@ function closeRegister(){
  objective('last-service-complete','Служба прекращена. Причина молчания не установлена.');
  window.__ASH_MANIFEST__.openReading({id:'last-register',title:'ПОСЛЕДНИЙ РЕЕСТР',text:'Последняя служба проведена в полном составе.\n\nИмена совпадают с надписями на погребальных нишах. В отчёте все они отмечены как очищенные.\n\nСлужба прекращена. Причина молчания не установлена.'});
 }
-function reset(retry=false){
+function reset(retry=false,keepLoading=false){
+ if(!keepLoading)loading.cancel();devRoomMode=false;
  manifest.dismiss();controller.cancel('reset');doorScene.reset();world.reset();shrine.reset();route.reset();story.reset({keepPlayed:retry});
  finale=null;pendingLesson=null;victoryShown=false;keeperShown=false;
  Object.assign(world.current,{x:8,y:18.2,cameraX:8,cameraY:18.2,fx:-.6,fy:-.8,motion:createMotion(-.6,-.8),note:'Последняя служба'});
@@ -49,11 +61,13 @@ function reset(retry=false){
  objective('last-service-route','Пройти погребальное крыло до нижней часовни.');cv.focus();
 }
 const idle=()=>{const s=actor().current;return !s.action&&s.sweepProgress===null&&!s.dash&&!s.interaction&&!s.execution;};
+const chapelStatus=()=>lastServiceChapelStatus({s:world.current,route:route.snapshot(),tutorial:segment.tutorial.snapshot(),blocked:blocked(),idle:idle(),hasFinale:!!finale});
 function updateRoute(){
+ if(devRoomMode){if(!finale&&world.current.phase==='won'){world.current.phase='playing';world.previous=world.snapshot();}return;}
  if(finale)return;
  const s=world.current;route.observe(s);if(s.phase==='won'){s.phase='playing';world.previous=world.snapshot();}
  if(blocked()||s.phase!=='playing'||!idle())return;
- if(route.snapshot().finished&&s.y<-48){
+ if(route.snapshot().finished&&chapelStatus().near){
   if(segment.tutorial.enter('boss')){dialogue(segment.tutorial.snapshot().dialogue);return;}
   objective('last-service-threshold','F — войти в нижнюю часовню. Можно вернуться к костру.');return;
  }
@@ -85,6 +99,7 @@ function step(dt){
 function frame(now){
  if(stopped)return;
  try{
+  if(loading.active()){last=now;acc=0;clear();loading.paint(now);requestAnimationFrame(frame);return;}
   const dt=last===null?0:Math.min(.1,(now-last)/1000);last=now;
   if(!paused&&!document.hidden)manifest.advance(now);
   segment.tick(dt,{paused:paused||document.hidden,modal:manifest.blocking()});story.tick(dt,{paused:paused||document.hidden||manifest.blocking()});
@@ -99,16 +114,21 @@ function frame(now){
   const current=actor().current;
   if(!terminal&&current.phase==='dead'){terminal=true;clear();window.__ASH_MANIFEST__.openDialogue({id:'death',speaker:'ОГОНЬ ПОГАС',text:'Повтори попытку. Прочитанные уроки сохраняются до полного перезапуска.'});}
   if(finale){const f=finale.frame();view.paint({...f,intro:{intro:false},manifest,paused,ready:actor().dashReady(),executionReady:actor().executionAvailable(),ritual:{parts:[],lights:[],hint:null},story:story.snapshot(),extra:f.chapter==='keeper'?storyBookParts(8,7):[]});}
-  else{const s=controller.decorate(world.snapshot());s.interactionAnimation=shrine.frame()??s.interactionAnimation;view.paint({s,intro:segment.snapshot(),env,manifest,paused,ready:world.dashReady(),executionReady:world.executionAvailable(),ritual:shrine.art(s,!blocked()),map:doorScene.map,story:story.snapshot(),extra:storyBookParts(8,-25)});}
+  else{const s=controller.decorate(world.snapshot());s.interactionAnimation=shrine.frame()??s.interactionAnimation;view.paint({s,intro:devRoomMode?{intro:false}:segment.snapshot(),env,manifest,paused,ready:world.dashReady(),executionReady:world.executionAvailable(),ritual:shrine.art(s,!blocked()),map:doorScene.map,story:story.snapshot(),extra:storyBookParts(8,-25),gate:chapelStatus()});}
   requestAnimationFrame(frame);
  }catch(error){stopped=true;window.__ASH_LAST_SERVICE_ERROR__=String(error.stack??error);document.getElementById('status').textContent='Ошибка: '+error.message;console.error(error);}
 }
 function enterChapel(){
  const s=world.current;
- if(finale||s.phase!=='playing'||!route.snapshot().finished||s.y>=-48||!segment.tutorial.snapshot().read.includes('boss')||!idle()||s.hitReaction>0||(s.arrows??[]).length)return false;
+ const gate=chapelStatus();
+ if(!gate.near)return false;
+ if(gate.reason==='lesson'){if(segment.tutorial.enter('boss'))dialogue(segment.tutorial.snapshot().dialogue);return true;}
+ if(!gate.ready){objective('last-service-threshold-blocked',gate.text);return true;}
  clear();controller.cancel('chapel-entry');
- finale=createLastServiceFinale(s,{createWorld:makeWorld,createArena:createGolemTrialScene,createKeeper:createKeeperScene,capture:captureGolemLoadout,restore:restoreGolemLoadout});
- story.play('awakening');objective('last-service-boss','Прекратить службу. Уничтожить трупного голема.');return true;
+ return loading.start('chapel',()=>{
+ finale=createLastServiceFinale(s,{createWorld:makeWorld,createArena:()=>dressLastServiceScene(createGolemTrialScene(),'chapel'),createKeeper:createKeeperScene,capture:captureGolemLoadout,restore:restoreGolemLoadout,transition:(id,load)=>loading.start(id,load)});
+ story.play('awakening');objective('last-service-boss','Прекратить службу. Уничтожить трупного голема.');
+ });
 }
 function pressBook(){
  const keeper=finale?.snapshot().chapter==='keeper';if(finale&&!keeper)return false;
@@ -133,6 +153,21 @@ window.addEventListener('keyup',e=>keys.delete(e.code));window.addEventListener(
 document.addEventListener('visibilitychange',()=>{if(document.hidden){paused=true;clear();last=null;}});
 cv.addEventListener('pointermove',e=>{const r=cv.getBoundingClientRect();pointer={x:(e.clientX-r.left)*1008/r.width,y:(e.clientY-r.top)*864/r.height};});cv.addEventListener('contextmenu',e=>e.preventDefault());
 cv.addEventListener('pointerdown',e=>{cv.focus();if(e.defaultPrevented||blocked()||![0,2].includes(e.button))return;e.preventDefault();if(commands.length<8)commands.push({kind:e.button===0?'light':'heavy',aim:view.aim(pointer)});});
-document.getElementById('retry').addEventListener('click',()=>reset(true));document.getElementById('new-game').addEventListener('click',()=>reset(false));
-window.__ASH_LAST_SERVICE__=Object.freeze({state:()=>actor().snapshot(),tutorial:()=>segment.tutorial.snapshot(),scene:()=>segment.snapshot(),story:()=>story.snapshot(),finale:()=>finale?.snapshot()??null,route:()=>route.snapshot(),doors:()=>doorScene.snapshot(),lights:()=>lighting.snapshot(),retry:()=>reset(true),restart:()=>reset(false)});
-reset();requestAnimationFrame(frame);
+document.getElementById('retry').addEventListener('click',()=>loading.start('wing',()=>reset(true,true)));document.getElementById('new-game').addEventListener('click',()=>loading.start('wing',()=>reset(false,true)));
+window.__ASH_LAST_SERVICE__=Object.freeze({state:()=>actor().snapshot(),tutorial:()=>segment.tutorial.snapshot(),scene:()=>segment.snapshot(),story:()=>story.snapshot(),finale:()=>finale?.snapshot()??null,chapel:chapelStatus,route:()=>route.snapshot(),doors:()=>doorScene.snapshot(),lights:()=>lighting.snapshot(),loading:()=>loading.snapshot(),testMode:()=>devRoomMode,retry:()=>reset(true),restart:()=>reset(false)});
+function testJumpRoom(id){
+ if(!lastServiceTestEnabled(window.location))return false;
+ const target=LAST_SERVICE_TEST_ROOMS[id];if(!target)throw Error('Unknown test room');
+ return loading.start(target.art,()=>{
+  reset(false,true);devRoomMode=true;welcome=false;pendingLesson=null;terminal=false;victoryShown=true;keeperShown=true;
+  if(id==='chapel'||id==='keeper'){
+   finale=createLastServiceFinale(world.current,{createWorld:makeWorld,createArena:()=>dressLastServiceScene(createGolemTrialScene(),'chapel'),createKeeper:createKeeperScene,capture:captureGolemLoadout,restore:restoreGolemLoadout,startChapter:id==='chapel'?'boss':'keeper',transition:(name,load)=>loading.start(name,load)});
+   if(id==='chapel')story.play('awakening');
+  }else{
+   Object.assign(world.current,{x:target.x,y:target.y,cameraX:target.x,cameraY:target.y,phase:'playing'});world.previous=world.snapshot();
+  }
+  objective('last-service-test','ТЕСТОВЫЙ ОСМОТР: '+target.label+'. Для проверки прохождения начни игру заново.');
+ });
+}
+installLastServiceTestPanel({jump:testJumpRoom,preview:id=>loading.start(id,()=>{},{preview:true}),restart:()=>loading.start('wing',()=>reset(false,true))});
+reset();loading.start('wing',()=>{});requestAnimationFrame(frame);
