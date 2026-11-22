@@ -1,3 +1,4 @@
+import {createInteractionStamp} from './interaction-stamp.js';
 import {FIRE_RULES,ignitionMethod,unlitFireHint} from '../interaction/fire-rules.js';
 const finitePoint=p=>Array.isArray(p)&&p.length===3&&p.every(Number.isFinite);
 const depth=(v,kind)=>v.reduce((s,p)=>s+p[0]+p[1]+p[2]*.006,0)/v.length+(kind===2?.01:.005);
@@ -13,7 +14,7 @@ export function createFireHintParts({sources=[],hover=null,time=0,project,lamp={
  }
  if(hover&&hover.availability==='ready'&&hover.enabled!==false&&hover.visible!==false&&!hover.removed){const method=hover.kind==='door'?'lantern':ignitionMethod(hover.modelId);let anchor=hover.contactPoint;
   if(!finitePoint(anchor)){const vertices=hover.parts?.flatMap(p=>p.v)??[];if(vertices.length)anchor=[vertices.reduce((n,p)=>n+p[0],0)/vertices.length,vertices.reduce((n,p)=>n+p[1],0)/vertices.length,Math.max(...vertices.map(p=>p[2]))];}
-  if(method&&finitePoint(anchor))add(hover.id,3,[[anchor[0],anchor[1],anchor[2]+.38]],{text:method==='sparks'?'E':'F',size:12,alpha:.95,actionLabel:true,effectKind:'action-label'});
+  if(method&&finitePoint(anchor)){const point=[anchor[0],anchor[1],anchor[2]+.38];if(method==='sparks')add(hover.id,3,[point],{text:'E',size:12,alpha:.95,actionLabel:true,effectKind:'action-label'});else parts.push(...createInteractionStamp(point,{sourceId:hover.id,project}));}
  }
  return parts;
 }
