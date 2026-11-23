@@ -1,0 +1,43 @@
+name: World appearance update 1
+on:
+  push:
+    branches: [world-appearance-update-1]
+  pull_request:
+    paths: ['src/**', 'tests/**', 'tools/**', 'public/**', 'package*.json', 'tsconfig.json', '.github/workflows/world-appearance-update-1.yml']
+permissions:
+  contents: read
+concurrency:
+  group: world-appearance-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  world-appearance-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Type check
+        run: npm run typecheck
+      - name: Build PLAY.html
+        run: npm run build
+      - name: Unit tests (npm test)
+        run: npm test
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Browser smoke test
+        run: npm run test:browser
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: world-appearance-${{ github.sha }}
+          if-no-files-found: warn
+          path: |
+            PLAY.html
+            docs/typecheck.json
+            docs/*browser*.json
+            docs/*browser*.png
