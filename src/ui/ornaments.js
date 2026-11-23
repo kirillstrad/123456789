@@ -1,6 +1,16 @@
 import {throneMenu} from './bright-throne-menu.js';
+import {createSceneHost} from '../app/scene-host.js';
 export function makeUI(out,glyph){
  document.documentElement.dataset.ashMenu='throne';
+ const live=()=>window.__ASH_ITERATION_2__,previous=window.__ASH_SCENES__;
+ const host=createSceneHost({onEnter(){
+  const api=live();if(typeof api?.pause!=='function')throw Error('Main game API is not ready');
+  const width=out.canvas.width,height=out.canvas.height;api.pause();
+  return ()=>{out.canvas.width=width;out.canvas.height=height;window.__ASH_THRONE__?.open?.();const EventClass=window.Event??globalThis.Event;if(typeof window.dispatchEvent==='function'&&typeof EventClass==='function')window.dispatchEvent(new EventClass('resize'));out.canvas.focus?.();};
+ }});
+ const scenes=Object.freeze({register:host.register,list:host.list,current:host.current,start:id=>host.start(id,{canvas:out.canvas,out}),exit:host.exit});window.__ASH_SCENES__=scenes;
+ const menuApi={mode:()=>host.active()?'scene':live().mode(),state:()=>live().state(),start:()=>live().start(),resume:()=>live().resume(),pause:()=>live().pause()};
+
  const ui=document.createElement('canvas'),hudView=document.createElement('canvas');
  ui.width=1008;ui.height=864;hudView.width=1008;hudView.height=144;
  const u=ui.getContext('2d',{willReadFrequently:true}),h=hudView.getContext('2d');let lampLife=100;
@@ -19,5 +29,5 @@ export function makeUI(out,glyph){
   if(warning)uiText(warning,504,113,11,'#bfbfbf');
   h.drawImage(ui,0,0,1008,144,0,0,1008,144);glyph(hudView,196,28,720,144,true,true);
  }
- return{menu(){throneMenu(out,window.__ASH_ITERATION_2__);},hud(lamp){lampLife=Number.isFinite(lamp)?Math.max(0,Math.min(100,lamp)):0;drawHUD();}};
+ return{menu(){if(!live())return;if(host.active()){try{host.frame(performance.now());return;}catch(error){window.__ASH_SCENE_ERROR__=String(error.stack??error);const status=document.getElementById('status');if(status)status.textContent='Ошибка сцены: '+error.message;}}throneMenu(out,menuApi);},hud(lamp){lampLife=Number.isFinite(lamp)?Math.max(0,Math.min(100,lamp)):0;drawHUD();},dispose(){try{host.dispose();}finally{if(window.__ASH_SCENES__===scenes){if(previous===undefined)delete window.__ASH_SCENES__;else window.__ASH_SCENES__=previous;}}}};
 }

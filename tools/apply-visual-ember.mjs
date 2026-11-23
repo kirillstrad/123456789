@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import {reconcileFirePresentation} from './visual-ember-fire-migration.mjs';
 const main='src/app/main.js',marker='// VISUAL_EMBER_ASCII_V1',pending=new Map(),read=p=>pending.get(p)??fs.readFileSync(p,'utf8');
 function edit(p,a,b,count=1){const s=read(p);if(s.split(a).length-1!==count)throw Error('Unexpected visual context: '+p+' / '+a.slice(0,70));pending.set(p,s.split(a).join(b));}
 function ensure(p,a,b){if(!read(p).includes(b))edit(p,a,b);}
@@ -7,8 +8,6 @@ if(!read(main).includes(marker)){
  if(source.split(anchor).length!==2)throw Error('Unexpected HP painter context');pending.set(hp,source.slice(0,source.indexOf(anchor))+"export {paintAsciiEnemyHealth as paintEnemyHealth} from './enemy-health-ascii.js';\n");
  edit('src/render/hero-backdrop.js','strength=.13','strength=.15');
  edit('src/render/hero-appearance.ts','return [139,129,117].map((n,i)=>Math.round((n+([200,185,158][i]!-n)*lift)*shade));','return [148,139,126].map((n,i)=>Math.round((n+([222,208,178][i]!-n)*lift)*shade));');
- edit('src/render/fire-presentation.js','c:[255,166,78]','c:[243,161,59]');
- edit('src/render/fire-presentation.js','c:[255,245,220]','c:[255,208,120]');
  edit('src/render/fire-feedback.js','c:[205,232,255]','c:[243,161,59]');
  edit(main,'v:l.power}))','v:l.power,fireWarmth:l.fireWarmth??0}))');
  edit(main,'...(ritualArt?.lights??[])','...(ritualArt?.lights??[]).map(l=>({...l,fireWarmth:1}))');
@@ -34,6 +33,9 @@ ensure(main,'fireWarmth:l.fireWarmth??0','fireWarmth:fireWarmthOf(l)');
 const feedback='tests/package-two-fire-feedback.test.mjs';
 ensure(feedback,'one persistent cool wisp and wick remain visible without lantern illumination','one persistent amber wisp and wick remain visible without lantern illumination');
 ensure(feedback,'p.c[2]>p.c[0]','p.c[0]>p.c[1]&&p.c[1]>p.c[2]&&p.c.every((n,i)=>n===[243,161,59][i])');
-ensure('tests/package-two-fire-presentation.test.mjs','assert.ok(flames.some(p=>p.kind===2&&p.c[1]===245));','assert.ok(flames.some(p=>p.kind===2&&p.c.every((n,i)=>n===[255,208,120][i])));assert.ok(flames.every(p=>p.c[0]>p.c[1]&&p.c[1]>p.c[2]));');
+const fireSource='src/render/fire-presentation.js',fireTest='tests/package-two-fire-presentation.test.mjs';
+const reconciled=reconcileFirePresentation(read(fireSource),read(fireTest));
+if(reconciled.renderer!==read(fireSource))pending.set(fireSource,reconciled.renderer);
+if(reconciled.test!==read(fireTest))pending.set(fireTest,reconciled.test);
 for(const[p,s]of pending)fs.writeFileSync(p,s);
 console.log('Visual patch prepared or repaired; light identities preserved and amber assertions updated. Full verification required.');

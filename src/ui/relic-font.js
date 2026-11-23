@@ -1,3 +1,4 @@
+import {relicCyrillic} from './relic-cyrillic.js';
 // Original embedded bitmap alphabet: no remote font, OS font or canvas text dependency.
 const alphabet={
  A:'01110/11011/11011/11111/11011/11011/11011',B:'11110/11011/11011/11110/11011/11011/11110',
@@ -29,11 +30,12 @@ const alphabet={
  '<':'00001/00010/00100/01000/00100/00010/00001','=':'00000/00000/11111/00000/11111/00000/00000',
  ' ':'00000/00000/00000/00000/00000/00000/00000'
 };
+Object.assign(alphabet,relicCyrillic);
 export const relicAlphabet=Object.freeze(Object.fromEntries(Object.entries(alphabet).map(([k,v])=>[k,Object.freeze(v.split('/'))])));
-export const relicMeasure=(text,scale=1)=>String(text).length*6*scale;
+export const relicMeasure=(text,scale=1)=>String(text).normalize('NFC').length*6*scale;
 export function relicLetters(ctx,text,x,y,scale=1,title=false){
  const sy=scale*(title?1.25:1);
- for(const ch of String(text).toUpperCase()){
+ for(const ch of String(text).normalize('NFC').toUpperCase()){
   const glyph=relicAlphabet[ch]??relicAlphabet['?'];
   glyph.forEach((row,j)=>{for(let i=0;i<5;i++)if(row[i]==='1'){
    ctx.fillRect(x+i*scale,y+j*sy,scale*.91,sy*.94);
@@ -42,3 +44,4 @@ export function relicLetters(ctx,text,x,y,scale=1,title=false){
   x+=6*scale;
  }
 }
+export const relicUnsupportedCharacters=text=>[...new Set([...String(text).normalize('NFC').toUpperCase()].filter(c=>!/[\r\n\t]/.test(c)&&!Object.hasOwn(relicAlphabet,c)))];
