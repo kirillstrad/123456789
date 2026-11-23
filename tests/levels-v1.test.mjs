@@ -56,7 +56,7 @@ test('levels submenu dispatches both IDs and does not launch the object gallery 
  for(const [index,id]of [[0,'test-chamber'],[1,'ashen-nave']]){const h=menuHarness(index);assert.deepEqual(h.starts,[id]);assert.equal(h.result.s.hasRun,true);assert.equal(h.result.s.page,'main');assert.equal(h.result.gallery,0);}
 });
 test('object gallery remains the third choice and back remains nonlaunching',()=>{
- const a=menuHarness(2);assert.equal(a.result.gallery,1);assert.equal(a.starts.length,0);const b=menuHarness(3);assert.equal(b.result.s.page,'main');assert.equal(b.starts.length,0);
+ const a=menuHarness(2);assert.equal(a.result.gallery,1);assert.equal(a.starts.length,0);const b=menuHarness(4);assert.equal(b.result.s.page,'main');assert.equal(b.starts.length,0);
 });
 test('missing level runtime shows a notice instead of starting the wrong scene',()=>{
  const h=menuHarness(1,{available:false});assert.equal(h.result.s.page,'notice');assert.equal(h.result.s.hasRun,false);assert.equal(h.starts.length,0);

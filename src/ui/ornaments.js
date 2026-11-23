@@ -1,5 +1,6 @@
 import {throneMenu} from './bright-throne-menu.js';
 import {createSceneHost} from '../app/scene-host.js';
+import {mountLastService} from '../app/last-service-mounted.js';
 export function makeUI(out,glyph){
  document.documentElement.dataset.ashMenu='throne';
  const live=()=>window.__ASH_ITERATION_2__,previous=window.__ASH_SCENES__;
@@ -8,6 +9,7 @@ export function makeUI(out,glyph){
   const width=out.canvas.width,height=out.canvas.height;api.pause();
   return ()=>{out.canvas.width=width;out.canvas.height=height;window.__ASH_THRONE__?.open?.();const EventClass=window.Event??globalThis.Event;if(typeof window.dispatchEvent==='function'&&typeof EventClass==='function')window.dispatchEvent(new EventClass('resize'));out.canvas.focus?.();};
  }});
+ host.register('last-service',({canvas,exit})=>mountLastService({canvas,hosted:true,onExit:exit}));
  const scenes=Object.freeze({register:host.register,list:host.list,current:host.current,start:id=>host.start(id,{canvas:out.canvas,out}),exit:host.exit});window.__ASH_SCENES__=scenes;
  const menuApi={mode:()=>host.active()?'scene':live().mode(),state:()=>live().state(),start:()=>live().start(),resume:()=>live().resume(),pause:()=>live().pause()};
 

@@ -11,10 +11,16 @@ const entries=walk('runtime').filter(p=>p.endsWith('.js')&&!p.split(path.sep).in
  function visit(node){if(ts.isCallExpression(node)&&ts.isIdentifier(node.expression)&&node.expression.text==='require'){if(node.arguments.length!==1||!ts.isStringLiteral(node.arguments[0]))throw Error('Dynamic require in '+id);dependencies.push(node.arguments[0].text);}ts.forEachChild(node,visit);}visit(source);
  return {id,code,dependencies};
 });
-const bundle=portableBundle(entries),template=fs.readFileSync('src/app/last-service.html','utf8');
-const vendor='<script src="./vendor/hero.js"></script>',entry='<script type="module" src="./app/last-service.js"></script>';
+const bundle=portableBundle(entries,'app/last-service-standalone.js'),template=fs.readFileSync('src/app/last-service.html','utf8');
+const vendor='<script src="./vendor/hero.js"></script>',entry='<script type="module" src="./app/last-service-standalone.js"></script>';
 if(template.split(vendor).length!==2||template.split(entry).length!==2)throw Error('Last Service HTML entry contract changed');
 const html=template.replace(vendor,()=>inlineScript(fs.readFileSync('public/vendor/hero.js','utf8'))).replace(entry,()=>inlineScript(bundle));
 if(/<script[^>]*src=/.test(html))throw Error('Portable HTML has external scripts');
 fs.writeFileSync('runtime/last-service.html',template);fs.writeFileSync('LAST_SERVICE.html',html);
 console.log('Last Service portable candidate created; gameplay acceptance pending');
+
+const hostedTemplate=fs.readFileSync('runtime/index.html','utf8'),mainEntry='<script type="module" src="./app/main.js"></script>';
+if(hostedTemplate.split(vendor).length!==2||hostedTemplate.split(mainEntry).length!==2)throw Error('Hosted test HTML entry contract changed');
+const hosted=hostedTemplate.replace(vendor,()=>inlineScript(fs.readFileSync('public/vendor/hero.js','utf8'))).replace(mainEntry,()=>inlineScript(portableBundle(entries,'app/last-service-hosted-test.js')));
+if(/<script[^>]*src=/.test(hosted))throw Error('Hosted portable HTML has external scripts');
+fs.writeFileSync('LAST_SERVICE_HOSTED_TEST.html',hosted);
