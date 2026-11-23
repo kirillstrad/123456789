@@ -18,9 +18,3 @@ const html=template.replace(vendor,()=>inlineScript(fs.readFileSync('public/vend
 if(/<script[^>]*src=/.test(html))throw Error('Portable HTML has external scripts');
 fs.writeFileSync('runtime/last-service.html',template);fs.writeFileSync('LAST_SERVICE.html',html);
 console.log('Last Service portable candidate created; gameplay acceptance pending');
-
-const hostedTemplate=fs.readFileSync('runtime/index.html','utf8'),mainEntry='<script type="module" src="./app/main.js"></script>';
-if(hostedTemplate.split(vendor).length!==2||hostedTemplate.split(mainEntry).length!==2)throw Error('Hosted test HTML entry contract changed');
-const hosted=hostedTemplate.replace(vendor,()=>inlineScript(fs.readFileSync('public/vendor/hero.js','utf8'))).replace(mainEntry,()=>inlineScript(portableBundle(entries,'app/last-service-hosted-test.js')));
-if(/<script[^>]*src=/.test(hosted))throw Error('Hosted portable HTML has external scripts');
-fs.writeFileSync('LAST_SERVICE_HOSTED_TEST.html',hosted);
